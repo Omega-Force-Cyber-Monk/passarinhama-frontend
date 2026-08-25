@@ -1,0 +1,136 @@
+import type { SerializedError } from "@reduxjs/toolkit";
+import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
+
+type TranslationParams = Record<string, string | number>;
+type TranslateFn = (_key: string, _params?: TranslationParams) => string;
+
+type BackendErrorPayload = {
+  detail?: unknown;
+  message?: unknown;
+  error?: unknown;
+  non_field_errors?: unknown;
+};
+
+const DEFAULT_ERROR_MESSAGE = "Something went wrong";
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const isFetchBaseQueryError = (error: unknown): error is FetchBaseQueryError =>
+  isObject(error) && "status" in error;
+
+const isSerializedError = (error: unknown): error is SerializedError =>
+  isObject(error) &&
+  ("message" in error || "code" in error || "name" in error || "stack" in error);
+
+const parsePayloadString = (value: string) => {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return undefined;
+  }
+
+  try {
+    const parsedValue = JSON.parse(trimmedValue);
+    return isObject(parsedValue) ? (parsedValue as BackendErrorPayload) : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const collectMessage = (value: unknown): string | undefined => {
+  if (typeof value === "string") {
+    const trimmedValue = value.trim();
+
+    if (!trimmedValue) {
+      return undefined;
+    }
+
+    const parsedValue = parsePayloadString(trimmedValue);
+    if (parsedValue) {
+      return collectMessage(parsedValue);
+    }
+
+    return trimmedValue;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const message = collectMessage(item);
+      if (message) {
+        return message;
+      }
+    }
+
+    return undefined;
+  }
+
+  if (!isObject(value)) {
+    return undefined;
+  }
+
+  return (
+    collectMessage(value.detail) ||
+    collectMessage(value.message) ||
+    collectMessage(value.error) ||
+    collectMessage(value.non_field_errors)
+  );
+};
+
+const getErrorPayload = (error: unknown): BackendErrorPayload | undefined => {
+  if (!isFetchBaseQueryError(error)) {
+    return undefined;
+  }
+
+  if (isObject(error.data)) {
+    return error.data as BackendErrorPayload;
+  }
+
+  if (typeof error.data === "string") {
+    return parsePayloadString(error.data);
+  }
+
+  return undefined;
+};
+
+export const getApiErrorDetail = (error: unknown) => {
+  const payloadMessage = collectMessage(getErrorPayload(error));
+
+  if (payloadMessage) {
+    return payloadMessage;
+  }
+
+  if (isFetchBaseQueryError(error)) {
+    return "error" in error ? collectMessage(error.error) : undefined;
+  }
+
+  if (isSerializedError(error)) {
+    return collectMessage(error.message);
+  }
+
+  return undefined;
+};
+
+export const getApiErrorStatus = (error: unknown) => {
+  if (isFetchBaseQueryError(error)) {
+    return error.status;
+  }
+
+  if (isSerializedError(error) && typeof error.code === "string") {
+    return error.code;
+  }
+
+  return undefined;
+};
+
+export const getApiErrorMessage = (
+  error: unknown,
+  _translate: TranslateFn,
+  _fallback?: string | { fallbackKey?: string; context?: string },
+) => getApiErrorDetail(error) || DEFAULT_ERROR_MESSAGE;
+
+export const getApiErrorDisplayMessage = (
+  error: unknown,
+  _translate: TranslateFn,
+  _fallback?: string | { fallbackKey?: string; context?: string },
+) => getApiErrorDetail(error) || DEFAULT_ERROR_MESSAGE;

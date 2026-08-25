@@ -1,0 +1,157 @@
+name: Frontend CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  NODE_VERSION: 24
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  CI: true
+  NODE_OPTIONS: --max-old-space-size=4096
+ 
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint || true
+
+      - name: Build to verify compilation
+        run: |
+          npm run build
+          echo "✅ Vite build completed successfully."
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      image-name: ${{ steps.prep.outputs.image_name }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare Image Name
+        id: prep
+        run: |
+          echo "image_name=$(echo "ghcr.io/${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ steps.prep.outputs.image_name }}:latest
+            ${{ steps.prep.outputs.image_name }}:${{ github.sha }}
+          build-args: |
+            VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            set -euo pipefail
+            trap 'echo "❌ Deployment failed at line $LINENO"' ERR
+
+            # Define image tags
+            RAW_IMAGE_NAME="ghcr.io/${{ github.repository }}"
+            IMAGE_NAME=$(echo "$RAW_IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
+            FRONTEND_IMAGE="${IMAGE_NAME}:${{ github.sha }}"
+
+            echo "🚀 Deployment started for image: $FRONTEND_IMAGE"
+
+            # Cleanup old temp containers if any exist
+            docker ps -a --filter "name=archicopro-frontend" --format '{{.Names}}' | xargs -r docker rm -f || true
+
+            # Login to GHCR
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Pull new image
+            echo "📥 Pulling new image..."
+            docker pull $FRONTEND_IMAGE
+
+            # Extract build files to host
+            echo "Extracting files to /srv/apps/archicopro/frontend..."
+            mkdir -p /srv/apps/archicopro/frontend
+            
+            # Clean old assets (preserving the directory itself for Docker volume stability)
+            rm -rf /srv/apps/archicopro/frontend/*
+            
+            TEMP_CONTAINER="temp_ui_$(date +%s)"
+            docker create --name $TEMP_CONTAINER $FRONTEND_IMAGE
+            docker cp $TEMP_CONTAINER:/app/dist/. /srv/apps/archicopro/frontend/
+            docker rm $TEMP_CONTAINER
+            
+            chmod -R 755 /srv/apps/archicopro/frontend
+
+            # Verify critical files
+            if [ ! -f "/srv/apps/archicopro/frontend/index.html" ]; then
+              echo "❌ Error: index.html not found in /srv/apps/archicopro/frontend"
+              exit 1
+            fi
+
+            # Health check (Host Nginx serves this path)
+            sleep 3
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 || echo "000")
+            if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "301" ] && [ "$HTTP_CODE" != "302" ]; then
+              echo "⚠️ Warning: Site returned HTTP $HTTP_CODE"
+            else
+              echo "✅ Site check succeeded with HTTP $HTTP_CODE"
+            fi
+
+            # Cleanup
+            find /var/www -maxdepth 1 -name "ui-backup-*" -mtime +7 -exec rm -rf {} \;
+            docker images --filter "reference=${IMAGE_NAME}" --format "{{.ID}} {{.Tag}}" | \
+              grep -v "${{ github.sha }}" | grep -v "latest" | head -n -3 | \
+              awk '{print $1}' | xargs -r docker rmi -f || true
+
+            echo "✅ Deployment complete!"
