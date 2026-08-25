@@ -94,6 +94,8 @@ export interface AdminBackupDirectory {
   path: string;
   exists: boolean;
   writable: boolean;
+  backend?: string;
+  api_access?: string;
 }
 
 export interface AdminBackupItem {
@@ -123,6 +125,11 @@ export interface UpdateAdminBackupConfigurationRequest {
 export interface DeleteAdminBackupResponse {
   status: string;
   message?: string;
+}
+
+export interface AdminBackupDirectoryActionResponse extends AdminBackupDirectory {
+  status: string;
+  detail?: string;
 }
 
 export interface AdminFileDownloadResponse {

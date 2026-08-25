@@ -133,6 +133,8 @@ import {
   useGetAdminBackupsQuery,
   useUpdateAdminBackupConfigurationMutation,
   useRunAdminBackupMutation,
+  useTestAdminBackupPermissionsMutation,
+  useCreateAdminBackupDirectoryMutation,
   useDeleteAdminBackupMutation,
   useDownloadAdminBackupMutation,
 } from "../redux/features/admin/adminApi";
@@ -1061,6 +1063,14 @@ export default function AdminPanel() {
   ] = useUpdateAdminBackupConfigurationMutation();
   const [runAdminBackup, { isLoading: isRunningBackup }] =
     useRunAdminBackupMutation();
+  const [
+    testAdminBackupPermissions,
+    { isLoading: isTestingBackupPermissions },
+  ] = useTestAdminBackupPermissionsMutation();
+  const [
+    createAdminBackupDirectory,
+    { isLoading: isCreatingBackupDirectory },
+  ] = useCreateAdminBackupDirectoryMutation();
   const [deleteAdminBackup, { isLoading: isDeletingBackup }] =
     useDeleteAdminBackupMutation();
   const [downloadAdminBackup, { isLoading: isDownloadingBackup }] =
@@ -1706,6 +1716,24 @@ export default function AdminPanel() {
   const handleRunBackup = async () => {
     try {
       await runAdminBackup().unwrap();
+      notifySuccess();
+    } catch (err) {
+      notifyError(err);
+    }
+  };
+
+  const handleTestBackupPermissions = async () => {
+    try {
+      await testAdminBackupPermissions().unwrap();
+      notifySuccess();
+    } catch (err) {
+      notifyError(err);
+    }
+  };
+
+  const handleCreateBackupDirectory = async () => {
+    try {
+      await createAdminBackupDirectory().unwrap();
       notifySuccess();
     } catch (err) {
       notifyError(err);
@@ -2806,11 +2834,11 @@ export default function AdminPanel() {
                   />
                 </label>
 
-                <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <button
                     type="submit"
                     disabled={isSavingBackupConfiguration || isLoadingBackups}
-                    className="rounded-2xl bg-slate-900 px-5 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white transition-all hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-2xl bg-slate-900 px-4 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-white transition-all hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSavingBackupConfiguration
                       ? translate("adminPanelPage.saving")
@@ -2820,11 +2848,31 @@ export default function AdminPanel() {
                     type="button"
                     onClick={handleRunBackup}
                     disabled={isRunningBackup}
-                    className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-900 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-900 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isRunningBackup
                       ? translate("adminPanelPage.running")
                       : translate("adminPanelPage.runBackupNow")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleTestBackupPermissions}
+                    disabled={isTestingBackupPermissions}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-900 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isTestingBackupPermissions
+                      ? translate("adminPanelPage.testing")
+                      : translate("adminPanelPage.testBackupPermissions")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreateBackupDirectory}
+                    disabled={isCreatingBackupDirectory}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-900 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isCreatingBackupDirectory
+                      ? translate("adminPanelPage.creating")
+                      : translate("adminPanelPage.createBackupDirectory")}
                   </button>
                 </div>
               </form>
