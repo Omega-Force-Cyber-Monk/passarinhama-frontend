@@ -914,8 +914,6 @@
     "running": "Exécution...",
     "testBackupPermissions": "Tester les permissions",
     "testing": "Test...",
-    "createBackupDirectory": "Creer le dossier",
-    "creating": "Creation...",
     "backupFiles": "Fichiers de sauvegarde",
     "backupDirectoryLabel": "Dossier : {value}",
     "backupExistsLabel": "Existe : {value}",

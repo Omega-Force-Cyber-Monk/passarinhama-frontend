@@ -914,8 +914,6 @@
     "running": "Running...",
     "testBackupPermissions": "Test Permissions",
     "testing": "Testing...",
-    "createBackupDirectory": "Create Directory",
-    "creating": "Creating...",
     "backupFiles": "Backup Files",
     "backupDirectoryLabel": "Directory: {value}",
     "backupExistsLabel": "Exists: {value}",
