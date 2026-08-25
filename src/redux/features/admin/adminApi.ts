@@ -141,16 +141,6 @@ export const adminApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: [{ type: 'Admin', id: 'BACKUPS' }],
     }),
-    createAdminBackupDirectory: builder.mutation<
-      AdminBackupDirectoryActionResponse,
-      void
-    >({
-      query: () => ({
-        url: '/settings/admin/backups/create-directory',
-        method: 'POST',
-      }),
-      invalidatesTags: [{ type: 'Admin', id: 'BACKUPS' }],
-    }),
     deleteAdminBackup: builder.mutation<DeleteAdminBackupResponse, string>({
       query: (id) => ({
         url: `/settings/admin/backups/${id}`,
@@ -191,7 +181,6 @@ export const {
   useUpdateAdminBackupConfigurationMutation,
   useRunAdminBackupMutation,
   useTestAdminBackupPermissionsMutation,
-  useCreateAdminBackupDirectoryMutation,
   useDeleteAdminBackupMutation,
   useDownloadAdminBackupMutation,
 } = adminApi;
