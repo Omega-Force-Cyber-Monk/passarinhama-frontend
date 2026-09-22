@@ -60,6 +60,7 @@ import { usePermissions } from "../hooks/usePermissions";
 import {
   useGetUsersQuery,
   useDeleteUserMutation,
+  useSoftDeleteUserMutation,
   useRestoreUserMutation,
   useCreateUserMutation,
   useUpdateUserMutation,
@@ -107,6 +108,7 @@ import {
   useCreateEventMutation,
   useGetEventByIdQuery,
   useUpdateEventMutation,
+  useGetEventCategoriesQuery,
 } from "../redux/features/events/eventsApi";
 import {
   useGetAllTrainingsQuery,
@@ -116,6 +118,7 @@ import {
   useGetTrainingByIdQuery,
   useGetTrainingPermissionsQuery,
   useSetTrainingPermissionMutation,
+  useGetTrainingCategoriesQuery,
   buildTrainingFormData,
 } from "../redux/features/trainings/trainingsApi";
 import { TrainingRequest } from "../redux/features/trainings/trainingTypes";
@@ -204,11 +207,9 @@ interface EventEntity {
 interface TrainingEntity {
   id: string;
   title: string;
-  instructor: string;
   category: string;
-  status: "open" | "full" | "completed";
-  attendees: number;
-  max_attendees: number;
+  excerpt?: string;
+  status: "draft" | "pending" | "published";
 }
 
 type AdminTab =
@@ -226,6 +227,7 @@ const ROLE_PERMISSION_FEATURES = [
   "document",
   "event",
   "forum",
+  "technicopro",
   "training",
   "user",
 ] as const;
@@ -572,31 +574,14 @@ export default function AdminPanel() {
     }
   };
 
-  const getTrainingFormatLabel = (trainingFormat?: string | null) => {
-    switch (trainingFormat) {
-      case "online":
-        return translate("adminPanelPage.trainingFormats.online");
-      case "in_person":
-        return translate("adminPanelPage.trainingFormats.inPerson");
-      case "hybrid":
-        return translate("adminPanelPage.trainingFormats.hybrid");
-      default:
-        return (
-          trainingFormat || translate("adminPanelPage.fallbacks.notAvailable")
-        );
-    }
-  };
-
   const getTrainingStatusLabel = (status?: string | null) => {
     switch (status) {
-      case "open":
-        return translate("adminPanelPage.trainingStatuses.open");
-      case "full":
-        return translate("adminPanelPage.trainingStatuses.full");
-      case "completed":
-        return translate("adminPanelPage.trainingStatuses.completed");
-      case "cancelled":
-        return translate("adminPanelPage.trainingStatuses.cancelled");
+      case "published":
+        return translate("adminPanelPage.articleStatuses.published");
+      case "pending":
+        return translate("adminPanelPage.articleStatuses.pending");
+      case "draft":
+        return translate("adminPanelPage.articleStatuses.draft");
       default:
         return status || translate("adminPanelPage.fallbacks.notAvailable");
     }
@@ -660,6 +645,8 @@ export default function AdminPanel() {
         return translate("adminPanelPage.rolePermissions.features.event");
       case "forum":
         return translate("adminPanelPage.rolePermissions.features.forum");
+      case "technicopro":
+        return translate("adminPanelPage.rolePermissions.features.technicopro");
       case "training":
         return translate("adminPanelPage.rolePermissions.features.training");
       case "user":
@@ -695,6 +682,7 @@ export default function AdminPanel() {
     year: new Date().getFullYear(),
     month: new Date().getMonth() + 1,
   });
+  const { data: eventCategories = [] } = useGetEventCategoriesQuery();
   const { data: trainingsData } = useGetAllTrainingsQuery();
   const { data: userRolesData = [] } = useGetUserRolesQuery();
   const forumPermissionRoleOptions = React.useMemo(
@@ -742,6 +730,8 @@ export default function AdminPanel() {
 
   // Mutations
   const [deleteUser, { isLoading: isDeletingUser }] = useDeleteUserMutation();
+  const [softDeleteUser, { isLoading: isArchivingUser }] =
+    useSoftDeleteUserMutation();
   const [restoreUser, { isLoading: isRestoringUser }] =
     useRestoreUserMutation();
   const [validateUser, { isLoading: isValidatingUser }] =
@@ -867,6 +857,9 @@ export default function AdminPanel() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [memberActionTarget, setMemberActionTarget] =
     useState<MemberUser | null>(null);
+  const [memberDeleteMode, setMemberDeleteMode] = useState<
+    "archive" | "restore" | "hard"
+  >("archive");
   const [permissionTab, setPermissionTab] = useState<"view" | "edit">("view");
   const [trainingPermissionTab, setTrainingPermissionTab] = useState<
     "view" | "edit"
@@ -941,6 +934,7 @@ export default function AdminPanel() {
   });
 
   const { data: articleCategories } = useGetArticleCategoriesQuery();
+  const { data: trainingCategories = [] } = useGetTrainingCategoriesQuery();
 
   // Fetch specific entity data when in edit mode
   const {
@@ -1206,12 +1200,22 @@ export default function AdminPanel() {
       if (activeTab === "events" && eventDetail) {
         setFormData({
           ...eventDetail,
+          event_category_id:
+            eventDetail.event_category?.id ||
+            eventDetail.event_category_id ||
+            eventCategories[0]?.id ||
+            "",
           attachments: eventDetail.attachments || [],
         });
       }
       if (activeTab === "trainings" && trainingDetail) {
         setFormData({
           ...trainingDetail,
+          category_id:
+            trainingDetail.category?.id ||
+            trainingDetail.category_id ||
+            trainingCategories[0]?.id ||
+            "",
           attachments: trainingDetail.attachments || [],
         });
       }
@@ -1225,6 +1229,8 @@ export default function AdminPanel() {
     isModalOpen,
     editingItem,
     activeTab,
+    eventCategories,
+    trainingCategories,
   ]);
 
   // Generic Form State
@@ -1264,6 +1270,13 @@ export default function AdminPanel() {
         .replace(/\s+/g, " ")
         .trim(),
     );
+
+  const getPlainTextPreview = (value: string | null | undefined) =>
+    (value || "")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
 
   React.useEffect(() => {
     if (!forumsData?.length) return;
@@ -1480,7 +1493,7 @@ export default function AdminPanel() {
         },
         events: {
           title: "",
-          event_type: "general",
+          event_category_id: eventCategories[0]?.id || "",
           event_date: new Date().toISOString().split("T")[0],
           end_date: new Date().toISOString().split("T")[0],
           event_time: "14:00",
@@ -1492,14 +1505,10 @@ export default function AdminPanel() {
         },
         trainings: {
           title: "",
+          excerpt: "",
           description: "",
-          instructor_name: "",
-          format: "online",
-          training_date: new Date().toISOString().split("T")[0],
-          end_date: new Date().toISOString().split("T")[0],
-          duration_hours: 7,
-          max_attendees: 20,
-          status: "open",
+          category_id: trainingCategories[0]?.id || "",
+          status: "draft",
           attachments: [],
           thumbnail: null,
         },
@@ -1576,7 +1585,11 @@ export default function AdminPanel() {
     setMemberPermissionDrafts({});
   };
 
-  const confirmDelete = (id: string, member?: MemberUser) => {
+  const confirmDelete = (
+    id: string,
+    member?: MemberUser,
+    mode: "archive" | "restore" | "hard" = "archive",
+  ) => {
     const canDeleteForTab =
       activeTab === "members"
         ? canDeleteMembers
@@ -1596,6 +1609,7 @@ export default function AdminPanel() {
 
     setDeletingId(id);
     setMemberActionTarget(activeTab === "members" ? member || null : null);
+    setMemberDeleteMode(activeTab === "members" ? mode : "hard");
     setIsConfirmOpen(true);
   };
 
@@ -1606,10 +1620,12 @@ export default function AdminPanel() {
       if (activeTab === "forums") {
         await deleteForum(deletingId).unwrap();
       } else if (activeTab === "members") {
-        if (memberActionTarget?.status === "suspended") {
+        if (memberDeleteMode === "restore") {
           await restoreUser(deletingId).unwrap();
-        } else {
+        } else if (memberDeleteMode === "hard") {
           await deleteUser(deletingId).unwrap();
+        } else {
+          await softDeleteUser(deletingId).unwrap();
         }
       } else if (activeTab === "articles") {
         await deleteArticle(deletingId).unwrap();
@@ -1621,6 +1637,7 @@ export default function AdminPanel() {
 
       setDeletingId(null);
       setMemberActionTarget(null);
+      setMemberDeleteMode("archive");
       setIsConfirmOpen(false);
       notifySuccess();
     } catch (err) {
@@ -1825,6 +1842,11 @@ export default function AdminPanel() {
         return;
       }
 
+      if (!formData.event_category_id) {
+        notifyRequiredField(translate("adminPanelPage.form.eventType"));
+        return;
+      }
+
       if (!formData.location?.trim()) {
         notifyRequiredField(translate("adminPanelPage.form.location"));
         return;
@@ -1835,23 +1857,13 @@ export default function AdminPanel() {
         return;
       }
 
-      if (!formData.training_date) {
-        notifyRequiredField(translate("adminPanelPage.form.trainingDate"));
-        return;
-      }
-
-      if (!formData.format) {
-        notifyRequiredField(translate("adminPanelPage.form.format"));
-        return;
-      }
-
-      if (!formData.duration_hours) {
-        notifyRequiredField(translate("adminPanelPage.form.durationHours"));
+      if (!formData.category_id) {
+        notifyRequiredField(translate("adminPanelPage.form.category"));
         return;
       }
 
       if (!hasRichTextValue(formData.description)) {
-        notifyRequiredField(translate("adminPanelPage.form.description"));
+        notifyRequiredField(translate("adminPanelPage.form.contentRichText"));
         return;
       }
 
@@ -1859,6 +1871,11 @@ export default function AdminPanel() {
         notifyRequiredField(translate("trainingsPage.thumbnailLabel"));
         return;
       }
+    }
+
+    if (activeTab === "trainings" && !trainingCategories.length) {
+      notifyRequiredField(translate("adminPanelPage.form.category"));
+      return;
     }
 
     try {
@@ -2028,7 +2045,7 @@ export default function AdminPanel() {
             id,
             data: {
               title: formData.title,
-              event_type: formData.event_type,
+              event_category_id: formData.event_category_id,
               event_date: formData.event_date,
               end_date: formData.end_date,
               event_time: formData.event_time,
@@ -2043,7 +2060,7 @@ export default function AdminPanel() {
         } else {
           await createEvent({
             title: formData.title,
-            event_type: formData.event_type,
+            event_category_id: formData.event_category_id,
             event_date: formData.event_date,
             end_date: formData.end_date,
             event_time: formData.event_time,
@@ -2057,13 +2074,9 @@ export default function AdminPanel() {
       } else if (activeTab === "trainings") {
         const requestBody: Partial<TrainingRequest> = {
           title: formData.title,
+          excerpt: formData.excerpt,
           description: formData.description,
-          instructor_name: formData.instructor_name,
-          format: formData.format,
-          training_date: formData.training_date,
-          end_date: formData.end_date,
-          duration_hours: formData.duration_hours,
-          max_attendees: formData.max_attendees,
+          category_id: formData.category_id,
           status: formData.status,
           remove_attachment_urls: removedFileUrls,
           thumbnail:
@@ -3308,10 +3321,10 @@ export default function AdminPanel() {
                             {translate("adminPanelPage.table.training")}
                           </th>
                           <th className={adminTableHeadCellClass}>
-                            {translate("adminPanelPage.table.instructor")}
+                            {translate("adminPanelPage.table.category")}
                           </th>
                           <th className={adminTableHeadCellClass}>
-                            {translate("adminPanelPage.table.capacity")}
+                            {translate("adminPanelPage.form.excerpt")}
                           </th>
                           <th className={adminTableHeadCellClass}>
                             {translate("adminPanelPage.table.status")}
@@ -3435,16 +3448,27 @@ export default function AdminPanel() {
                             <Actions
                               onView={() => handleOpenDetails(member)}
                               onEdit={() => handleOpenModal(member)}
-                              onDelete={() => confirmDelete(member.id, member)}
+                              onDelete={() =>
+                                confirmDelete(
+                                  member.id,
+                                  member,
+                                  member.status === "suspended"
+                                    ? "restore"
+                                    : "archive",
+                                )
+                              }
+                              onPermanentDelete={() =>
+                                confirmDelete(member.id, member, "hard")
+                              }
                               deleteLabel={
                                 member.status === "suspended"
                                   ? translate("adminPanelPage.restore")
-                                  : translate("adminPanelPage.delete")
+                                  : translate("adminPanelPage.archive")
                               }
                               deleteTitle={
                                 member.status === "suspended"
                                   ? translate("adminPanelPage.restore")
-                                  : translate("adminPanelPage.delete")
+                                  : translate("adminPanelPage.archive")
                               }
                               deleteVariant={
                                 member.status === "suspended"
@@ -3602,7 +3626,8 @@ export default function AdminPanel() {
                             <td
                               className={`${adminTableCellClass} text-[10px] font-black uppercase text-amber-600`}
                             >
-                              {getEventTypeLabel(event.event_type)}
+                              {event.event_category?.name ||
+                                getEventTypeLabel(event.event_type || "")}
                             </td>
                             <td className={`${adminTableCellClass} text-right`}>
                               <Actions
@@ -3631,31 +3656,23 @@ export default function AdminPanel() {
                             <td
                               className={`${adminTableCellClass} text-xs text-gray-500`}
                             >
-                              {training.instructor_name ||
-                                `${training.created_by.first_name} ${training.created_by.last_name}`.trim() ||
+                              {training.category?.name ||
                                 translate(
-                                  "adminPanelPage.fallbacks.defaultAuthor",
+                                  "adminPanelPage.fallbacks.notAvailable",
                                 )}
                             </td>
-                            <td className={adminTableCellClass}>
-                              <span className="relative block h-1 w-full max-w-[100px] overflow-hidden rounded-full bg-slate-100">
-                                <span
-                                  className="absolute left-0 top-0 h-full bg-primary"
-                                  style={{
-                                    width: `${
-                                      training.max_attendees > 0
-                                        ? (training.attendee_count /
-                                            training.max_attendees) *
-                                          100
-                                        : 0
-                                    }%`,
-                                  }}
-                                />
-                              </span>
-                              <span className="mt-1 block text-[9px] font-black uppercase text-gray-400">
-                                {training.attendee_count} /{" "}
-                                {training.max_attendees}
-                              </span>
+                            <td
+                              className={`${adminTableCellClass} max-w-xs truncate text-xs text-gray-500`}
+                              title={
+                                training.excerpt ||
+                                getPlainTextPreview(training.description)
+                              }
+                            >
+                              {training.excerpt ||
+                                getPlainTextPreview(training.description) ||
+                                translate(
+                                  "adminPanelPage.fallbacks.notAvailable",
+                                )}
                             </td>
                             <td
                               className={`${adminTableCellClass} text-[10px] font-black uppercase text-emerald-600`}
@@ -4747,27 +4764,13 @@ export default function AdminPanel() {
               <div className="grid grid-cols-2 gap-4">
                 <SelectField
                   label={translate("adminPanelPage.form.eventType")}
-                  options={[
-                    {
-                      label: translate("adminPanelPage.eventTypes.general"),
-                      value: "general",
-                    },
-                    {
-                      label: translate("adminPanelPage.eventTypes.training"),
-                      value: "training",
-                    },
-                    {
-                      label: translate("adminPanelPage.eventTypes.commission"),
-                      value: "commission",
-                    },
-                    {
-                      label: translate("adminPanelPage.eventTypes.board"),
-                      value: "board",
-                    },
-                  ]}
-                  value={formData.event_type}
+                  options={eventCategories.map((category) => ({
+                    label: category.name,
+                    value: category.id,
+                  }))}
+                  value={formData.event_category_id || ""}
                   onChange={(val) =>
-                    setFormData({ ...formData, event_type: val })
+                    setFormData({ ...formData, event_category_id: val })
                   }
                 />
                 <FormField
@@ -4914,94 +4917,55 @@ export default function AdminPanel() {
                 value={formData.title || ""}
                 onChange={(val) => setFormData({ ...formData, title: val })}
               />
-              <div className="grid grid-cols-2 gap-4">
-                <BeautifulDateTimePicker
-                  label={translate("adminPanelPage.form.trainingDate")}
-                  type="date"
-                  value={formData.training_date || ""}
-                  onChange={(val) =>
-                    setFormData({ ...formData, training_date: val })
+              <SelectField
+                label={translate("adminPanelPage.form.category")}
+                options={trainingCategories.map((category) => ({
+                  label: category.name,
+                  value: category.id,
+                }))}
+                value={formData.category_id || ""}
+                onChange={(val) =>
+                  setFormData({ ...formData, category_id: val })
+                }
+              />
+              <FormField
+                label={translate("adminPanelPage.form.excerpt")}
+                value={formData.excerpt || ""}
+                onChange={(val) => setFormData({ ...formData, excerpt: val })}
+                required={false}
+              />
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                  {translate("adminPanelPage.form.contentRichText")}
+                </label>
+                <TiptapEditor
+                  content={formData.description || ""}
+                  onChange={(content) =>
+                    setFormData({ ...formData, description: content })
                   }
-                  icon={<CalendarIcon className="w-4 h-4 text-primary" />}
-                />
-                <BeautifulDateTimePicker
-                  label={translate("adminPanelPage.form.endDate")}
-                  type="date"
-                  value={formData.end_date || ""}
-                  onChange={(val) =>
-                    setFormData({ ...formData, end_date: val })
-                  }
-                  icon={<CalendarIcon className="w-4 h-4 text-primary" />}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label={translate("adminPanelPage.table.instructor")}
-                  value={formData.instructor_name || ""}
-                  onChange={(val) =>
-                    setFormData({ ...formData, instructor_name: val })
-                  }
-                  required={false}
-                />
-                <SelectField
-                  label={translate("adminPanelPage.form.format")}
-                  options={[
-                    {
-                      label: translate("adminPanelPage.trainingFormats.online"),
-                      value: "online",
-                    },
-                    {
-                      label: translate(
-                        "adminPanelPage.trainingFormats.inPerson",
-                      ),
-                      value: "in_person",
-                    },
-                    {
-                      label: translate("adminPanelPage.trainingFormats.hybrid"),
-                      value: "hybrid",
-                    },
-                  ]}
-                  value={formData.format}
-                  onChange={(val) => setFormData({ ...formData, format: val })}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label={translate("adminPanelPage.form.durationHours")}
-                  type="number"
-                  value={formData.duration_hours || 0}
-                  onChange={(val) =>
-                    setFormData({ ...formData, duration_hours: parseInt(val) })
-                  }
-                />
-                <FormField
-                  label={translate("adminPanelPage.form.maxAttendees")}
-                  type="number"
-                  value={formData.max_attendees || 20}
-                  onChange={(val) =>
-                    setFormData({ ...formData, max_attendees: parseInt(val) })
-                  }
+                  placeholder={translate("adminPanelPage.form.description")}
+                  onImageUpload={handleImageUpload}
                 />
               </div>
               <SelectField
                 label={translate("adminPanelPage.form.statusOptional")}
                 options={[
                   {
-                    label: translate("adminPanelPage.trainingStatuses.open"),
-                    value: "open",
+                    label: translate("adminPanelPage.articleStatuses.draft"),
+                    value: "draft",
                   },
                   {
-                    label: translate("adminPanelPage.trainingStatuses.full"),
-                    value: "full",
+                    label: translate("adminPanelPage.articleStatuses.pending"),
+                    value: "pending",
                   },
                   {
                     label: translate(
-                      "adminPanelPage.trainingStatuses.completed",
+                      "adminPanelPage.articleStatuses.published",
                     ),
-                    value: "completed",
+                    value: "published",
                   },
                 ]}
-                value={formData.status || "open"}
+                value={formData.status || "draft"}
                 onChange={(val) => setFormData({ ...formData, status: val })}
               />
               <div className="space-y-2">
@@ -5068,7 +5032,17 @@ export default function AdminPanel() {
                 </label>
                 {editingItem && formData.attachments?.length > 0 && (
                   <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-                    {formData.attachments.map((url: string, idx: number) => {
+                    {formData.attachments.map((attachment: any, idx: number) => {
+                      const url =
+                        typeof attachment === "string"
+                          ? attachment
+                          : attachment.url || attachment.file_url || "";
+                      const name =
+                        typeof attachment === "string"
+                          ? getLastPathSegment(attachment)
+                          : attachment.original_name ||
+                            attachment.file_name ||
+                            getLastPathSegment(url);
                       const isRemoved = removedFileUrls.includes(url);
                       return (
                         <div
@@ -5085,7 +5059,7 @@ export default function AdminPanel() {
                             <FilePreviewCard
                               url={url}
                               href={url}
-                              name={getLastPathSegment(url)}
+                              name={name}
                               subtitle={translate(
                                 "adminPanelPage.actions.viewFile",
                               )}
@@ -5139,18 +5113,6 @@ export default function AdminPanel() {
                   title={translate("trainingsPage.clickOrDragDrop")}
                   hint={translate("trainingsPage.attachmentsHint")}
                   emptyLabel={translate("trainingsPage.attachmentsLabel")}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                  {translate("adminPanelPage.form.description")}
-                </label>
-                <TiptapEditor
-                  content={formData.description || ""}
-                  onChange={(content) =>
-                    setFormData({ ...formData, description: content })
-                  }
-                  onImageUpload={handleImageUpload}
                 />
               </div>
             </>
@@ -5215,6 +5177,7 @@ export default function AdminPanel() {
           if (
             !isDeletingForum &&
             !isDeletingUser &&
+            !isArchivingUser &&
             !isRestoringUser &&
             !isDeletingArticle &&
             !isDeletingEvent &&
@@ -5223,26 +5186,36 @@ export default function AdminPanel() {
             setIsConfirmOpen(false);
             setDeletingId(null);
             setMemberActionTarget(null);
+            setMemberDeleteMode("archive");
           }
         }}
         onConfirm={handleDelete}
         title={
-          activeTab === "members" && memberActionTarget?.status === "suspended"
+          activeTab === "members" && memberDeleteMode === "restore"
             ? translate("adminPanelPage.confirmRestoreTitle", {
                 entity: getTabLabel(activeTab).toLowerCase(),
               })
+            : activeTab === "members" && memberDeleteMode === "archive"
+              ? translate("adminPanelPage.confirmArchiveTitle")
             : translate("adminPanelPage.confirmDeleteTitle", {
                 entity: getTabLabel(activeTab).toLowerCase(),
               })
         }
         message={
-          activeTab === "members" && memberActionTarget?.status === "suspended"
+          activeTab === "members" && memberDeleteMode === "restore"
             ? translate("adminPanelPage.confirmRestoreMessage", {
                 entity:
                   memberActionTarget?.email ||
                   memberActionTarget?.first_name ||
                   getTabLabel(activeTab).toLowerCase(),
               })
+            : activeTab === "members" && memberDeleteMode === "archive"
+              ? translate("adminPanelPage.confirmArchiveMessage", {
+                  entity:
+                    memberActionTarget?.email ||
+                    memberActionTarget?.first_name ||
+                    getTabLabel(activeTab).toLowerCase(),
+                })
             : translate("adminPanelPage.confirmDeleteMessage", {
                 entity: getTabLabel(activeTab).toLowerCase(),
               })
@@ -5250,6 +5223,7 @@ export default function AdminPanel() {
         isLoading={
           isDeletingForum ||
           isDeletingUser ||
+          isArchivingUser ||
           isRestoringUser ||
           isDeletingArticle ||
           isDeletingEvent ||
@@ -6644,6 +6618,7 @@ const Actions = ({
   onView,
   onManagePermissions,
   onPublish,
+  onPermanentDelete,
   deleteLabel,
   deleteTitle,
   deleteVariant = "delete",
@@ -6653,6 +6628,7 @@ const Actions = ({
   onView: () => void;
   onManagePermissions?: () => void;
   onPublish?: () => void;
+  onPermanentDelete?: () => void;
   deleteLabel?: string;
   deleteTitle?: string;
   deleteVariant?: "delete" | "restore";
@@ -6708,6 +6684,19 @@ const Actions = ({
               : translate("adminPanelPage.delete"))}
         </span>
       </button>
+
+      {onPermanentDelete && (
+        <button
+          onClick={onPermanentDelete}
+          title={translate("adminPanelPage.permanentDelete")}
+          className="p-2 rounded-lg text-slate-400 transition-colors cursor-pointer hover:bg-red-100 hover:text-red-700"
+        >
+          <Trash2 className="w-4 h-4" />
+          <span className="sr-only">
+            {translate("adminPanelPage.permanentDelete")}
+          </span>
+        </button>
+      )}
 
       {onPublish && (
         <button

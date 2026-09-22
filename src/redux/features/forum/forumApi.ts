@@ -22,6 +22,11 @@ import {
 
 const FORUMS_BASE_PATH = "/forums/forums";
 
+type ListResponse<T> = T[] | { results?: T[] };
+
+const normalizeListResponse = <T>(response: ListResponse<T>): T[] =>
+  Array.isArray(response) ? response : response.results || [];
+
 const trimOrUndefined = (value: string | null | undefined) => {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
@@ -105,6 +110,8 @@ export const forumApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getForums: builder.query<ForumListItem[], void>({
       query: () => FORUMS_BASE_PATH,
+      transformResponse: (response: ListResponse<ForumListItem>) =>
+        normalizeListResponse(response),
       providesTags: (result) =>
         result
           ? [
@@ -351,6 +358,8 @@ export const forumApi = apiSlice.injectEndpoints({
     }),
     getPinnedTopics: builder.query<PinnedTopic[], void>({
       query: () => "/forums/topics/pinned",
+      transformResponse: (response: ListResponse<PinnedTopic>) =>
+        normalizeListResponse(response),
       providesTags: (result) =>
         result
           ? [

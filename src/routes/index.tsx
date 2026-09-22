@@ -5,7 +5,6 @@ import RouteError from '../components/RouteError';
 
 
 // Lazy load pages
-const Dashboard = lazy(() => import('../pages/Dashboard'));
 const Home = lazy(() => import('../pages/Home'));
 const Login = lazy(() => import('../pages/Login'));
 const Signup = lazy(() => import('../pages/Signup'));
@@ -17,9 +16,9 @@ const Articles = lazy(() => import('../pages/Articles'));
 const Agenda = lazy(() => import('../pages/Agenda/Agenda'));
 const Events = lazy(() => import('../pages/Events'));
 const Trainings = lazy(() => import('../pages/Trainings'));
+const TechnicoPro = lazy(() => import('../pages/TechnicoPro'));
 const DocumentLibrary = lazy(() => import('../pages/DocumentLibrary'));
 const AdminPanel = lazy(() => import('../pages/AdminPanel'));
-const Moderation = lazy(() => import('../pages/Moderation'));
 const Profile = lazy(() => import('../pages/Profile'));
 const ArticleDetail = lazy(() => import('../pages/ArticleDetail'));
 
@@ -37,7 +36,6 @@ import PublicRoute from '../components/PublicRoute';
 import PermissionRoute from '../components/PermissionRoute';
 import {
   canAccessAdminPanel,
-  canAccessModeration,
 } from '../redux/features/auth/permissionUtils';
 
 const isSuperuser = (user: { is_superuser?: boolean } | null) =>
@@ -74,11 +72,7 @@ export const router = createBrowserRouter([
         element: <Home />,
         errorElement: <RouteError />,
       },
-      {
-        path: 'dashboard',
-        element: <PermissionRoute allow={isSuperuser}><Dashboard /></PermissionRoute>,
-        errorElement: <RouteError />,
-      },
+      
       {
         path: 'directory',
         element: <PermissionRoute allow={isSuperuser}><MemberDirectory /></PermissionRoute>,
@@ -101,6 +95,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'articles',
+        element: <PermissionRoute feature="article"><Articles /></PermissionRoute>,
+        errorElement: <RouteError />,
+      },
+      {
+        path: 'articles/category/:categoryId',
         element: <PermissionRoute feature="article"><Articles /></PermissionRoute>,
         errorElement: <RouteError />,
       },
@@ -135,8 +134,28 @@ export const router = createBrowserRouter([
         errorElement: <RouteError />,
       },
       {
+        path: 'trainings/category/:categoryId',
+        element: <PermissionRoute feature="training"><Trainings /></PermissionRoute>,
+        errorElement: <RouteError />,
+      },
+      {
         path: 'trainings/:trainingId',
         element: <PermissionRoute feature="training"><Trainings /></PermissionRoute>,
+        errorElement: <RouteError />,
+      },
+      {
+        path: 'technicopro',
+        element: <PermissionRoute feature="technicopro"><TechnicoPro /></PermissionRoute>,
+        errorElement: <RouteError />,
+      },
+      {
+        path: 'technicopro/category/:categoryId',
+        element: <PermissionRoute feature="technicopro"><TechnicoPro /></PermissionRoute>,
+        errorElement: <RouteError />,
+      },
+      {
+        path: 'technicopro/:technicoproId',
+        element: <PermissionRoute feature="technicopro"><TechnicoPro /></PermissionRoute>,
         errorElement: <RouteError />,
       },
       {
@@ -154,11 +173,7 @@ export const router = createBrowserRouter([
         element: <PermissionRoute feature="document"><DocumentLibrary /></PermissionRoute>,
         errorElement: <RouteError />,
       },
-      {
-        path: 'moderation',
-        element: <PermissionRoute allow={canAccessModeration}><Moderation /></PermissionRoute>,
-        errorElement: <RouteError />,
-      },
+      
       {
         path: 'admin',
         element: <PermissionRoute allow={canAccessAdminPanel}><AdminPanel /></PermissionRoute>,

@@ -10,10 +10,10 @@ import {
   useGetArticlesQuery,
 } from "../redux/features/articles/articlesApi";
 import { useGetUpcomingEventsQuery } from "../redux/features/events/eventsApi";
-import { useGetUpcomingTrainingsQuery } from "../redux/features/trainings/trainingsApi";
+import { useGetTrainingsPaginatedQuery } from "../redux/features/trainings/trainingsApi";
 import { useI18n } from "../i18n";
 import { RootState } from "../redux/store";
-import { useDirectUserPermissions } from "../hooks/useDirectUserPermissions";
+import { usePermissions } from "../hooks/usePermissions";
 
 const stripHtml = (value?: string | null) =>
   (value || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
@@ -101,18 +101,18 @@ export default function Home() {
   const location = useLocation();
   const { localeCode, translate } = useI18n();
   const { user } = useSelector((state: RootState) => state.auth);
-  const { hasDirectPermission } = useDirectUserPermissions();
+  const { hasPermission } = usePermissions();
   const MAX_SECTION_CARDS = 4;
   const canViewForum =
-    Boolean(user?.is_superuser) || hasDirectPermission("forum", "view");
+    Boolean(user?.is_superuser) || hasPermission("forum", "view");
   const canViewArticle =
-    Boolean(user?.is_superuser) || hasDirectPermission("article", "view");
+    Boolean(user?.is_superuser) || hasPermission("article", "view");
   const canViewEvent =
-    Boolean(user?.is_superuser) || hasDirectPermission("event", "view");
+    Boolean(user?.is_superuser) || hasPermission("event", "view");
   const canViewTraining =
-    Boolean(user?.is_superuser) || hasDirectPermission("training", "view");
+    Boolean(user?.is_superuser) || hasPermission("training", "view");
   const canViewDocument =
-    Boolean(user?.is_superuser) || hasDirectPermission("document", "view");
+    Boolean(user?.is_superuser) || hasPermission("document", "view");
   const canViewAnyHomeSection =
     canViewForum ||
     canViewArticle ||
@@ -141,8 +141,13 @@ export default function Home() {
     { skip: !canViewArticle } as any,
   );
   const { data: trainingsData, isLoading: isTrainingsLoading } =
-    useGetUpcomingTrainingsQuery(
-      { page: 1, pageSize: MAX_SECTION_CARDS },
+    useGetTrainingsPaginatedQuery(
+      {
+        page: 1,
+        pageSize: MAX_SECTION_CARDS,
+        status: "published",
+        details: true,
+      },
       { skip: !canViewTraining } as any,
     );
 
@@ -151,7 +156,7 @@ export default function Home() {
   const visibleForums = forums.slice(0, MAX_SECTION_CARDS);
   const visibleEvents = upcomingEvents.slice(0, MAX_SECTION_CARDS);
 
-  const formatDate = (value?: string | null) => {
+const formatDate = (value?: string | null) => {
     if (!value) return "";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
@@ -160,7 +165,10 @@ export default function Home() {
       month: "long",
       year: "numeric",
     });
-  };
+};
+
+const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
+  typeof value === "string" ? value : value?.url || null;
 
   if (!canViewAnyHomeSection) {
     return (
@@ -393,12 +401,17 @@ export default function Home() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             {trainings.map((training) => {
               const trainingImage =
-                training.thumbnail_url || training.attachments?.[0] || null;
-              const trainingDateRange =
-                training.end_date &&
-                training.end_date !== training.training_date
-                  ? `${formatDate(training.training_date)} - ${formatDate(training.end_date)}`
-                  : formatDate(training.training_date);
+                training.thumbnail_url || getAttachmentUrl(training.attachments?.[0]) || null;
+              const trainingMeta =
+                training.category?.name ||
+                formatDate(training.published_at || training.created_at);
+              const trainingSummary =
+                training.excerpt ||
+                (training.description || "")
+                  .replace(/<[^>]*>/g, " ")
+                  .replace(/&nbsp;/g, " ")
+                  .replace(/\s+/g, " ")
+                  .trim();
 
               return (
               <button
@@ -419,18 +432,23 @@ export default function Home() {
                 ) : null}
                 <div className="flex flex-col px-4 pb-4 pt-3.5">
                   <div className="mb-[5px] text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--archi-secondary)]">
-                    {trainingDateRange}
+                    {trainingMeta}
                   </div>
                   <div className="mb-2 text-[13px] font-bold leading-[1.4] text-[var(--archi-text)]">
                     {training.title}
                   </div>
+                  {trainingSummary ? (
+                    <p className="mb-3 line-clamp-2 text-[12px] leading-relaxed text-[var(--archi-secondary)]">
+                      {trainingSummary}
+                    </p>
+                  ) : null}
                   <div className="flex items-center gap-1.5 text-[11.5px] text-[var(--archi-secondary)]">
                     <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-sky-400 to-cyan-400 text-[8px] font-bold text-white">
-                      {`${training.created_by.first_name?.[0] || ""}${training.created_by.last_name?.[0] || ""}`.trim() ||
+                      {`${training.created_by?.first_name?.[0] || ""}${training.created_by?.last_name?.[0] || ""}`.trim() ||
                         "AC"}
                     </div>
                     <span>
-                      {[training.created_by.first_name, training.created_by.last_name]
+                      {[training.created_by?.first_name, training.created_by?.last_name]
                         .filter(Boolean)
                         .join(" ") || translate("articlesPage.defaultAuthor")}
                     </span>
@@ -491,7 +509,9 @@ export default function Home() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             {articles.map((article) => {
               const articleImage =
-                article.thumbnail_url || article.structured_fields?.file_urls?.[0] || null;
+                article.thumbnail_url ||
+                getAttachmentUrl(article.structured_fields?.file_urls?.[0]) ||
+                null;
 
               return (
               <button

@@ -54,7 +54,14 @@ const buildArticleFormData = (body: Partial<CreateArticleRequest>) => {
 export const articlesApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getArticles: builder.query<PaginatedArticles, GetArticlesQueryParams>({
-      query: ({ page = 1, pageSize = 20, status }) => {
+      query: ({
+        page = 1,
+        pageSize = 20,
+        status,
+        category_id,
+        search,
+        details,
+      }) => {
         const params = new URLSearchParams({
           page: String(page),
           page_size: String(pageSize),
@@ -62,6 +69,15 @@ export const articlesApi = apiSlice.injectEndpoints({
 
         if (status) {
           params.set('status', status);
+        }
+        if (category_id) {
+          params.set('category_id', category_id);
+        }
+        if (search?.trim()) {
+          params.set('search', search.trim());
+        }
+        if (details !== undefined) {
+          params.set('details', String(details));
         }
 
         return `/articles/articles?${params.toString()}`;
@@ -154,17 +170,24 @@ export const articlesApi = apiSlice.injectEndpoints({
       ],
     }),
     createArticleCategory: builder.mutation<ArticleCategory, CreateArticleCategoryRequest>({
-      query: ({ name }) => ({
-        url: `/articles/article-categories?name=${encodeURIComponent(name)}`,
+      query: (body) => ({
+        url: '/articles/article-categories',
         method: 'POST',
-        body: {},
+        body,
+        headers: {
+          'Content-Type': 'application/json',
+        },
       }),
       invalidatesTags: ['Article'],
     }),
     updateArticleCategory: builder.mutation<ArticleCategory, UpdateArticleCategoryRequest>({
-      query: ({ id, name }) => ({
-        url: `/articles/article-categories/${id}?name=${encodeURIComponent(name)}`,
+      query: ({ id, ...body }) => ({
+        url: `/articles/article-categories/${id}`,
         method: 'PATCH',
+        body,
+        headers: {
+          'Content-Type': 'application/json',
+        },
       }),
       invalidatesTags: ['Article'],
     }),

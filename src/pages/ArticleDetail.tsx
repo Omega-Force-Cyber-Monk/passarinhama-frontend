@@ -35,6 +35,20 @@ const getAttachmentType = (url: string) => {
   return 'file' as const;
 };
 
+const getAttachmentUrl = (attachment: string | { url: string }) =>
+  typeof attachment === 'string' ? attachment : attachment.url;
+
+const getAttachmentName = (
+  attachment: string | { url: string; original_name?: string | null; file_name?: string | null },
+  fallback: string,
+) => {
+  if (typeof attachment !== 'string') {
+    return attachment.original_name || attachment.file_name || attachment.url.split('/').pop() || fallback;
+  }
+
+  return attachment.split('/').pop() || fallback;
+};
+
 const getAttachmentTypeLabel = (
   type: ReturnType<typeof getAttachmentType>,
   fallback: string,
@@ -104,12 +118,11 @@ export default function ArticleDetail() {
     article.structured_fields?.author || translate('articleDetailPage.defaultAuthor');
   const authorInitials = authorName.split(' ').map(n => n[0]).join('').toUpperCase();
   const featuredImageUrl = article.thumbnail_url || null;
-  const attachmentUrls = Array.from(
-    new Set(
-      (article.structured_fields?.file_urls || []).filter(
-        (url) => url && url !== featuredImageUrl,
-      ),
-    ),
+  const attachmentUrls = (article.structured_fields?.file_urls || []).filter(
+    (attachment) => {
+      const url = getAttachmentUrl(attachment);
+      return url && url !== featuredImageUrl;
+    },
   );
 
   return (
@@ -202,9 +215,12 @@ export default function ArticleDetail() {
               {translate('articleDetailPage.attachmentsTitle')}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {attachmentUrls.map((url, idx) => {
+              {attachmentUrls.map((attachment, idx) => {
+                const url = getAttachmentUrl(attachment);
                 const fileName =
-                  url.split('/').pop() ||
+                  getAttachmentName(attachment, translate('articleDetailPage.attachmentFallback', {
+                    count: idx + 1,
+                  })) ||
                   translate('articleDetailPage.attachmentFallback', {
                     count: idx + 1,
                   });

@@ -67,7 +67,7 @@ import {
   useGetPinnedTopicsQuery,
 } from "../redux/features/forum/forumApi";
 import { useUploadFileMutation } from "../redux/features/articles/articlesApi";
-import { useDirectUserPermissions } from "../hooks/useDirectUserPermissions";
+import { usePermissions } from "../hooks/usePermissions";
 import { getApiErrorDisplayMessage } from "../utils/apiErrorMessages";
 
 // Enhanced Mock Data Types
@@ -587,7 +587,7 @@ export default function Forums() {
   };
 
   const { user } = useSelector((state: RootState) => state.auth);
-  const { hasDirectPermission } = useDirectUserPermissions();
+  const { hasPermission } = usePermissions();
   const { data: userRolesData = [] } = useGetUserRolesQuery();
   const isSuperuser = Boolean(user?.is_superuser);
   const currentUserId = user?.id || "";
@@ -1486,12 +1486,12 @@ export default function Forums() {
     }
   };
 
-  const canViewForum = isSuperuser || hasDirectPermission("forum", "view");
-  const canCreateForum = hasDirectPermission("forum", "create");
+  const canViewForum = isSuperuser || hasPermission("forum", "view");
+  const canCreateForum = hasPermission("forum", "create");
   const canCreateTopic = canViewForum;
   const canPostMessage = canViewForum;
-  const canEditForum = hasDirectPermission("forum", "edit");
-  const canDeleteForum = hasDirectPermission("forum", "delete");
+  const canEditForum = hasPermission("forum", "edit");
+  const canDeleteForum = hasPermission("forum", "delete");
   const canManageForumPermissions = canEditForum;
   const canSeeForumPermissionsButton = isSuperuser;
   const canPinTopic = isSuperuser;

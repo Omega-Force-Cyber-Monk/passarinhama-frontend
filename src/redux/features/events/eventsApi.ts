@@ -1,12 +1,15 @@
 import { apiSlice as baseApi } from '../api/apiSlice';
 import {
   Event,
+  EventCategory,
   CalendarStats,
   GetEventsQueryParams,
   CreateEventRequest,
   UpdateEventRequest,
   EventRegistrationResponse,
-  EventRegistrationsList
+  EventRegistrationsList,
+  CreateEventCategoryRequest,
+  UpdateEventCategoryRequest,
 } from './eventTypes';
 
 const appendIfDefined = (formData: FormData, key: string, value: unknown) => {
@@ -21,7 +24,7 @@ const buildEventFormData = (
   const formData = new FormData();
 
   appendIfDefined(formData, 'title', body.title);
-  appendIfDefined(formData, 'event_type', body.event_type);
+  appendIfDefined(formData, 'event_category_id', body.event_category_id);
   appendIfDefined(formData, 'event_date', body.event_date);
   appendIfDefined(formData, 'end_date', body.end_date);
   appendIfDefined(formData, 'event_time', body.event_time);
@@ -58,15 +61,56 @@ export const eventsApi = baseApi.injectEndpoints({
     }),
 
     getEvents: builder.query<Event[], GetEventsQueryParams>({
-      query: ({ year, month }) => {
+      query: ({ year, month, event_category_id }) => {
         const params = new URLSearchParams({
           year: String(year),
           month: String(month).padStart(2, '0'),
         });
 
+        if (event_category_id) {
+          params.set('event_category_id', event_category_id);
+        }
+
         return `/events/events?${params.toString()}`;
       },
       providesTags: ['Event'],
+    }),
+
+    getEventCategories: builder.query<EventCategory[], void>({
+      query: () => '/events/event-categories',
+      providesTags: ['EventCategory'],
+    }),
+
+    createEventCategory: builder.mutation<EventCategory, CreateEventCategoryRequest>({
+      query: (body) => ({
+        url: '/events/event-categories',
+        method: 'POST',
+        body,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }),
+      invalidatesTags: ['EventCategory', 'Event'],
+    }),
+
+    updateEventCategory: builder.mutation<EventCategory, UpdateEventCategoryRequest>({
+      query: ({ id, ...body }) => ({
+        url: `/events/event-categories/${id}`,
+        method: 'PATCH',
+        body,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }),
+      invalidatesTags: ['EventCategory', 'Event'],
+    }),
+
+    deleteEventCategory: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/events/event-categories/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['EventCategory', 'Event'],
     }),
 
     getEventById: builder.query<Event, string>({
@@ -128,6 +172,10 @@ export const {
   useGetUpcomingEventsQuery,
   useGetCalendarStatsQuery,
   useGetEventsQuery,
+  useGetEventCategoriesQuery,
+  useCreateEventCategoryMutation,
+  useUpdateEventCategoryMutation,
+  useDeleteEventCategoryMutation,
   useGetEventByIdQuery,
   useCreateEventMutation,
   useUpdateEventMutation,

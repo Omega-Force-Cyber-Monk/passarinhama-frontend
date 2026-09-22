@@ -1,40 +1,58 @@
-export type TrainingFormat = 'online' | 'in_person' | 'hybrid';
-export type TrainingStatus = 'open' | 'full' | 'completed';
+import type { DynamicCategory, PaginatedResponse } from "../api/apiTypes";
+
+export type TrainingStatus = "draft" | "pending" | "published";
+
+export interface TrainingCategory extends DynamicCategory {}
+
+export interface TrainingAttachment {
+  url: string;
+  original_name?: string | null;
+  file_name?: string | null;
+  mime_type?: string | null;
+  file_size?: number | null;
+}
 
 export interface Training {
   id: string;
   title: string;
+  excerpt?: string | null;
   description: string;
-  instructor_name: string | null;
-  format: TrainingFormat;
-  training_date: string;
-  end_date: string;
-  duration_hours: number;
-  thumbnail_url: string | null;
-  max_attendees: number;
-  attendee_count: number;
-  spots_left: number;
-  is_at_capacity: boolean;
-  is_registered: boolean;
+  instructor_name?: string | null;
+  format?: string | null;
+  training_date?: string | null;
+  end_date?: string | null;
+  duration_hours?: number | null;
+  max_attendees?: number | null;
+  attendee_count?: number | null;
+  spots_left?: number | null;
+  is_at_capacity?: boolean | null;
+  is_registered?: boolean | null;
+  category_id?: string | null;
+  category: TrainingCategory | null;
   status: TrainingStatus;
-  attachments: string[];
+  thumbnail_url: string | null;
+  attachments?: Array<string | TrainingAttachment> | null;
+  published_at?: string | null;
   created_at: string;
-  created_by: {
+  updated_at?: string | null;
+  created_by?: {
     id: string;
     first_name: string;
     last_name: string;
-  };
+  } | null;
 }
 
 export interface TrainingRequest {
   title: string;
+  excerpt?: string;
   description: string;
+  category_id: string;
   instructor_name?: string;
-  format: TrainingFormat;
-  training_date: string;
-  end_date: string;
-  duration_hours: number;
-  max_attendees: number;
+  format?: string;
+  training_date?: string;
+  end_date?: string;
+  duration_hours?: number;
+  max_attendees?: number;
   thumbnail?: File | null;
   status?: TrainingStatus;
   attachments?: File[];
@@ -64,8 +82,24 @@ export interface BulkTrainingPermissionResponse {
   permissions: TrainingPermission[];
 }
 
-export interface PaginatedTrainings {
-  total: number;
-  page: number;
-  results: Training[];
+export type PaginatedTrainings = PaginatedResponse<Training>;
+
+export interface GetTrainingsQueryParams {
+  page?: number;
+  pageSize?: number;
+  status?: TrainingStatus;
+  category_id?: string;
+  search?: string;
+  details?: boolean;
+}
+
+export interface CreateTrainingCategoryRequest {
+  name: string;
+  description?: string | null;
+}
+
+export interface UpdateTrainingCategoryRequest {
+  id: string;
+  name: string;
+  description?: string | null;
 }

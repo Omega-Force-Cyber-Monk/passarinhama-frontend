@@ -12,16 +12,18 @@ import {
   Menu,
   MessageSquare,
   Settings,
-  ShieldCheck,
   Users,
   X,
-  LayoutDashboard,
   ChevronDown,
+  Wrench,
 } from "lucide-react";
 import { RootState } from "../redux/store";
 import { logout, setUser } from "../redux/features/auth/authSlice";
 import { ROLE_SLUGS } from "../redux/features/auth/authTypes";
 import { useGetForumsQuery } from "../redux/features/forum/forumApi";
+import { useGetArticleCategoriesQuery } from "../redux/features/articles/articlesApi";
+import { useGetTrainingCategoriesQuery } from "../redux/features/trainings/trainingsApi";
+import { useGetTechnicoProCategoriesQuery } from "../redux/features/technicopro/technicoproApi";
 import {
   useGetUsersMeQuery,
   useGetUsersOnlineQuery,
@@ -106,6 +108,9 @@ const DashboardLayout: React.FC = () => {
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [forumsDropdownOpen, setForumsDropdownOpen] = useState(false);
+  const [articlesDropdownOpen, setArticlesDropdownOpen] = useState(false);
+  const [trainingsDropdownOpen, setTrainingsDropdownOpen] = useState(false);
+  const [technicoProDropdownOpen, setTechnicoProDropdownOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const dispatch = useDispatch();
@@ -115,7 +120,7 @@ const DashboardLayout: React.FC = () => {
   const { translate } = useI18n();
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
   const lastSyncedProfileRef = useRef<string>("");
-  const { canAccessFeature, canAccessAdminPanel, canAccessModeration } =
+  const { canAccessFeature, canAccessAdminPanel } =
     usePermissions();
   const isSuperuser = Boolean(user?.is_superuser);
 
@@ -125,6 +130,16 @@ const DashboardLayout: React.FC = () => {
   const { data: forumsData } = useGetForumsQuery(undefined, {
     skip: !isAuthenticated,
   });
+  const { data: articleCategoriesData } = useGetArticleCategoriesQuery(undefined, {
+    skip: !isAuthenticated || !canAccessFeature("article"),
+  });
+  const { data: trainingCategoriesData } = useGetTrainingCategoriesQuery(undefined, {
+    skip: !isAuthenticated || !canAccessFeature("training"),
+  });
+  const { data: technicoProCategoriesData } =
+    useGetTechnicoProCategoriesQuery(undefined, {
+      skip: !isAuthenticated || !canAccessFeature("technicopro"),
+    });
   const { data: onlineUsersData } = useGetUsersOnlineQuery(undefined, {
     skip: !isAuthenticated,
   });
@@ -153,9 +168,10 @@ const DashboardLayout: React.FC = () => {
   }, [dispatch, profileData]);
 
   useEffect(() => {
-    if (location.pathname.startsWith("/forums")) {
-      setForumsDropdownOpen(true);
-    }
+    setArticlesDropdownOpen(location.pathname.startsWith("/articles"));
+    setForumsDropdownOpen(location.pathname.startsWith("/forums"));
+    setTrainingsDropdownOpen(location.pathname.startsWith("/trainings"));
+    setTechnicoProDropdownOpen(location.pathname.startsWith("/technicopro"));
     setSidebarOpen(false);
     setSearchOpen(false);
   }, [location.pathname]);
@@ -192,19 +208,11 @@ const DashboardLayout: React.FC = () => {
       { name: translate("common.home"), path: "/", icon: Home },
     ];
 
-    if (isSuperuser) {
+    if (canAccessFeature("event")) {
       items.push({
-        name: translate("common.dashboard"),
-        path: "/dashboard",
-        icon: LayoutDashboard,
-      });
-    }
-
-    if (canAccessFeature("forum")) {
-      items.push({
-        name: translate("common.forums"),
-        path: "/forums",
-        icon: MessageSquare,
+        name: translate("common.agenda"),
+        path: "/agenda",
+        icon: Calendar,
       });
     }
 
@@ -216,11 +224,11 @@ const DashboardLayout: React.FC = () => {
       });
     }
 
-    if (canAccessFeature("event")) {
+    if (canAccessFeature("forum")) {
       items.push({
-        name: translate("common.agenda"),
-        path: "/agenda",
-        icon: Calendar,
+        name: translate("common.forums"),
+        path: "/forums",
+        icon: MessageSquare,
       });
     }
 
@@ -229,6 +237,14 @@ const DashboardLayout: React.FC = () => {
         name: translate("common.training"),
         path: "/trainings",
         icon: BookOpen,
+      });
+    }
+
+    if (canAccessFeature("technicopro")) {
+      items.push({
+        name: translate("common.technicopro"),
+        path: "/technicopro",
+        icon: Wrench,
       });
     }
 
@@ -241,7 +257,7 @@ const DashboardLayout: React.FC = () => {
     }
 
     if (isSuperuser) {
-      items.splice(2, 0, {
+      items.push({
         name: translate("common.members"),
         path: "/directory",
         icon: Users,
@@ -256,19 +272,10 @@ const DashboardLayout: React.FC = () => {
       });
     }
 
-    if (canAccessModeration) {
-      items.push({
-        name: translate("common.moderation"),
-        path: "/moderation",
-        icon: ShieldCheck,
-      });
-    }
-
     return items;
   }, [
     canAccessAdminPanel,
     canAccessFeature,
-    canAccessModeration,
     isSuperuser,
     translate,
   ]);
@@ -370,14 +377,69 @@ const DashboardLayout: React.FC = () => {
                   : location.pathname === item.path ||
                     location.pathname.startsWith(`${item.path}/`);
 
-              if (item.path === "/forums") {
+              const dynamicNavConfig =
+                item.path === "/articles"
+                  ? {
+                      isOpen: articlesDropdownOpen,
+                      setOpen: setArticlesDropdownOpen,
+                      isActive: location.pathname.startsWith("/articles"),
+                      allPath: "/articles",
+                      allLabel: translate("layout.allNews"),
+                      children: (articleCategoriesData || []).map((category) => ({
+                        id: category.id,
+                        name: category.name,
+                        path: `/articles/category/${category.id}`,
+                      })),
+                    }
+                  : item.path === "/forums"
+                    ? {
+                        isOpen: forumsDropdownOpen,
+                        setOpen: setForumsDropdownOpen,
+                        isActive: showForumsActive,
+                        allPath: "/forums",
+                        allLabel: translate("layout.allDiscussions"),
+                        children: (forumsData || []).map((forum) => ({
+                          id: forum.id,
+                          name: forum.name,
+                          path: `/forums/${forum.id}`,
+                        })),
+                      }
+                    : item.path === "/trainings"
+                      ? {
+                          isOpen: trainingsDropdownOpen,
+                          setOpen: setTrainingsDropdownOpen,
+                          isActive: location.pathname.startsWith("/trainings"),
+                          allPath: "/trainings",
+                          allLabel: translate("layout.allTraining"),
+                          children: (trainingCategoriesData || []).map((category) => ({
+                            id: category.id,
+                            name: category.name,
+                            path: `/trainings/category/${category.id}`,
+                          })),
+                        }
+                      : item.path === "/technicopro"
+                        ? {
+                            isOpen: technicoProDropdownOpen,
+                            setOpen: setTechnicoProDropdownOpen,
+                            isActive: location.pathname.startsWith("/technicopro"),
+                            allPath: "/technicopro",
+                            allLabel: translate("layout.allTechnicoPro"),
+                            children: (technicoProCategoriesData || []).map((category) => ({
+                              id: category.id,
+                              name: category.name,
+                              path: `/technicopro/category/${category.id}`,
+                            })),
+                          }
+                        : null;
+
+              if (dynamicNavConfig) {
                 return (
                   <div key={item.path} className="rounded-[12px]">
                     <button
                       type="button"
-                      onClick={() => setForumsDropdownOpen((value) => !value)}
+                      onClick={() => dynamicNavConfig.setOpen((value) => !value)}
                       className={`flex w-full items-center gap-2.5 rounded-[10px] px-2.5 py-[9px] text-left text-[15px] font-semibold transition-all cursor-pointer ${
-                        showForumsActive
+                        dynamicNavConfig.isActive
                           ? "bg-[var(--archi-accent)] text-[var(--archi-text)]"
                           : "text-[var(--archi-text)] hover:bg-[var(--archi-surface-soft)]"
                       }`}
@@ -386,43 +448,44 @@ const DashboardLayout: React.FC = () => {
                       <span>{item.name}</span>
                       <ChevronDown
                         className={`ml-auto h-4 w-4 shrink-0 transition-transform ${
-                          forumsDropdownOpen ? "rotate-180" : ""
+                          dynamicNavConfig.isOpen ? "rotate-180" : ""
                         }`}
                       />
                     </button>
 
                     <div
                       className={`relative ml-3.5 overflow-hidden pl-4 transition-all duration-300 ${
-                        forumsDropdownOpen
+                        dynamicNavConfig.isOpen
                           ? "max-h-[600px] py-1 opacity-100"
                           : "max-h-0 py-0 opacity-0"
                       }`}
                     >
                       <div className="absolute bottom-1.5 left-[6px] top-1.5 w-px bg-[var(--archi-border)]" />
                       <Link
-                        to="/forums"
+                        to={dynamicNavConfig.allPath}
                         className={`relative flex items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-[12.5px] font-medium transition-all ${
-                          location.pathname === "/forums"
+                          location.pathname === dynamicNavConfig.allPath
                             ? "bg-[var(--archi-surface-soft)] text-[var(--archi-text)]"
                             : "text-[var(--archi-secondary)] hover:bg-[var(--archi-surface-soft)] hover:text-[var(--archi-text)]"
                         }`}
                       >
                         <span className="h-[5px] w-[5px] rounded-full bg-[var(--archi-muted)]" />
-                        {translate("layout.allDiscussions")}
+                        {dynamicNavConfig.allLabel}
                       </Link>
 
-                      {(forumsData || []).map((forum) => (
+                      {dynamicNavConfig.children.map((child) => (
                         <Link
-                          key={forum.id}
-                          to={`/forums/${forum.id}`}
+                          key={child.id}
+                          to={child.path}
                           className={`relative flex items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-[12.5px] font-medium transition-all ${
-                            location.pathname.includes(`/forums/${forum.id}`)
+                            location.pathname === child.path ||
+                            location.pathname.startsWith(`${child.path}/`)
                               ? "bg-[var(--archi-surface-soft)] text-[var(--archi-text)]"
                               : "text-[var(--archi-secondary)] hover:bg-[var(--archi-surface-soft)] hover:text-[var(--archi-text)]"
                           }`}
                         >
                           <span className="h-[5px] w-[5px] rounded-full bg-[var(--archi-muted)]" />
-                          <span className="truncate">{forum.name}</span>
+                          <span className="truncate">{child.name}</span>
                         </Link>
                       ))}
                     </div>
@@ -737,8 +800,12 @@ const DashboardLayout: React.FC = () => {
                               </div>
                               <div className="truncate text-[11px] text-[var(--archi-secondary)]">
                                 {[
-                                  formatSearchDate(training.training_date),
-                                  training.format,
+                                  training.category_name,
+                                  training.excerpt,
+                                  formatSearchDate(
+                                    training.published_at ||
+                                      training.created_at,
+                                  ),
                                 ]
                                   .filter(Boolean)
                                   .join(" • ")}

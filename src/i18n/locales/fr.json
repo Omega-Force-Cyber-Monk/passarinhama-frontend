@@ -6,6 +6,7 @@
     "articles": "Actualités",
     "agenda": "Agenda",
     "training": "Formations",
+    "technicopro": "TechnicoPro",
     "certifications": "Certifications",
     "documents": "Documents",
     "members": "Membres",
@@ -24,6 +25,7 @@
     "cancel": "Annuler",
     "confirm": "Confirmer",
     "loading": "Chargement...",
+    "description": "Description",
     "requiredField": "{field} est requis.",
     "selectAtLeastOne": "Sélectionnez au moins un(e) {field}.",
     "accessRestrictedTitle": "Acces restreint",
@@ -34,6 +36,9 @@
   },
   "layout": {
     "allDiscussions": "Tous les forums",
+    "allNews": "Toutes les actualités",
+    "allTraining": "Toutes les formations",
+    "allTechnicoPro": "Tout TechnicoPro",
     "seeAll": "Voir tout ({count})",
     "memberArea": "Espace membres",
     "legacyExtranet": "Ancien Extranet",
@@ -399,6 +404,7 @@
     "addNewCategory": "Ajouter une nouvelle catégorie",
     "categoryName": "Nom de la catégorie",
     "categoryNamePlaceholder": "ex. Durabilité",
+    "categoryDescriptionPlaceholder": "Décrivez le contenu de cette catégorie",
     "retry": "Réessayer",
     "creating": "Création...",
     "createCategory": "Créer la catégorie",
@@ -444,6 +450,7 @@
     "title": "Agenda des événements",
     "description": "Réunions, formations et commissions de l'association.",
     "newEvent": "Nouvel événement",
+    "categories": "Catégories",
     "syncingAgenda": "Synchronisation de l'agenda...",
     "weekdayMon": "Lun",
     "weekdayTue": "Mar",
@@ -949,8 +956,12 @@
     "seeMore": "Voir plus",
     "terminalDetailedAccess": "Accès détaillé au terminal",
     "restore": "Restaurer",
+    "archive": "Archiver",
+    "permanentDelete": "Supprimer définitivement",
     "confirmDeleteTitle": "Supprimer {entity} ?",
     "confirmDeleteMessage": "Voulez-vous vraiment supprimer {entity} ? Cette action est irréversible.",
+    "confirmArchiveTitle": "Archiver le membre ?",
+    "confirmArchiveMessage": "Voulez-vous vraiment archiver {entity} ? Le compte pourra être restauré plus tard.",
     "confirmRestoreTitle": "Restaurer {entity} ?",
     "confirmRestoreMessage": "Voulez-vous vraiment restaurer {entity} ?",
     "confirmRejectionTitle": "Confirmer le rejet",
@@ -1052,6 +1063,7 @@
         "document": "Documents",
         "event": "Événements",
         "forum": "Forums",
+        "technicopro": "TechnicoPro",
         "training": "Formations",
         "user": "Utilisateurs"
       },
@@ -1459,5 +1471,14 @@
         }
       }
     }
+  },
+  "technicoproPage": {
+    "create": "Nouveau TechnicoPro",
+    "edit": "Modifier TechnicoPro",
+    "save": "Enregistrer TechnicoPro",
+    "delete": "Supprimer TechnicoPro",
+    "deleteConfirm": "Cet élément TechnicoPro sera supprimé définitivement.",
+    "empty": "Aucun contenu TechnicoPro trouvé.",
+    "success": "TechnicoPro mis à jour avec succès."
   }
 }

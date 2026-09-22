@@ -57,6 +57,10 @@ export interface BulkUpdatePermissionsResponse {
 export interface Document {
   id: string;
   original_name: string;
+  document_url?: string | null;
+  file_url?: string | null;
+  preview_url?: string | null;
+  download_url?: string | null;
   file_type: string;
   mime_type: string;
   file_size: number;

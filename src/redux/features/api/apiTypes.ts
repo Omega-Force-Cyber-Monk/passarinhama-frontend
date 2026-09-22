@@ -5,6 +5,22 @@ export interface StatsResponse {
   plannedTrainings: number;
 }
 
+export interface PaginatedResponse<T> {
+  total: number;
+  page: number;
+  page_size?: number;
+  total_pages?: number;
+  results: T[];
+}
+
+export interface DynamicCategory {
+  id: string;
+  name: string;
+  description?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface ApiUserRoleDetails {
   id: string;
   name: string;

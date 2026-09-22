@@ -12,7 +12,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import Modal from "../components/ui/Modal";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import { useAppToast } from "../components/ui/AppToastProvider";
@@ -426,6 +426,7 @@ export default function Articles() {
     : translate("articlesPage.defaultAuthor");
 
   const navigate = useNavigate();
+  const { categoryId } = useParams<{ categoryId?: string }>();
   const [publishedPage, setPublishedPage] = useState(1);
   const [pendingPage, setPendingPage] = useState(1);
   const [draftPage, setDraftPage] = useState(1);
@@ -439,6 +440,7 @@ export default function Articles() {
     page: publishedPage,
     pageSize: ARTICLES_PAGE_SIZE,
     status: "published",
+    category_id: categoryId,
   });
   const {
     data: pendingArticlesData,
@@ -450,6 +452,7 @@ export default function Articles() {
       page: pendingPage,
       pageSize: ARTICLES_PAGE_SIZE,
       status: "pending",
+      category_id: categoryId,
     },
     {
       skip: !isSuperuser,
@@ -465,6 +468,7 @@ export default function Articles() {
       page: draftPage,
       pageSize: ARTICLES_PAGE_SIZE,
       status: "draft",
+      category_id: categoryId,
     },
     {
       skip: !canManageArticleContent,
@@ -512,6 +516,7 @@ export default function Articles() {
   const [editingCategory, setEditingCategory] = useState<ArticleCategory | null>(null);
   const [categoryForm, setCategoryForm] = useState({
     name: "",
+    description: "",
   });
   const [categoryDeletingId, setCategoryDeletingId] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -553,6 +558,7 @@ export default function Articles() {
   const publishedArticles = mapArticlesForUi(publishedArticlesData?.results || []);
   const pendingArticles = mapArticlesForUi(pendingArticlesData?.results || []);
   const draftArticles = mapArticlesForUi(draftArticlesData?.results || []);
+  const selectedCategory = categoriesData?.find((category) => category.id === categoryId);
   const permissionArticles = React.useMemo(
     () =>
       Array.from(
@@ -806,6 +812,7 @@ export default function Articles() {
     setEditingCategory(null);
     setCategoryForm({
       name: "",
+      description: "",
     });
   };
 
@@ -824,10 +831,12 @@ export default function Articles() {
         await updateCategory({
           id: editingCategory.id,
           name: categoryForm.name.trim(),
+          description: categoryForm.description.trim() || null,
         }).unwrap();
       } else {
         await createCategory({
           name: categoryForm.name.trim(),
+          description: categoryForm.description.trim() || null,
         }).unwrap();
       }
 
@@ -849,6 +858,7 @@ export default function Articles() {
     setEditingCategory(category);
     setCategoryForm({
       name: category.name,
+      description: category.description || "",
     });
   };
 
@@ -1001,8 +1011,13 @@ export default function Articles() {
       <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 underline decoration-primary decoration-4 underline-offset-8 sm:text-3xl">
-            {translate("articlesPage.title")}
+            {selectedCategory?.name || translate("articlesPage.title")}
           </h2>
+          {selectedCategory?.description ? (
+            <p className="mt-3 max-w-2xl text-sm font-medium text-slate-500">
+              {selectedCategory.description}
+            </p>
+          ) : null}
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
           {canSeeArticlePermissionsButton && (
@@ -1897,6 +1912,24 @@ export default function Articles() {
             />
           </div>
 
+          <div className="space-y-2 text-left">
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              {translate("common.description")}
+            </label>
+            <textarea
+              disabled={isCreatingCategory || isUpdatingCategory}
+              className="min-h-24 w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none disabled:opacity-50"
+              value={categoryForm.description}
+              onChange={(e) =>
+                setCategoryForm((current) => ({
+                  ...current,
+                  description: e.target.value,
+                }))
+              }
+              placeholder={translate("articlesPage.categoryDescriptionPlaceholder")}
+            />
+          </div>
+
           {categoriesData?.length ? (
             <div className="space-y-3 border-t border-slate-100 pt-4 text-left">
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -1912,6 +1945,11 @@ export default function Articles() {
                       <p className="truncate text-sm font-semibold text-slate-900">
                         {category.name}
                       </p>
+                      {category.description ? (
+                        <p className="mt-1 line-clamp-2 text-xs font-medium text-slate-500">
+                          {category.description}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex items-center gap-2 self-end sm:self-auto">
                       <button

@@ -358,6 +358,16 @@ export const membersApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: [{ type: 'User', id: 'LIST' }],
     }),
+    softDeleteUser: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/user/users/${id}/soft`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (result, error, id) => [
+        { type: 'User', id },
+        { type: 'User', id: 'LIST' },
+      ],
+    }),
     restoreUser: builder.mutation<RestoreUserResponse, string>({
       query: (id) => ({
         url: `/user/users/${id}/restore`,
@@ -474,6 +484,7 @@ export const {
   useGetUserByIdQuery,
   useUpdateUserMutation,
   useDeleteUserMutation,
+  useSoftDeleteUserMutation,
   useRestoreUserMutation,
   useValidateUserMutation,
   useUploadUserPhotoMutation,

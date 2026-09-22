@@ -1,9 +1,13 @@
 import { apiSlice } from "../api/apiSlice";
 import {
   Training,
+  TrainingCategory,
   TrainingPermission,
   TrainingRequest,
   PaginatedTrainings,
+  GetTrainingsQueryParams,
+  CreateTrainingCategoryRequest,
+  UpdateTrainingCategoryRequest,
   SetTrainingPermissionRequest,
   BulkTrainingPermissionResponse,
 } from "./trainingTypes";
@@ -18,13 +22,9 @@ const buildTrainingFormData = (body: Partial<TrainingRequest>) => {
   const formData = new FormData();
 
   appendIfDefined(formData, "title", body.title);
+  appendIfDefined(formData, "excerpt", body.excerpt);
   appendIfDefined(formData, "description", body.description);
-  appendIfDefined(formData, "instructor_name", body.instructor_name);
-  appendIfDefined(formData, "format", body.format);
-  appendIfDefined(formData, "training_date", body.training_date);
-  appendIfDefined(formData, "end_date", body.end_date);
-  appendIfDefined(formData, "duration_hours", body.duration_hours);
-  appendIfDefined(formData, "max_attendees", body.max_attendees);
+  appendIfDefined(formData, "category_id", body.category_id);
   appendIfDefined(formData, "status", body.status);
   body.remove_attachment_urls?.forEach((url) => {
     formData.append("remove_attachment_urls", url);
@@ -50,25 +50,60 @@ const resolveTrainingBody = (body: Partial<TrainingRequest> | FormData) =>
 
 export const trainingsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getUpcomingTrainings: builder.query<
-      PaginatedTrainings,
-      { page?: number; pageSize?: number }
-    >({
-      query: ({ page = 1, pageSize = 20 }) =>
-        `/trainings/trainings/upcoming?page=${page}&page_size=${pageSize}`,
+    getTrainingsPaginated: builder.query<PaginatedTrainings, GetTrainingsQueryParams | void>({
+      query: (queryParams) => {
+        const {
+          page = 1,
+          pageSize = 20,
+          status,
+          category_id,
+          search,
+          details,
+        } = queryParams || {};
+        const params = new URLSearchParams({
+          page: String(page),
+          page_size: String(pageSize),
+        });
+
+        if (status) params.set("status", status);
+        if (category_id) params.set("category_id", category_id);
+        if (search?.trim()) params.set("search", search.trim());
+        if (details !== undefined) params.set("details", String(details));
+
+        return `/trainings/trainings?${params.toString()}`;
+      },
       providesTags: (result) =>
         result
           ? [
-              ...result.results.map(({ id }) => ({
-                type: "Training" as const,
-                id,
-              })),
+              ...result.results.map(({ id }) => ({ type: "Training" as const, id })),
               { type: "Training", id: "LIST" },
             ]
           : [{ type: "Training", id: "LIST" }],
     }),
-    getAllTrainings: builder.query<Training[], void>({
-      query: () => "/trainings/trainings",
+    getAllTrainings: builder.query<Training[], GetTrainingsQueryParams | void>({
+      query: (queryParams) => {
+        const {
+          page = 1,
+          pageSize = 100,
+          status,
+          category_id,
+          search,
+          details = true,
+        } = queryParams || {};
+        const params = new URLSearchParams({
+          page: String(page),
+          page_size: String(pageSize),
+          details: String(details),
+        });
+
+        if (status) params.set("status", status);
+        if (category_id) params.set("category_id", category_id);
+        if (search?.trim()) params.set("search", search.trim());
+
+        return `/trainings/trainings?${params.toString()}`;
+      },
+      transformResponse: (response: Training[] | PaginatedTrainings): Training[] =>
+        Array.isArray(response) ? response : response.results,
       providesTags: (result) =>
         result
           ? [
@@ -76,6 +111,45 @@ export const trainingsApi = apiSlice.injectEndpoints({
               { type: "Training", id: "LIST" },
             ]
           : [{ type: "Training", id: "LIST" }],
+    }),
+    getTrainingCategories: builder.query<TrainingCategory[], void>({
+      query: () => "/trainings/training-categories",
+      providesTags: ["TrainingCategory"],
+    }),
+    createTrainingCategory: builder.mutation<
+      TrainingCategory,
+      CreateTrainingCategoryRequest
+    >({
+      query: (body) => ({
+        url: "/trainings/training-categories",
+        method: "POST",
+        body,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }),
+      invalidatesTags: ["TrainingCategory", { type: "Training", id: "LIST" }],
+    }),
+    updateTrainingCategory: builder.mutation<
+      TrainingCategory,
+      UpdateTrainingCategoryRequest
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/trainings/training-categories/${id}`,
+        method: "PATCH",
+        body,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }),
+      invalidatesTags: ["TrainingCategory", { type: "Training", id: "LIST" }],
+    }),
+    deleteTrainingCategory: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/trainings/training-categories/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["TrainingCategory", { type: "Training", id: "LIST" }],
     }),
     getTrainingById: builder.query<Training, string>({
       query: (id) => `/trainings/trainings/${id}`,
@@ -131,40 +205,22 @@ export const trainingsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: [{ type: "Training", id: "LIST" }],
     }),
-    registerForTraining: builder.mutation<unknown, string>({
-      query: (id) => ({
-        url: `/trainings/trainings/${id}/register`,
-        method: "POST",
-      }),
-      invalidatesTags: (result, error, id) => [
-        { type: "Training", id },
-        { type: "Training", id: "LIST" },
-      ],
-    }),
-    unregisterFromTraining: builder.mutation<void, string>({
-      query: (id) => ({
-        url: `/trainings/trainings/${id}/register`,
-        method: "DELETE",
-      }),
-      invalidatesTags: (result, error, id) => [
-        { type: "Training", id },
-        { type: "Training", id: "LIST" },
-      ],
-    }),
   }),
 });
 
 export const {
-  useGetUpcomingTrainingsQuery,
+  useGetTrainingsPaginatedQuery,
   useGetAllTrainingsQuery,
+  useGetTrainingCategoriesQuery,
+  useCreateTrainingCategoryMutation,
+  useUpdateTrainingCategoryMutation,
+  useDeleteTrainingCategoryMutation,
   useGetTrainingByIdQuery,
   useGetTrainingPermissionsQuery,
   useSetTrainingPermissionMutation,
   useCreateTrainingMutation,
   useUpdateTrainingMutation,
   useDeleteTrainingMutation,
-  useRegisterForTrainingMutation,
-  useUnregisterFromTrainingMutation,
 } = trainingsApi;
 
 export { buildTrainingFormData };

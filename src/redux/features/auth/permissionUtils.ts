@@ -11,6 +11,7 @@ export const PERMISSION_FEATURES = [
   'event',
   'forum',
   'training',
+  'technicopro',
   'user',
 ] as const;
 

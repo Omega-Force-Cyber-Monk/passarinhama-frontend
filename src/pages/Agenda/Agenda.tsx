@@ -16,6 +16,7 @@ import {
   Globe,
   Paperclip,
   ExternalLink,
+  Grid,
 } from "lucide-react";
 import TiptapEditor from "../../components/ui/TiptapEditor";
 import { motion, AnimatePresence } from "motion/react";
@@ -60,12 +61,17 @@ import {
   useRegisterForEventMutation,
   useUnregisterFromEventMutation,
   useGetEventRegistrationsQuery,
+  useGetEventCategoriesQuery,
+  useCreateEventCategoryMutation,
+  useUpdateEventCategoryMutation,
+  useDeleteEventCategoryMutation,
 } from "../../redux/features/events/eventsApi";
 import { useUploadFileMutation } from "../../redux/features/articles/articlesApi";
 import {
   Event as APIEvent,
   CreateEventRequest,
   UpdateEventRequest,
+  EventCategory,
 } from "../../redux/features/events/eventTypes";
 import { parseISO, isSameDay } from "date-fns";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
@@ -82,7 +88,7 @@ type EventFormState = CreateEventRequest & {
 
 const getDefaultEventFormData = (): EventFormState => ({
   title: "",
-  event_type: "general",
+  event_category_id: "",
   event_date: format(new Date(), "yyyy-MM-dd"),
   end_date: format(new Date(), "yyyy-MM-dd"),
   event_time: "14:00",
@@ -241,12 +247,19 @@ export default function Agenda() {
     isLoading: isLoadingUpcoming,
     isError: isUpcomingError,
   } = useGetUpcomingEventsQuery({ limit: 6 });
+  const { data: eventCategories = [] } = useGetEventCategoriesQuery();
 
   const [createEvent, { isLoading: isCreatingEvent }] =
     useCreateEventMutation();
   const [updateEvent, { isLoading: isUpdatingEvent }] =
     useUpdateEventMutation();
   const [deleteEvent] = useDeleteEventMutation();
+  const [createEventCategory, { isLoading: isCreatingCategory }] =
+    useCreateEventCategoryMutation();
+  const [updateEventCategory, { isLoading: isUpdatingCategory }] =
+    useUpdateEventCategoryMutation();
+  const [deleteEventCategory, { isLoading: isDeletingCategory }] =
+    useDeleteEventCategoryMutation();
   const [registerForEvent, { isLoading: isRegistering }] =
     useRegisterForEventMutation();
   const [unregisterFromEvent, { isLoading: isUnregistering }] =
@@ -291,6 +304,14 @@ export default function Agenda() {
   const [formData, setFormData] = useState<EventFormState>(
     getDefaultEventFormData,
   );
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<EventCategory | null>(null);
+  const [categoryForm, setCategoryForm] = useState({
+    name: "",
+    description: "",
+    color_code: "#F2C41E",
+  });
+  const [categoryDeletingId, setCategoryDeletingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"info" | "participants">("info");
   const [dayViewModal, setDayViewModal] = useState<{
     isOpen: boolean;
@@ -301,6 +322,17 @@ export default function Agenda() {
     date: null,
     events: [],
   });
+
+  useEffect(() => {
+    if (formData.event_category_id || !eventCategories.length) {
+      return;
+    }
+
+    setFormData((current) => ({
+      ...current,
+      event_category_id: eventCategories[0].id,
+    }));
+  }, [eventCategories, formData.event_category_id]);
   const notifySuccess = (
     msg: string = translate("agendaPage.operationSuccessful"),
   ) => {
@@ -321,12 +353,23 @@ export default function Agenda() {
     end: endOfWeek(new Date()),
   }).map((day) => format(day, "EEE", { locale: dateLocale }));
 
-  const translateEventType = (type: string) => {
-    if (type === "training") return translate("agendaPage.eventTypeTraining");
-    if (type === "commission")
-      return translate("agendaPage.eventTypeCommission");
-    if (type === "board") return translate("agendaPage.eventTypeBoard");
-    return translate("agendaPage.eventTypeGeneral");
+  const getEventCategory = (event?: APIEvent | null) =>
+    event?.event_category ||
+    eventCategories.find((category) => category.id === event?.event_category_id) ||
+    null;
+
+  const getEventCategoryLabel = (event?: APIEvent | null) =>
+    getEventCategory(event)?.name ||
+    event?.event_type ||
+    translate("agendaPage.eventTypeGeneral");
+
+  const getEventCategoryStyle = (event?: APIEvent | null) => {
+    const color = getEventCategory(event)?.color_code || "#F2C41E";
+    return {
+      backgroundColor: `${color}1A`,
+      borderColor: `${color}55`,
+      color,
+    };
   };
 
   const days = eachDayOfInterval({
@@ -398,6 +441,11 @@ export default function Agenda() {
       return;
     }
 
+    if (!formData.event_category_id) {
+      requireField(translate("agendaPage.eventType"));
+      return;
+    }
+
     if (!formData.location.trim()) {
       requireField(translate("agendaPage.location"));
       return;
@@ -413,7 +461,7 @@ export default function Agenda() {
       if (isEditMode && editingEventId) {
         const payload: UpdateEventRequest = {
           title: formData.title,
-          event_type: formData.event_type,
+          event_category_id: formData.event_category_id,
           event_date: formData.event_date,
           end_date: formData.end_date,
           event_time: formData.event_time,
@@ -432,7 +480,7 @@ export default function Agenda() {
       } else {
         const payload: CreateEventRequest = {
           title: formData.title,
-          event_type: formData.event_type,
+          event_category_id: formData.event_category_id,
           event_date: formData.event_date,
           end_date: formData.end_date,
           event_time: formData.event_time,
@@ -519,7 +567,7 @@ export default function Agenda() {
     navigate("/agenda");
     setFormData({
       title: event.title,
-      event_type: event.event_type,
+      event_category_id: event.event_category?.id || event.event_category_id || "",
       event_date: event.event_date,
       end_date: event.end_date || event.event_date,
       event_time: event.event_time,
@@ -814,6 +862,67 @@ export default function Agenda() {
     setCurrentMonth(setYear(currentMonth, year));
   };
 
+  const resetCategoryForm = () => {
+    setEditingCategory(null);
+    setCategoryForm({
+      name: "",
+      description: "",
+      color_code: "#F2C41E",
+    });
+  };
+
+  const handleSaveCategory = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!categoryForm.name.trim()) {
+      toast.error(
+        translate("common.requiredField", {
+          field: translate("agendaPage.categories"),
+        }),
+      );
+      return;
+    }
+
+    try {
+      if (editingCategory) {
+        await updateEventCategory({
+          id: editingCategory.id,
+          name: categoryForm.name.trim(),
+          description: categoryForm.description.trim() || null,
+          color_code: categoryForm.color_code,
+        }).unwrap();
+      } else {
+        await createEventCategory({
+          name: categoryForm.name.trim(),
+          description: categoryForm.description.trim() || null,
+          color_code: categoryForm.color_code,
+        }).unwrap();
+      }
+      resetCategoryForm();
+      notifySuccess();
+    } catch (error) {
+      toast.error(getApiErrorDisplayMessage(error, translate, "apiErrors.default"));
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    setCategoryDeletingId(id);
+    try {
+      await deleteEventCategory(id).unwrap();
+      notifySuccess();
+      if (formData.event_category_id === id) {
+        setFormData((current) => ({
+          ...current,
+          event_category_id: eventCategories.find((category) => category.id !== id)?.id || "",
+        }));
+      }
+    } catch (error) {
+      toast.error(getApiErrorDisplayMessage(error, translate, "apiErrors.default"));
+    } finally {
+      setCategoryDeletingId(null);
+    }
+  };
+
   if (!canViewEvent) {
     return <Navigate to="/" replace state={{ accessRestricted: true }} />;
   }
@@ -829,15 +938,24 @@ export default function Agenda() {
             {translate("agendaPage.description")}
           </p> */}
         </div>
-        {canCreateEvent && (
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <button
-            onClick={openCreateModal}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-2 text-sm font-bold text-slate-900 shadow-sm transition-all hover:bg-primary-dark cursor-pointer sm:w-auto"
+            onClick={() => setIsCategoryModalOpen(true)}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-2 text-sm font-bold text-slate-900 shadow-sm transition-all hover:bg-slate-50 cursor-pointer sm:w-auto"
           >
-            <CalendarCheck className="w-4 h-4" />
-            {translate("agendaPage.newEvent")}
+            <Grid className="w-4 h-4 text-primary" />
+            {translate("agendaPage.categories")}
           </button>
-        )}
+          {canCreateEvent && (
+            <button
+              onClick={openCreateModal}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-2 text-sm font-bold text-slate-900 shadow-sm transition-all hover:bg-primary-dark cursor-pointer sm:w-auto"
+            >
+              <CalendarCheck className="w-4 h-4" />
+              {translate("agendaPage.newEvent")}
+            </button>
+          )}
+        </div>
       </header>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-4 lg:gap-8">
@@ -940,18 +1058,11 @@ export default function Agenda() {
                       {/* Event posting */}
                       {dayEvents.length > 0 ? (
                         <div className="mt-2 space-y-1 text-slate-900">
-                          <div
-                            onClick={() => handleEventClick(dayEvents[0])}
-                            className={`text-[9px] font-bold py-1 px-1.5 rounded truncate border shadow-xs group/item flex items-center justify-between overflow-hidden cursor-pointer ${
-                              dayEvents[0].event_type === "training"
-                                ? "bg-blue-50 text-blue-700 border-blue-100"
-                                : dayEvents[0].event_type === "commission"
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-                                  : dayEvents[0].event_type === "board"
-                                    ? "bg-purple-50 text-purple-700 border-purple-100"
-                                    : "bg-amber-50 text-amber-700 border-amber-100"
-                            }`}
-                          >
+	                          <div
+	                            onClick={() => handleEventClick(dayEvents[0])}
+	                            style={getEventCategoryStyle(dayEvents[0])}
+	                            className="text-[9px] font-bold py-1 px-1.5 rounded truncate border shadow-xs group/item flex items-center justify-between overflow-hidden cursor-pointer"
+	                          >
                             <span className="truncate">
                               {dayEvents[0].title}
                             </span>
@@ -1140,23 +1251,17 @@ export default function Agenda() {
               </label>
               <select
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary/10 outline-none font-bold text-sm transition-all"
-                value={formData.event_type}
+                value={formData.event_category_id || ""}
                 onChange={(e) =>
-                  setFormData({ ...formData, event_type: e.target.value })
+                  setFormData({ ...formData, event_category_id: e.target.value })
                 }
               >
-                <option value="general">
-                  {translate("agendaPage.eventTypeGeneral")}
-                </option>
-                <option value="training">
-                  {translate("agendaPage.eventTypeTraining")}
-                </option>
-                <option value="commission">
-                  {translate("agendaPage.eventTypeCommission")}
-                </option>
-                <option value="board">
-                  {translate("agendaPage.eventTypeBoard")}
-                </option>
+                <option value="">{translate("articlesPage.selectCategory")}</option>
+                {eventCategories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="space-y-2">
@@ -1382,19 +1487,12 @@ export default function Agenda() {
                   exit={{ opacity: 0, x: 10 }}
                   className="space-y-6"
                 >
-                  <div
-                    className={`w-fit px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-                      selectedEvent.event_type === "training"
-                        ? "bg-blue-50 text-blue-700"
-                        : selectedEvent.event_type === "commission"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : selectedEvent.event_type === "board"
-                            ? "bg-purple-50 text-purple-700"
-                            : "bg-amber-50 text-amber-700"
-                    }`}
-                  >
-                    {translateEventType(selectedEvent.event_type)}
-                  </div>
+	                  <div
+	                    style={getEventCategoryStyle(selectedEvent)}
+	                    className="w-fit px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest"
+	                  >
+	                    {getEventCategoryLabel(selectedEvent)}
+	                  </div>
 
                   <h3 className="text-2xl font-bold leading-tight">
                     {selectedEvent.title}
@@ -1756,6 +1854,122 @@ export default function Agenda() {
         )}
       </Modal>
 
+      <Modal
+        isOpen={isCategoryModalOpen}
+        onClose={() => {
+          setIsCategoryModalOpen(false);
+          resetCategoryForm();
+        }}
+        title={translate("agendaPage.categories")}
+      >
+        <div className="space-y-5">
+          {canCreateEvent && (
+            <form noValidate onSubmit={handleSaveCategory} className="space-y-3">
+              <input
+                value={categoryForm.name}
+                onChange={(event) =>
+                  setCategoryForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+                placeholder={translate("articlesPage.categoryNamePlaceholder")}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none"
+              />
+              <textarea
+                value={categoryForm.description}
+                onChange={(event) =>
+                  setCategoryForm((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
+                }
+                placeholder={translate("articlesPage.categoryDescriptionPlaceholder")}
+                className="min-h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none"
+              />
+              <input
+                type="color"
+                value={categoryForm.color_code}
+                onChange={(event) =>
+                  setCategoryForm((current) => ({
+                    ...current,
+                    color_code: event.target.value,
+                  }))
+                }
+                className="h-12 w-full rounded-xl border border-slate-200 bg-white p-1"
+              />
+              <button
+                type="submit"
+                disabled={
+                  !categoryForm.name.trim() ||
+                  isCreatingCategory ||
+                  isUpdatingCategory
+                }
+                className="w-full rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold uppercase tracking-widest text-white disabled:opacity-50"
+              >
+                {editingCategory
+                  ? translate("articlesPage.updateCategory")
+                  : translate("articlesPage.createCategory")}
+              </button>
+            </form>
+          )}
+
+          <div className="space-y-2">
+            {eventCategories.map((category) => (
+              <div
+                key={category.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3"
+              >
+                <div className="flex min-w-0 items-start gap-3 text-left">
+                  <span
+                    className="mt-1 h-4 w-4 shrink-0 rounded-full border border-white shadow-sm"
+                    style={{ backgroundColor: category.color_code || "#F2C41E" }}
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-slate-900">
+                      {category.name}
+                    </p>
+                    {category.description ? (
+                      <p className="line-clamp-2 text-xs font-medium text-slate-500">
+                        {category.description}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+                {canCreateEvent ? (
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingCategory(category);
+                        setCategoryForm({
+                          name: category.name,
+                          description: category.description || "",
+                          color_code: category.color_code || "#F2C41E",
+                        });
+                      }}
+                      className="rounded-lg p-2 text-slate-500 hover:bg-slate-200"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={
+                        categoryDeletingId === category.id || isDeletingCategory
+                      }
+                      onClick={() => handleDeleteCategory(category.id)}
+                      className="rounded-lg p-2 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
+
       {/* Day List View Modal */}
       <Modal
         isOpen={dayViewModal.isOpen}
@@ -1770,23 +1984,16 @@ export default function Agenda() {
           {dayViewModal.events.map((event) => (
             <div
               key={event.id}
-              onClick={() => {
-                setDayViewModal({ ...dayViewModal, isOpen: false });
-                handleEventClick(event);
-              }}
-              className={`p-4 rounded-2xl border flex items-center justify-between group cursor-pointer transition-all hover:translate-x-1 ${
-                event.event_type === "training"
-                  ? "bg-blue-50 border-blue-100 hover:bg-blue-100"
-                  : event.event_type === "commission"
-                    ? "bg-emerald-50 border-emerald-100 hover:bg-emerald-100"
-                    : event.event_type === "board"
-                      ? "bg-purple-50 border-purple-100 hover:bg-purple-100"
-                      : "bg-amber-50 border-amber-100 hover:bg-amber-100"
-              }`}
-            >
+	              onClick={() => {
+	                setDayViewModal({ ...dayViewModal, isOpen: false });
+	                handleEventClick(event);
+	              }}
+	              style={getEventCategoryStyle(event)}
+	              className="p-4 rounded-2xl border flex items-center justify-between group cursor-pointer transition-all hover:translate-x-1"
+	            >
               <div className="flex flex-col text-left">
                 <span className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-1">
-                  {event.event_time} • {translateEventType(event.event_type)}
+	                  {event.event_time} • {getEventCategoryLabel(event)}
                 </span>
                 <span className="font-bold text-sm text-slate-900 group-hover:text-primary-dark transition-colors">
                   {event.title}

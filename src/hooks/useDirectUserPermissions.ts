@@ -23,6 +23,7 @@ const isPermissionFeature = (feature: string): feature is PermissionFeature =>
     'event',
     'forum',
     'training',
+    'technicopro',
     'user',
   ].includes(feature);
 

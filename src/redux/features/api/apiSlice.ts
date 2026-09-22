@@ -78,12 +78,16 @@ export const apiSlice = createApi({
     "Article",
     "Event",
     "Training",
+    "TrainingCategory",
+    "TechnicoPro",
+    "TechnicoProCategory",
     "Forum",
     "Post",
     "Topic",
     "Admin",
     "Folder",
     "Document",
+    "EventCategory",
   ],
   endpoints: (builder) => ({
     getStats: builder.query<any, void>({

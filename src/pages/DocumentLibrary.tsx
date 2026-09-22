@@ -39,7 +39,6 @@ import {
   useGetFolderPermissionsQuery,
   useUpdateFolderPermissionsBulkMutation,
   useLazyDownloadDocumentQuery,
-  useDownloadDocumentQuery,
 } from "../redux/features/documents/documentsApi";
 import { useGetUserRolesQuery } from "../redux/features/members/membersApi";
 import {
@@ -219,6 +218,12 @@ const getPreviewType = (mimeType?: string) => {
 const getOfficePreviewUrl = (url: string) =>
   `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
 
+const getDocumentPreviewUrl = (file?: Document | null) =>
+  file?.preview_url ||
+  file?.document_url ||
+  file?.file_url ||
+  null;
+
 const DocumentContentPreview = ({
   file,
   compact = false,
@@ -227,40 +232,10 @@ const DocumentContentPreview = ({
   compact?: boolean;
 }) => {
   const previewType = getPreviewType(file.mime_type);
-  const shouldFetchPreview = previewType !== "unsupported";
-  const {
-    data: previewData,
-    isFetching,
-  } = useDownloadDocumentQuery(file.id, { skip: !shouldFetchPreview });
-
-  const previewUrl = previewData?.download_url;
-  const officePreviewUrl =
-    previewUrl && previewType === "document"
-      ? getOfficePreviewUrl(previewUrl)
-      : null;
+  const previewUrl = getDocumentPreviewUrl(file);
   const containerClass = compact ? "h-12 w-12 rounded-xl" : "h-32 rounded-xl";
 
-  if (!shouldFetchPreview) {
-    return (
-      <div
-        className={`${containerClass} bg-slate-50 flex items-center justify-center relative overflow-hidden`}
-      >
-        <File className="w-8 h-8 text-slate-300" />
-      </div>
-    );
-  }
-
-  if (isFetching || !previewUrl) {
-    return (
-      <div
-        className={`${containerClass} bg-slate-100 animate-pulse flex items-center justify-center`}
-      >
-        <File className="w-6 h-6 text-slate-300" />
-      </div>
-    );
-  }
-
-  if (previewType === "image") {
+  if (previewUrl && previewType === "image") {
     return (
       <div className={`${containerClass} bg-slate-50 overflow-hidden`}>
         <img
@@ -272,7 +247,7 @@ const DocumentContentPreview = ({
     );
   }
 
-  if (previewType === "video") {
+  if (previewUrl && previewType === "video") {
     return (
       <div className={`${containerClass} bg-black overflow-hidden`}>
         <video
@@ -286,35 +261,16 @@ const DocumentContentPreview = ({
     );
   }
 
-  if (previewType === "pdf") {
-    return (
-      <div className={`${containerClass} bg-white overflow-hidden border border-slate-100`}>
-        <iframe
-          src={previewUrl}
-          title={file.original_name}
-          className="w-full h-full pointer-events-none"
-        />
-      </div>
-    );
-  }
-
-  if (previewType === "document" && officePreviewUrl) {
-    return (
-      <div className={`${containerClass} bg-white overflow-hidden border border-slate-100`}>
-        <iframe
-          src={officePreviewUrl}
-          title={file.original_name}
-          className="w-full h-full pointer-events-none"
-        />
-      </div>
-    );
-  }
-
   return (
     <div
-      className={`${containerClass} bg-slate-50 flex items-center justify-center relative overflow-hidden`}
+      className={`${containerClass} bg-slate-50 flex flex-col items-center justify-center relative overflow-hidden px-3 text-center`}
     >
       <File className="w-8 h-8 text-slate-300" />
+      {!compact && (
+        <span className="mt-2 max-w-full truncate text-[10px] font-bold uppercase tracking-widest text-slate-400">
+          {file.file_type || file.mime_type.split("/")[1] || "file"}
+        </span>
+      )}
     </div>
   );
 };
@@ -546,20 +502,25 @@ export default function DocumentLibrary() {
       return;
     }
 
-    openedFileRef.current = fileId;
-    setIsLoadingPreview(true);
+    const matchedPreviewType = getPreviewType(matchedFile.mime_type);
+    const matchedPreviewUrl = getDocumentPreviewUrl(matchedFile);
 
-    void (async () => {
-      try {
-        const { download_url } = await downloadTrigger(fileId).unwrap();
-        setPreviewUrl(download_url);
-      } catch (error) {
-        notifyError(error);
-      } finally {
-        setIsLoadingPreview(false);
-      }
-    })();
-  }, [downloadTrigger, fileId, files, folderId, isLoadingContent, navigate]);
+    if (
+      matchedPreviewUrl &&
+      (matchedPreviewType === "pdf" || matchedPreviewType === "document")
+    ) {
+      openedFileRef.current = null;
+      setPreviewUrl(null);
+      setIsLoadingPreview(false);
+      void openFileInBrowserViewer(matchedFile);
+      navigate(`/documents/folder/${folderId}`, { replace: true });
+      return;
+    }
+
+    openedFileRef.current = fileId;
+    setPreviewUrl(matchedPreviewUrl);
+    setIsLoadingPreview(false);
+  }, [fileId, files, folderId, isLoadingContent, navigate, openFileInBrowserViewer]);
 
   React.useEffect(() => {
     if (!permissionFolders.length) {
@@ -617,6 +578,54 @@ export default function DocumentLibrary() {
   const notifyError = (error: unknown) => {
     notify(getApiErrorDisplayMessage(error, translate), "error");
   };
+
+  async function openFileInBrowserViewer(file: Document) {
+    const fileUrl = getDocumentPreviewUrl(file);
+
+    if (!fileUrl) {
+      notify(translate("documentLibraryPage.previewUnavailable"), "error");
+      return;
+    }
+
+    const popup = window.open("about:blank", "_blank");
+    if (popup) {
+      popup.opener = null;
+    }
+    const previewType = getPreviewType(file.mime_type);
+
+    try {
+      const response = await fetch(fileUrl);
+      if (!response.ok) {
+        throw new Error("Unable to open file");
+      }
+
+      const blob = await response.blob();
+      const typedBlob = blob.type
+        ? blob
+        : new Blob([blob], { type: file.mime_type || "application/pdf" });
+      const objectUrl = URL.createObjectURL(typedBlob);
+
+      if (popup) {
+        popup.location.href = objectUrl;
+      } else {
+        window.open(objectUrl, "_blank", "noopener,noreferrer");
+      }
+
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch (error) {
+      if (previewType === "pdf") {
+        popup?.close();
+        notifyError(error);
+        return;
+      }
+
+      if (popup) {
+        popup.location.href = fileUrl;
+      } else {
+        window.open(fileUrl, "_blank", "noopener,noreferrer");
+      }
+    }
+  }
 
   const translateRole = (role: string) => {
     const normalizedRole = normalizeRoleSlug(role);
@@ -821,10 +830,37 @@ export default function DocumentLibrary() {
     }
   };
 
-  const handleDownload = async (id: string) => {
+  const triggerBrowserDownload = async (url: string, filename: string) => {
     try {
-      const { download_url } = await downloadTrigger(id).unwrap();
-      window.open(download_url, "_blank");
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error("Download failed");
+      }
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.target = "_blank";
+      link.rel = "noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+  };
+
+  const handleDownload = async (id: string, fallbackName?: string) => {
+    try {
+      const { download_url, filename } = await downloadTrigger(id).unwrap();
+      await triggerBrowserDownload(download_url, filename || fallbackName || "download");
     } catch (error) {
       notifyError(error);
     }
@@ -834,12 +870,23 @@ export default function DocumentLibrary() {
     navigate(`/documents/folder/${folder.id}`);
   };
 
-  const handleOpenFile = (id: string) => {
+  const handleOpenFile = async (file: Document) => {
     if (!currentFolder.id) {
       return;
     }
 
-    navigate(`/documents/folder/${currentFolder.id}/file/${id}`);
+    const filePreviewType = getPreviewType(file.mime_type);
+    const filePreviewUrl = getDocumentPreviewUrl(file);
+
+    if (
+      filePreviewUrl &&
+      (filePreviewType === "pdf" || filePreviewType === "document")
+    ) {
+      await openFileInBrowserViewer(file);
+      return;
+    }
+
+    navigate(`/documents/folder/${currentFolder.id}/file/${file.id}`);
   };
 
   const navigateToPathItem = (id: string | null) => {
@@ -855,6 +902,7 @@ export default function DocumentLibrary() {
     previewUrl && previewType === "document"
       ? getOfficePreviewUrl(previewUrl)
       : null;
+  const openPreviewUrl = previewUrl;
   const showInitialPageSkeleton = isLoadingFolders && !allFolders;
 
   const handleOpenPermissionsModal = (folderId?: string | null) => {
@@ -1235,7 +1283,7 @@ export default function DocumentLibrary() {
                     {filteredFiles.map((file) => (
                       <div
                         key={file.id}
-                        onClick={() => handleOpenFile(file.id)}
+                        onClick={() => handleOpenFile(file)}
                         className={`bg-white p-4 rounded-2xl border shadow-sm transition-colors group cursor-pointer ${
                           fileId === file.id
                             ? "border-primary/60 ring-2 ring-primary/10"
@@ -1260,7 +1308,7 @@ export default function DocumentLibrary() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDownload(file.id);
+                                handleDownload(file.id, file.original_name);
                               }}
                               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 cursor-pointer"
                             >
@@ -1326,7 +1374,7 @@ export default function DocumentLibrary() {
                         {filteredFiles.map((file) => (
                           <tr
                             key={file.id}
-                            onClick={() => handleOpenFile(file.id)}
+                            onClick={() => handleOpenFile(file)}
                             className={`transition-colors group cursor-pointer ${
                               fileId === file.id
                                 ? "bg-primary/5"
@@ -1370,7 +1418,7 @@ export default function DocumentLibrary() {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleDownload(file.id);
+                                    handleDownload(file.id, file.original_name);
                                   }}
                                   className="p-2 hover:bg-primary/10 rounded-lg text-primary-dark cursor-pointer"
                                   title={translate("documentLibraryPage.download")}
@@ -1818,15 +1866,22 @@ export default function DocumentLibrary() {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button
-                  onClick={() => handleDownload(selectedPreviewFile.id)}
+                  onClick={() =>
+                    handleDownload(
+                      selectedPreviewFile.id,
+                      selectedPreviewFile.original_name,
+                    )
+                  }
                   className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all cursor-pointer"
                 >
                   <Download className="w-4 h-4" />
                   {translate("documentLibraryPage.download")}
                 </button>
-                {previewUrl && (
+                {openPreviewUrl && (
                   <button
-                    onClick={() => window.open(previewUrl, "_blank")}
+                    onClick={() => {
+                      window.open(openPreviewUrl, "_blank", "noopener,noreferrer");
+                    }}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all cursor-pointer"
                   >
                     <ExternalLink className="w-4 h-4" />

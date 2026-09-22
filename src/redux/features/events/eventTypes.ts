@@ -5,10 +5,21 @@ export interface EventCreator {
   email?: string;
 }
 
+export interface EventCategory {
+  id: string;
+  name: string;
+  color_code?: string | null;
+  description?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Event {
   id: string;
   title: string;
-  event_type: 'general' | 'training' | 'commission' | 'board' | string;
+  event_type?: 'general' | 'training' | 'commission' | 'board' | string;
+  event_category_id?: string | null;
+  event_category?: EventCategory | null;
   event_date: string;
   end_date: string | null;
   day: number;
@@ -35,11 +46,13 @@ export interface CalendarStats {
 export interface GetEventsQueryParams {
   year: number;
   month: number;
+  event_category_id?: string;
 }
 
 export interface CreateEventRequest {
   title: string;
-  event_type: string;
+  event_category_id?: string;
+  event_type?: string;
   event_date: string;
   end_date: string;
   event_time: string;
@@ -53,6 +66,7 @@ export interface CreateEventRequest {
 
 export interface UpdateEventRequest {
   title?: string;
+  event_category_id?: string;
   event_type?: string;
   event_date?: string;
   end_date?: string;
@@ -64,6 +78,19 @@ export interface UpdateEventRequest {
   status?: string;
   new_attachments?: File[];
   remove_attachment_urls?: string[];
+}
+
+export interface CreateEventCategoryRequest {
+  name: string;
+  description?: string | null;
+  color_code?: string | null;
+}
+
+export interface UpdateEventCategoryRequest {
+  id: string;
+  name: string;
+  description?: string | null;
+  color_code?: string | null;
 }
 
 export interface EventRegistrationResponse {

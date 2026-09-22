@@ -80,10 +80,11 @@ export interface DashboardSearchEvent {
 export interface DashboardSearchTraining {
   id: string;
   title: string;
-  format: string;
+  excerpt?: string | null;
+  category_name?: string | null;
   status: string;
-  training_date: string;
-  duration_hours: number | null;
+  published_at?: string | null;
+  created_at?: string | null;
   attachments?: string[] | null;
 }
 

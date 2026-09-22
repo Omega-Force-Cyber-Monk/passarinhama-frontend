@@ -1,19 +1,24 @@
+import type { DynamicCategory } from '../api/apiTypes';
+
 export type ArticleStatus = 'pending' | 'draft' | 'published' | 'archived';
 
+export interface ArticleAttachment {
+  url: string;
+  original_name?: string | null;
+  file_name?: string | null;
+  mime_type?: string | null;
+  file_size?: number | null;
+}
+
 export interface ArticleStructuredFields {
-  file_urls?: string[];
+  file_urls?: Array<string | ArticleAttachment>;
   tags?: string[];
   author?: string;
   difficulty?: string;
   estimated_read_time_minutes?: number;
 }
 
-export interface ArticleCategory {
-  id: string;
-  name: string;
-  color_code?: string;
-  created_at?: string;
-}
+export interface ArticleCategory extends DynamicCategory {}
 
 export interface ArticleAuthor {
   id: string;
@@ -23,11 +28,13 @@ export interface ArticleAuthor {
 
 export interface CreateArticleCategoryRequest {
   name: string;
+  description?: string | null;
 }
 
 export interface UpdateArticleCategoryRequest {
   id: string;
   name: string;
+  description?: string | null;
 }
 
 export interface Article {
@@ -39,6 +46,7 @@ export interface Article {
   status: ArticleStatus;
   thumbnail_url?: string | null;
   pdf_url: string | null;
+  attachments?: ArticleAttachment[] | null;
   author_id: string;
   created_at: string;
   updated_at: string;
@@ -82,6 +90,9 @@ export interface GetArticlesQueryParams {
   page?: number;
   pageSize?: number;
   status?: ArticleStatus;
+  category_id?: string;
+  search?: string;
+  details?: boolean;
 }
 
 export interface CreateArticleRequest {
