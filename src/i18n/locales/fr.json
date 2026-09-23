@@ -532,6 +532,7 @@
     "catalogBadge": "Formations",
     "title": "Formations",
     "description": "Développez vos compétences et validez vos heures obligatoires de formation continue avec l'Ordre des architectes.",
+    "createTraining": "Créer une formation",
     "proposeTraining": "Proposer une formation",
     "loading": "Chargement...",
     "full": "Complet",
@@ -1040,6 +1041,7 @@
       "members": "Membres",
       "forums": "Forums",
       "articles": "Actualités",
+      "technicopro": "TechnicoPro",
       "events": "Agenda",
       "trainings": "Formations",
       "moderation": "Modération",
@@ -1237,6 +1239,7 @@
     "pagination": {
       "showingMembers": "Affichage de {count} sur {total} membres",
       "showingArticles": "Affichage de {count} sur {total} actualités",
+      "showingTechnicoPro": "Affichage de {count} sur {total} éléments TechnicoPro",
       "showingQueue": "Affichage de {count} sur {total} éléments de la file",
       "showingLogs": "Affichage de {count} sur {total} éléments du journal",
       "pageOf": "Page {current} sur {total}",

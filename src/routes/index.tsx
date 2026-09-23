@@ -34,12 +34,7 @@ const LoadingFallback = () => (
 import ProtectedRoute from '../components/ProtectedRoute';
 import PublicRoute from '../components/PublicRoute';
 import PermissionRoute from '../components/PermissionRoute';
-import {
-  canAccessAdminPanel,
-} from '../redux/features/auth/permissionUtils';
-
-const isSuperuser = (user: { is_superuser?: boolean } | null) =>
-  Boolean(user?.is_superuser);
+import { canAccessAdminPanel } from '../redux/features/auth/permissionUtils';
 
 export const router = createBrowserRouter([
   {
@@ -75,7 +70,7 @@ export const router = createBrowserRouter([
       
       {
         path: 'directory',
-        element: <PermissionRoute allow={isSuperuser}><MemberDirectory /></PermissionRoute>,
+        element: <PermissionRoute feature="user"><MemberDirectory /></PermissionRoute>,
         errorElement: <RouteError />,
       },
       {

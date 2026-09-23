@@ -191,6 +191,8 @@ const DashboardLayout: React.FC = () => {
   }, []);
 
   const getRoleLabel = (role?: string | null) => {
+    const roleDetailsName = user?.role_details?.name;
+
     switch (role) {
       case ROLE_SLUGS.ADMIN:
         return translate("common.roleAdmin");
@@ -199,7 +201,7 @@ const DashboardLayout: React.FC = () => {
       case ROLE_SLUGS.MEMBER:
         return translate("common.roleMember");
       default:
-      // return role?.replace(/_/g, " ") || translate("common.member");
+        return roleDetailsName || role?.replace(/_/g, " ") || translate("common.member");
     }
   };
 
@@ -256,7 +258,7 @@ const DashboardLayout: React.FC = () => {
       });
     }
 
-    if (isSuperuser) {
+    if (canAccessFeature("user")) {
       items.push({
         name: translate("common.members"),
         path: "/directory",
@@ -276,7 +278,6 @@ const DashboardLayout: React.FC = () => {
   }, [
     canAccessAdminPanel,
     canAccessFeature,
-    isSuperuser,
     translate,
   ]);
 

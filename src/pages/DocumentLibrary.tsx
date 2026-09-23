@@ -50,7 +50,7 @@ import {
   normalizeRoleSlug,
 } from "../redux/features/auth/authTypes";
 import { getApiErrorDisplayMessage } from "../utils/apiErrorMessages";
-import { useDirectUserPermissions } from "../hooks/useDirectUserPermissions";
+import { usePermissions } from "../hooks/usePermissions";
 
 const SkeletonBar = ({ className }: { className: string }) => (
   <div className={`animate-pulse rounded-full bg-slate-100 ${className}`} />
@@ -316,13 +316,12 @@ const DocumentLibraryPageSkeleton = () => (
 export default function DocumentLibrary() {
   const { translate } = useI18n();
   const { user } = useSelector((state: RootState) => state.auth);
-  const { hasDirectPermission } = useDirectUserPermissions();
+  const { hasPermission } = usePermissions();
   const isSuperuser = Boolean(user?.is_superuser);
-  const canViewDocument =
-    isSuperuser || hasDirectPermission("document", "view");
-  const canCreateDocument = hasDirectPermission("document", "create");
-  const canEditDocument = hasDirectPermission("document", "edit");
-  const canDeleteDocument = hasDirectPermission("document", "delete");
+  const canViewDocument = hasPermission("document", "view");
+  const canCreateDocument = hasPermission("document", "create");
+  const canEditDocument = hasPermission("document", "edit");
+  const canDeleteDocument = hasPermission("document", "delete");
   const canManageDocumentPermissions = canEditDocument;
   const canSeeDocumentPermissionsButton = isSuperuser;
   const navigate = useNavigate();

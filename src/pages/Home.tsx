@@ -103,16 +103,11 @@ export default function Home() {
   const { user } = useSelector((state: RootState) => state.auth);
   const { hasPermission } = usePermissions();
   const MAX_SECTION_CARDS = 4;
-  const canViewForum =
-    Boolean(user?.is_superuser) || hasPermission("forum", "view");
-  const canViewArticle =
-    Boolean(user?.is_superuser) || hasPermission("article", "view");
-  const canViewEvent =
-    Boolean(user?.is_superuser) || hasPermission("event", "view");
-  const canViewTraining =
-    Boolean(user?.is_superuser) || hasPermission("training", "view");
-  const canViewDocument =
-    Boolean(user?.is_superuser) || hasPermission("document", "view");
+  const canViewForum = hasPermission("forum", "view");
+  const canViewArticle = hasPermission("article", "view");
+  const canViewEvent = hasPermission("event", "view");
+  const canViewTraining = hasPermission("training", "view");
+  const canViewDocument = hasPermission("document", "view");
   const canViewAnyHomeSection =
     canViewForum ||
     canViewArticle ||

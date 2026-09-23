@@ -88,10 +88,10 @@ export default function TechnicoProPage() {
   const { user } = useSelector((state: RootState) => state.auth);
   const { hasPermission } = usePermissions();
   const isSuperuser = Boolean(user?.is_superuser);
-  const canView = isSuperuser || hasPermission("technicopro", "view");
-  const canCreate = isSuperuser || hasPermission("technicopro", "create");
-  const canEdit = isSuperuser || hasPermission("technicopro", "edit");
-  const canDelete = isSuperuser || hasPermission("technicopro", "delete");
+  const canView = hasPermission("technicopro", "view");
+  const canCreate = hasPermission("technicopro", "create");
+  const canEdit = hasPermission("technicopro", "edit");
+  const canDelete = hasPermission("technicopro", "delete");
   const canManageCategories = canCreate || canEdit || isSuperuser;
 
   const [page, setPage] = useState(1);

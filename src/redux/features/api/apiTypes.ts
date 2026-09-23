@@ -34,10 +34,10 @@ export interface ApiUserPermission {
   role_id?: string;
   user_id?: string;
   feature: string;
-  can_view: boolean;
-  can_create: boolean;
-  can_edit: boolean;
-  can_delete: boolean;
+  can_view: boolean | null;
+  can_create: boolean | null;
+  can_edit: boolean | null;
+  can_delete: boolean | null;
 }
 
 export interface CurrentUserApiResponse {

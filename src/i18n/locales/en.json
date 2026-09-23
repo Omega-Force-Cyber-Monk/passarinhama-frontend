@@ -529,6 +529,7 @@
     "catalogBadge": "Training",
     "title": "Training",
     "description": "Develop your skills and validate your mandatory continuing education hours with the Order of Architects.",
+    "createTraining": "Create Training",
     "proposeTraining": "Propose Training",
     "loading": "Loading...",
     "full": "Full",
@@ -1040,6 +1041,7 @@
       "members": "Members",
       "forums": "Forums",
       "articles": "Articles",
+      "technicopro": "TechnicoPro",
       "events": "Agenda",
       "trainings": "Trainings",
       "moderation": "Moderation",
@@ -1237,6 +1239,7 @@
     "pagination": {
       "showingMembers": "Showing {count} of {total} members",
       "showingArticles": "Showing {count} of {total} articles",
+      "showingTechnicoPro": "Showing {count} of {total} TechnicoPro items",
       "showingQueue": "Showing {count} of {total} queue items",
       "showingLogs": "Showing {count} of {total} log items",
       "pageOf": "Page {current} of {total}",

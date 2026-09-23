@@ -26,6 +26,7 @@ import {
   CreateUserPermissionRequest,
   UpdateUserPermissionRequest,
   UpdateMemberPermissionRequest,
+  CreateMemberPermissionRequest,
 } from './membersTypes';
 
 const getCsvFilename = (contentDisposition?: string | null) => {
@@ -318,6 +319,26 @@ export const membersApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { user_id }) => [
         { type: 'User', id: `USER-PERMISSIONS-${user_id}` },
+        { type: 'User', id: user_id },
+        { type: 'User', id: 'ME' },
+      ],
+    }),
+    createMemberPermission: builder.mutation<
+      MemberPermission,
+      CreateMemberPermissionRequest
+    >({
+      query: (body) => ({
+        url: '/user/user-permissions',
+        method: 'POST',
+        body,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }),
+      invalidatesTags: (_result, _error, { user_id }) => [
+        { type: 'User', id: `USER-PERMISSIONS-${user_id}` },
+        { type: 'User', id: user_id },
+        { type: 'User', id: 'ME' },
       ],
     }),
     getUsersMe: builder.query<User, void>({
@@ -478,6 +499,7 @@ export const {
   useCreateUserPermissionMutation,
   useUpdateUserPermissionMutation,
   useGetMemberPermissionsQuery,
+  useCreateMemberPermissionMutation,
   useUpdateMemberPermissionMutation,
   useGetUsersMeQuery,
   useUpdateUsersMeMutation,

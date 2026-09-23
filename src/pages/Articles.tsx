@@ -25,7 +25,7 @@ import TiptapEditor from "../components/ui/TiptapEditor";
 import { useI18n } from "../i18n";
 import { useSelector } from "react-redux";
 import { RootState } from "../redux/store";
-import { useDirectUserPermissions } from "../hooks/useDirectUserPermissions";
+import { usePermissions } from "../hooks/usePermissions";
 import { useGetUserRolesQuery } from "../redux/features/members/membersApi";
 import type {
   Article as ApiArticle,
@@ -409,12 +409,12 @@ export default function Articles() {
   const { localeCode, translate } = useI18n();
   const toast = useAppToast();
   const { user } = useSelector((state: RootState) => state.auth);
-  const { hasDirectPermission } = useDirectUserPermissions();
+  const { hasPermission } = usePermissions();
   const isSuperuser = Boolean(user?.is_superuser);
-  const canCreateArticle = hasDirectPermission("article", "create");
-  const canEditArticle = hasDirectPermission("article", "edit");
-  const canDeleteArticle = hasDirectPermission("article", "delete");
-  const canViewArticle = isSuperuser || hasDirectPermission("article", "view");
+  const canCreateArticle = hasPermission("article", "create");
+  const canEditArticle = hasPermission("article", "edit");
+  const canDeleteArticle = hasPermission("article", "delete");
+  const canViewArticle = hasPermission("article", "view");
   const canManageCategories = isSuperuser;
   const canPublishArticle = canEditArticle;
   const canManageArticlePermissions = canEditArticle;

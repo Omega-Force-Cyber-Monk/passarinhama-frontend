@@ -16,7 +16,7 @@ import { FilePreviewCard, SelectedFilesPreview } from "../components/ui/FileUplo
 import TiptapEditor from "../components/ui/TiptapEditor";
 import { useI18n } from "../i18n";
 import { RootState } from "../redux/store";
-import { useDirectUserPermissions } from "../hooks/useDirectUserPermissions";
+import { usePermissions } from "../hooks/usePermissions";
 import { useUploadFileMutation } from "../redux/features/articles/articlesApi";
 import {
   useCreateTrainingCategoryMutation,
@@ -90,12 +90,12 @@ export default function Trainings() {
   const navigate = useNavigate();
   const { categoryId, trainingId } = useParams<{ categoryId?: string; trainingId?: string }>();
   const { user } = useSelector((state: RootState) => state.auth);
-  const { hasDirectPermission } = useDirectUserPermissions();
+  const { hasPermission } = usePermissions();
   const isSuperuser = Boolean(user?.is_superuser);
-  const canViewTraining = isSuperuser || hasDirectPermission("training", "view");
-  const canCreateTraining = hasDirectPermission("training", "create");
-  const canEditTraining = hasDirectPermission("training", "edit");
-  const canDeleteTraining = hasDirectPermission("training", "delete");
+  const canViewTraining = hasPermission("training", "view");
+  const canCreateTraining = hasPermission("training", "create");
+  const canEditTraining = hasPermission("training", "edit");
+  const canDeleteTraining = hasPermission("training", "delete");
   const canManageCategories = canCreateTraining || canEditTraining || isSuperuser;
 
   const [page, setPage] = useState(1);

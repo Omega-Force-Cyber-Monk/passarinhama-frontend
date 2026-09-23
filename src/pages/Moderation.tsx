@@ -62,7 +62,7 @@ export default function Moderation() {
   const isAuthorized = canAccessModeration;
 
   if (!isAuthorized) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />;
   }
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);

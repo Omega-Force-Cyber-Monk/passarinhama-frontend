@@ -30,6 +30,8 @@ import {
   Paperclip,
   Globe,
   Download,
+  Wrench,
+  Archive,
 } from "lucide-react";
 import TiptapEditor from "../components/ui/TiptapEditor";
 import {
@@ -75,6 +77,7 @@ import {
   useCreateUserPermissionMutation,
   useUpdateUserPermissionMutation,
   useGetMemberPermissionsQuery,
+  useCreateMemberPermissionMutation,
   useUpdateMemberPermissionMutation,
 } from "../redux/features/members/membersApi";
 import {
@@ -103,6 +106,15 @@ import {
   useDeleteFileMutation,
 } from "../redux/features/articles/articlesApi";
 import {
+  useCreateTechnicoProMutation,
+  useDeleteTechnicoProMutation,
+  useGetTechnicoProByIdQuery,
+  useGetTechnicoProCategoriesQuery,
+  useGetTechnicoProsQuery,
+  usePublishTechnicoProMutation,
+  useUpdateTechnicoProMutation,
+} from "../redux/features/technicopro/technicoproApi";
+import {
   useGetEventsQuery,
   useDeleteEventMutation,
   useCreateEventMutation,
@@ -126,6 +138,10 @@ import type {
   Article,
   CreateArticleRequest,
 } from "../redux/features/articles/articleTypes";
+import type {
+  TechnicoPro,
+  TechnicoProRequest,
+} from "../redux/features/technicopro/technicoproTypes";
 import {
   useGetAdminSmtpSettingsQuery,
   useUpdateAdminSmtpSettingsMutation,
@@ -216,6 +232,7 @@ type AdminTab =
   | "members"
   | "forums"
   | "articles"
+  | "technicopro"
   | "events"
   | "trainings"
   | "moderation"
@@ -403,6 +420,7 @@ export default function AdminPanel() {
   const toast = useAppToast();
   const MEMBERS_PAGE_SIZE = 10;
   const ARTICLES_PAGE_SIZE = 20;
+  const TECHNICOPRO_PAGE_SIZE = 20;
   const MODERATION_QUEUE_PAGE_SIZE = 20;
   const MODERATION_LOGS_PAGE_SIZE = 20;
   const { user } = useSelector((state: RootState) => state.auth);
@@ -422,6 +440,10 @@ export default function AdminPanel() {
   const canCreateArticles = hasPermission("article", "create");
   const canEditArticles = hasPermission("article", "edit");
   const canDeleteArticles = hasPermission("article", "delete");
+  const canViewTechnicoPro = hasPermission("technicopro", "view");
+  const canCreateTechnicoPro = hasPermission("technicopro", "create");
+  const canEditTechnicoPro = hasPermission("technicopro", "edit");
+  const canDeleteTechnicoPro = hasPermission("technicopro", "delete");
   const canViewEvents = hasPermission("event", "view");
   const canCreateEvents = hasPermission("event", "create");
   const canEditEvents = hasPermission("event", "edit");
@@ -433,7 +455,7 @@ export default function AdminPanel() {
   const canManageRolesPermissions = canEditMembers;
 
   if (!canAccessAdminPanel) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />;
   }
 
   // --- COMPONENT STATE ---
@@ -443,6 +465,7 @@ export default function AdminPanel() {
   const [memberRoleFilter, setMemberRoleFilter] = useState("all");
   const [memberPage, setMemberPage] = useState(1);
   const [articlePage, setArticlePage] = useState(1);
+  const [technicoproPage, setTechnicoproPage] = useState(1);
   const [moderationQueuePage, setModerationQueuePage] = useState(1);
   const [moderationLogsPage, setModerationLogsPage] = useState(1);
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
@@ -678,6 +701,14 @@ export default function AdminPanel() {
     page: articlePage,
     pageSize: ARTICLES_PAGE_SIZE,
   });
+  const {
+    data: technicoproData,
+    isLoading: isLoadingTechnicoPro,
+    isFetching: isFetchingTechnicoPro,
+  } = useGetTechnicoProsQuery({
+    page: technicoproPage,
+    pageSize: TECHNICOPRO_PAGE_SIZE,
+  });
   const { data: eventsData } = useGetEventsQuery({
     year: new Date().getFullYear(),
     month: new Date().getMonth() + 1,
@@ -784,6 +815,8 @@ export default function AdminPanel() {
     useCreateUserPermissionMutation();
   const [updateUserPermission, { isLoading: isUpdatingUserPermission }] =
     useUpdateUserPermissionMutation();
+  const [createMemberPermission, { isLoading: isCreatingMemberPermission }] =
+    useCreateMemberPermissionMutation();
   const [updateMemberPermission, { isLoading: isUpdatingMemberPermission }] =
     useUpdateMemberPermissionMutation();
 
@@ -797,6 +830,14 @@ export default function AdminPanel() {
     usePublishArticleMutation();
   const [uploadFile] = useUploadFileMutation();
   const [deleteFile] = useDeleteFileMutation();
+  const [deleteTechnicoPro, { isLoading: isDeletingTechnicoPro }] =
+    useDeleteTechnicoProMutation();
+  const [createTechnicoPro, { isLoading: isCreatingTechnicoPro }] =
+    useCreateTechnicoProMutation();
+  const [updateTechnicoPro, { isLoading: isUpdatingTechnicoPro }] =
+    useUpdateTechnicoProMutation();
+  const [publishTechnicoPro, { isLoading: isPublishingTechnicoPro }] =
+    usePublishTechnicoProMutation();
 
   const [deleteEvent, { isLoading: isDeletingEvent }] =
     useDeleteEventMutation();
@@ -934,6 +975,7 @@ export default function AdminPanel() {
   });
 
   const { data: articleCategories } = useGetArticleCategoriesQuery();
+  const { data: technicoproCategories = [] } = useGetTechnicoProCategoriesQuery();
   const { data: trainingCategories = [] } = useGetTrainingCategoriesQuery();
 
   // Fetch specific entity data when in edit mode
@@ -971,6 +1013,17 @@ export default function AdminPanel() {
       (!editingItem && !viewingId),
   });
   const {
+    data: technicoproDetail,
+    isLoading: isLoadingTechnicoProDetail,
+    isError: isErrorTechnicoPro,
+    refetch: refetchTechnicoPro,
+  } = useGetTechnicoProByIdQuery(editingItem?.id || viewingId, {
+    skip:
+      (!isModalOpen && !isDetailsOpen) ||
+      activeTab !== "technicopro" ||
+      (!editingItem && !viewingId),
+  });
+  const {
     data: eventDetail,
     isLoading: isLoadingEvent,
     isError: isErrorEvent,
@@ -1000,11 +1053,13 @@ export default function AdminPanel() {
         ? memberDetail
         : activeTab === "articles"
           ? articleDetail
-          : activeTab === "events"
-            ? eventDetail
-            : activeTab === "trainings"
-              ? trainingDetail
-              : null;
+          : activeTab === "technicopro"
+            ? technicoproDetail
+            : activeTab === "events"
+              ? eventDetail
+              : activeTab === "trainings"
+                ? trainingDetail
+                : null;
   const detailsItem = viewingItem as any;
 
   const isDetailsLoading =
@@ -1012,6 +1067,7 @@ export default function AdminPanel() {
     (isLoadingForum ||
       isLoadingMember ||
       isLoadingArticle ||
+      isLoadingTechnicoProDetail ||
       isLoadingEvent ||
       isLoadingTraining);
   const isDetailsError =
@@ -1019,6 +1075,7 @@ export default function AdminPanel() {
     (isErrorForum ||
       isErrorMember ||
       isErrorArticle ||
+      isErrorTechnicoPro ||
       isErrorEvent ||
       isErrorTraining);
 
@@ -1026,6 +1083,7 @@ export default function AdminPanel() {
     if (activeTab === "forums") refetchForum();
     else if (activeTab === "members") refetchMember();
     else if (activeTab === "articles") refetchArticle();
+    else if (activeTab === "technicopro") refetchTechnicoPro();
     else if (activeTab === "events") refetchEvent();
     else if (activeTab === "trainings") refetchTraining();
   };
@@ -1118,6 +1176,15 @@ export default function AdminPanel() {
             (articlesData?.page_size || ARTICLES_PAGE_SIZE),
         ),
       );
+  const totalTechnicoProPages = technicoproData?.total_pages
+    ? Math.max(1, technicoproData.total_pages)
+    : Math.max(
+        1,
+        Math.ceil(
+          (technicoproData?.total || 0) /
+            (technicoproData?.page_size || TECHNICOPRO_PAGE_SIZE),
+        ),
+      );
   const totalModerationQueuePages = moderationQueueData?.total_pages
     ? Math.max(1, moderationQueueData.total_pages)
     : Math.max(
@@ -1151,14 +1218,17 @@ export default function AdminPanel() {
         ? 6
         : activeTab === "articles"
           ? 5
-          : activeTab === "events"
+          : activeTab === "technicopro"
             ? 5
-            : activeTab === "trainings"
+            : activeTab === "events"
               ? 5
-              : 5;
+              : activeTab === "trainings"
+                ? 5
+                : 5;
   const showTableSkeleton =
     (activeTab === "members" && isLoadingUsers) ||
     (activeTab === "articles" && isLoadingArticles) ||
+    (activeTab === "technicopro" && isLoadingTechnicoPro) ||
     (activeTab === "moderation" &&
       ((modSubTab === "queue" && isLoadingModeration) ||
         (modSubTab === "logs" && isLoadingModerationLogs)));
@@ -1169,6 +1239,10 @@ export default function AdminPanel() {
 
   React.useEffect(() => {
     setArticlePage(1);
+  }, [searchTerm]);
+
+  React.useEffect(() => {
+    setTechnicoproPage(1);
   }, [searchTerm]);
 
   React.useEffect(() => {
@@ -1191,6 +1265,16 @@ export default function AdminPanel() {
         const normalized = { ...articleDetail };
         if (articleDetail.category?.id) {
           normalized.category_id = articleDetail.category.id;
+        }
+        if (!normalized.structured_fields) {
+          normalized.structured_fields = { file_urls: [] };
+        }
+        setFormData(normalized);
+      }
+      if (activeTab === "technicopro" && technicoproDetail) {
+        const normalized = { ...technicoproDetail };
+        if (technicoproDetail.category?.id) {
+          normalized.category_id = technicoproDetail.category.id;
         }
         if (!normalized.structured_fields) {
           normalized.structured_fields = { file_urls: [] };
@@ -1224,6 +1308,7 @@ export default function AdminPanel() {
     forumDetail,
     memberDetail,
     articleDetail,
+    technicoproDetail,
     eventDetail,
     trainingDetail,
     isModalOpen,
@@ -1419,8 +1504,10 @@ export default function AdminPanel() {
         ? canCreateMembers
         : activeTab === "forums"
           ? canCreateForums
-          : activeTab === "articles"
-            ? canCreateArticles
+        : activeTab === "articles"
+          ? canCreateArticles
+          : activeTab === "technicopro"
+            ? canCreateTechnicoPro
             : activeTab === "events"
               ? canCreateEvents
               : activeTab === "trainings"
@@ -1431,8 +1518,10 @@ export default function AdminPanel() {
         ? canEditMembers
         : activeTab === "forums"
           ? canEditForums
-          : activeTab === "articles"
-            ? canEditArticles
+        : activeTab === "articles"
+          ? canEditArticles
+          : activeTab === "technicopro"
+            ? canEditTechnicoPro
             : activeTab === "events"
               ? canEditEvents
               : activeTab === "trainings"
@@ -1491,6 +1580,17 @@ export default function AdminPanel() {
           },
           thumbnail: null,
         },
+        technicopro: {
+          title: "",
+          category_id: technicoproCategories[0]?.id || "",
+          excerpt: "",
+          body: "",
+          status: "draft",
+          structured_fields: {
+            file_urls: [],
+          },
+          thumbnail: null,
+        },
         events: {
           title: "",
           event_category_id: eventCategories[0]?.id || "",
@@ -1535,6 +1635,11 @@ export default function AdminPanel() {
 
     if (activeTab === "articles") {
       navigate(`/articles/${item.id}`);
+      return;
+    }
+
+    if (activeTab === "technicopro") {
+      navigate(`/technicopro/${item.id}`);
       return;
     }
 
@@ -1595,8 +1700,10 @@ export default function AdminPanel() {
         ? canDeleteMembers
         : activeTab === "forums"
           ? canDeleteForums
-          : activeTab === "articles"
-            ? canDeleteArticles
+        : activeTab === "articles"
+          ? canDeleteArticles
+          : activeTab === "technicopro"
+            ? canDeleteTechnicoPro
             : activeTab === "events"
               ? canDeleteEvents
               : activeTab === "trainings"
@@ -1629,6 +1736,8 @@ export default function AdminPanel() {
         }
       } else if (activeTab === "articles") {
         await deleteArticle(deletingId).unwrap();
+      } else if (activeTab === "technicopro") {
+        await deleteTechnicoPro(deletingId).unwrap();
       } else if (activeTab === "events") {
         await deleteEvent(deletingId).unwrap();
       } else if (activeTab === "trainings") {
@@ -1648,6 +1757,15 @@ export default function AdminPanel() {
   const handlePublishArticle = async (id: string) => {
     try {
       await publishArticle(id).unwrap();
+      notifySuccess();
+    } catch (err) {
+      notifyError(err);
+    }
+  };
+
+  const handlePublishTechnicoPro = async (id: string) => {
+    try {
+      await publishTechnicoPro(id).unwrap();
       notifySuccess();
     } catch (err) {
       notifyError(err);
@@ -1802,6 +1920,26 @@ export default function AdminPanel() {
         return;
       }
     } else if (activeTab === "articles") {
+      if (!formData.title?.trim()) {
+        notifyRequiredField(translate("adminPanelPage.form.articleTitle"));
+        return;
+      }
+
+      if (!formData.category_id) {
+        notifyRequiredField(translate("adminPanelPage.form.category"));
+        return;
+      }
+
+      if (!hasRichTextValue(formData.body)) {
+        notifyRequiredField(translate("adminPanelPage.form.contentRichText"));
+        return;
+      }
+
+      if (!(formData.thumbnail || formData.thumbnail_url)) {
+        notifyRequiredField(translate("articlesPage.thumbnailLabel"));
+        return;
+      }
+    } else if (activeTab === "technicopro") {
       if (!formData.title?.trim()) {
         notifyRequiredField(translate("adminPanelPage.form.articleTitle"));
         return;
@@ -2038,6 +2176,62 @@ export default function AdminPanel() {
           }
 
           await createArticle(articlePayload as CreateArticleRequest).unwrap();
+        }
+      } else if (activeTab === "technicopro") {
+        const technicoProPayload: Partial<TechnicoProRequest> = {};
+        const technicoProFields = [
+          "title",
+          "category_id",
+          "body",
+          "excerpt",
+          "status",
+        ];
+
+        technicoProFields.forEach((key) => {
+          if (formData[key] !== undefined && formData[key] !== null) {
+            if (!editingItem || formData[key] !== editingItem[key]) {
+              technicoProPayload[key as keyof TechnicoProRequest] =
+                formData[key];
+            }
+          }
+        });
+
+        if (selectedFiles.length > 0) {
+          technicoProPayload.files = selectedFiles;
+        }
+
+        if (editingItem && id) {
+          const currentFileUrls = formData.structured_fields?.file_urls || [];
+          const updatedFileUrls = currentFileUrls.filter(
+            (url: string) => !removedFileUrls.includes(url),
+          );
+
+          technicoProPayload.structured_fields = {
+            ...(formData.structured_fields || {}),
+            file_urls: updatedFileUrls,
+          };
+
+          if (removedFileUrls.length > 0) {
+            technicoProPayload.remove_file_urls = removedFileUrls.join(",");
+          }
+
+          if (formData.thumbnail instanceof File) {
+            technicoProPayload.thumbnail = formData.thumbnail;
+          }
+
+          await updateTechnicoPro({ id, data: technicoProPayload }).unwrap();
+        } else {
+          if (formData.structured_fields) {
+            technicoProPayload.structured_fields = formData.structured_fields;
+          }
+
+          if (formData.thumbnail instanceof File) {
+            technicoProPayload.thumbnail = formData.thumbnail;
+          }
+
+          await createTechnicoPro(
+            technicoProPayload as TechnicoProRequest,
+          ).unwrap();
         }
       } else if (activeTab === "events") {
         if (editingItem && id) {
@@ -2294,19 +2488,30 @@ export default function AdminPanel() {
 
   const handleSaveMemberPermission = async (feature: RolePermissionFeature) => {
     const permission = memberPermissionDrafts[feature];
-    if (!permission?.id || !selectedMemberForPermissions) {
+    if (!permission || !selectedMemberForPermissions) {
       return;
     }
 
     try {
-      await updateMemberPermission({
-        id: permission.id,
-        user_id: selectedMemberForPermissions.id,
-        can_view: permission.can_view,
-        can_create: permission.can_create,
-        can_edit: permission.can_edit,
-        can_delete: permission.can_delete,
-      }).unwrap();
+      if (permission.id) {
+        await updateMemberPermission({
+          id: permission.id,
+          user_id: selectedMemberForPermissions.id,
+          can_view: Boolean(permission.can_view),
+          can_create: Boolean(permission.can_create),
+          can_edit: Boolean(permission.can_edit),
+          can_delete: Boolean(permission.can_delete),
+        }).unwrap();
+      } else {
+        await createMemberPermission({
+          user_id: selectedMemberForPermissions.id,
+          feature: permission.feature,
+          can_view: Boolean(permission.can_view),
+          can_create: Boolean(permission.can_create),
+          can_edit: Boolean(permission.can_edit),
+          can_delete: Boolean(permission.can_delete),
+        }).unwrap();
+      }
 
       await refetchMemberPermissions();
       notifySuccess();
@@ -2340,6 +2545,14 @@ export default function AdminPanel() {
           count: articlesData?.total || 0,
         }
       : null,
+    canViewTechnicoPro
+      ? {
+          id: "technicopro",
+          icon: Wrench,
+          label: getTabLabel("technicopro"),
+          count: technicoproData?.total || 0,
+        }
+      : null,
     canViewEvents
       ? {
           id: "events",
@@ -2354,14 +2567,6 @@ export default function AdminPanel() {
           icon: BookOpen,
           label: getTabLabel("trainings"),
           count: trainingsData?.length || 0,
-        }
-      : null,
-    canAccessModeration
-      ? {
-          id: "moderation",
-          icon: ShieldAlert,
-          label: getTabLabel("moderation"),
-          count: moderationQueueData?.total || 0,
         }
       : null,
     canManageRolesPermissions
@@ -2451,6 +2656,7 @@ export default function AdminPanel() {
             ((activeTab === "members" && canCreateMembers) ||
               (activeTab === "forums" && canCreateForums) ||
               (activeTab === "articles" && canCreateArticles) ||
+              (activeTab === "technicopro" && canCreateTechnicoPro) ||
               (activeTab === "events" && canCreateEvents) ||
               (activeTab === "trainings" && canCreateTrainings)) && (
               <button
@@ -3299,6 +3505,22 @@ export default function AdminPanel() {
                           </th>
                         </>
                       )}
+                      {activeTab === "technicopro" && (
+                        <>
+                          <th className={adminTableHeadCellClass}>
+                            {translate("common.technicopro")}
+                          </th>
+                          <th className={adminTableHeadCellClass}>
+                            {translate("adminPanelPage.table.author")}
+                          </th>
+                          <th className={adminTableHeadCellClass}>
+                            {translate("adminPanelPage.table.category")}
+                          </th>
+                          <th className={adminTableHeadCellClass}>
+                            {translate("adminPanelPage.table.status")}
+                          </th>
+                        </>
+                      )}
                       {activeTab === "events" && (
                         <>
                           <th className={adminTableHeadCellClass}>
@@ -3473,7 +3695,7 @@ export default function AdminPanel() {
                               deleteVariant={
                                 member.status === "suspended"
                                   ? "restore"
-                                  : "delete"
+                                  : "archive"
                               }
                               onManagePermissions={() =>
                                 handleOpenMemberPermissionsModal(member)
@@ -3588,6 +3810,66 @@ export default function AdminPanel() {
                                 onPublish={
                                   article.status !== "published"
                                     ? () => handlePublishArticle(article.id)
+                                    : undefined
+                                }
+                              />
+                            </td>
+                          </tr>
+                        ))}
+
+                    {/* RENDER TECHNICOPRO */}
+                    {!showTableSkeleton &&
+                      activeTab === "technicopro" &&
+                      (technicoproData?.results || [])
+                        .filter((item) =>
+                          item.title
+                            .toLowerCase()
+                            .includes(searchTerm.toLowerCase()),
+                        )
+                        .map((item) => (
+                          <tr key={item.id} className={adminTableRowClass}>
+                            <td
+                              className={`${adminTableCellClass} max-w-xs truncate font-bold`}
+                            >
+                              {item.title}
+                            </td>
+                            <td
+                              className={`${adminTableCellClass} text-xs text-gray-500`}
+                            >
+                              {item.structured_fields?.author ||
+                                translate(
+                                  "adminPanelPage.fallbacks.defaultAuthor",
+                                )}
+                            </td>
+                            <td
+                              className={`${adminTableCellClass} text-[10px] font-black uppercase text-primary-dark`}
+                            >
+                              {item.category?.name ||
+                                translate(
+                                  "adminPanelPage.fallbacks.articleCategory",
+                                )}
+                            </td>
+                            <td
+                              className={`${adminTableCellClass} text-[10px] font-black uppercase`}
+                            >
+                              {item.status === "published" ? (
+                                <span className="text-emerald-600">
+                                  {getArticleStatusLabel(item.status)}
+                                </span>
+                              ) : (
+                                <span className="text-amber-600">
+                                  {getArticleStatusLabel(item.status)}
+                                </span>
+                              )}
+                            </td>
+                            <td className={`${adminTableCellClass} text-right`}>
+                              <Actions
+                                onView={() => handleViewItem(item)}
+                                onEdit={() => handleOpenModal(item)}
+                                onDelete={() => confirmDelete(item.id)}
+                                onPublish={
+                                  item.status !== "published"
+                                    ? () => handlePublishTechnicoPro(item.id)
                                     : undefined
                                 }
                               />
@@ -3899,6 +4181,53 @@ export default function AdminPanel() {
                     className={adminPaginationButtonClass}
                     disabled={
                       articlePage >= totalArticlePages || isFetchingArticles
+                    }
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "technicopro" && (
+              <div className={adminPaginationClass}>
+                <p className={adminPaginationTextClass}>
+                  {translate("adminPanelPage.pagination.showingTechnicoPro", {
+                    count: technicoproData?.results.length || 0,
+                    total: technicoproData?.total || 0,
+                  })}
+                  {isFetchingTechnicoPro && !isLoadingTechnicoPro
+                    ? translate("adminPanelPage.pagination.refreshing")
+                    : ""}
+                </p>
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  <span className={adminPaginationPageClass}>
+                    {translate("adminPanelPage.pagination.pageOf", {
+                      current: technicoproPage,
+                      total: totalTechnicoProPages,
+                    })}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setTechnicoproPage((currentPage) =>
+                        Math.max(1, currentPage - 1),
+                      )
+                    }
+                    className={adminPaginationButtonClass}
+                    disabled={technicoproPage <= 1 || isFetchingTechnicoPro}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() =>
+                      setTechnicoproPage((currentPage) =>
+                        Math.min(totalTechnicoProPages, currentPage + 1),
+                      )
+                    }
+                    className={adminPaginationButtonClass}
+                    disabled={
+                      technicoproPage >= totalTechnicoProPages ||
+                      isFetchingTechnicoPro
                     }
                   >
                     <ChevronRight className="w-4 h-4" />
@@ -4533,8 +4862,8 @@ export default function AdminPanel() {
             </>
           )}
 
-          {/* ARTICLE FORM */}
-          {activeTab === "articles" && (
+          {/* ARTICLE / TECHNICOPRO FORM */}
+          {(activeTab === "articles" || activeTab === "technicopro") && (
             <>
               <FormField
                 label={translate("adminPanelPage.form.articleTitle")}
@@ -4545,10 +4874,13 @@ export default function AdminPanel() {
                 <SelectField
                   label={translate("adminPanelPage.form.category")}
                   options={
-                    articleCategories?.map((c) => ({
+                    (activeTab === "technicopro"
+                      ? technicoproCategories
+                      : articleCategories || []
+                    ).map((c) => ({
                       label: c.name,
                       value: c.id,
-                    })) || []
+                    }))
                   }
                   value={formData.category_id}
                   onChange={(val) =>
@@ -4715,7 +5047,11 @@ export default function AdminPanel() {
                 <FileDropzone
                   files={selectedFiles}
                   onFilesChange={setSelectedFiles}
-                  inputId="admin-article-attachments-upload"
+                  inputId={
+                    activeTab === "technicopro"
+                      ? "admin-technicopro-attachments-upload"
+                      : "admin-article-attachments-upload"
+                  }
                   title={translate("articlesPage.uploadPrompt")}
                   hint={translate("articlesPage.uploadHelp")}
                   emptyLabel={translate("articlesPage.attachmentsOptional")}
@@ -5127,6 +5463,8 @@ export default function AdminPanel() {
               isUpdatingForum ||
               isCreatingArticle ||
               isUpdatingArticle ||
+              isCreatingTechnicoPro ||
+              isUpdatingTechnicoPro ||
               isCreatingEvent ||
               isUpdatingEvent ||
               isCreatingTraining ||
@@ -5140,6 +5478,8 @@ export default function AdminPanel() {
             isUpdatingForum ||
             isCreatingArticle ||
             isUpdatingArticle ||
+            isCreatingTechnicoPro ||
+            isUpdatingTechnicoPro ||
             isCreatingEvent ||
             isUpdatingEvent ||
             isCreatingTraining ||
@@ -5160,6 +5500,8 @@ export default function AdminPanel() {
             isUpdatingForum ||
             isCreatingArticle ||
             isUpdatingArticle ||
+            isCreatingTechnicoPro ||
+            isUpdatingTechnicoPro ||
             isCreatingEvent ||
             isUpdatingEvent ||
             isCreatingTraining ||
@@ -5180,6 +5522,7 @@ export default function AdminPanel() {
             !isArchivingUser &&
             !isRestoringUser &&
             !isDeletingArticle &&
+            !isDeletingTechnicoPro &&
             !isDeletingEvent &&
             !isDeletingTraining
           ) {
@@ -5226,6 +5569,7 @@ export default function AdminPanel() {
           isArchivingUser ||
           isRestoringUser ||
           isDeletingArticle ||
+          isDeletingTechnicoPro ||
           isDeletingEvent ||
           isDeletingTraining
         }
@@ -5881,11 +6225,11 @@ export default function AdminPanel() {
                   );
                   const isDirty =
                     permission &&
-                    originalPermission &&
+                    (!originalPermission ||
                     (permission.can_view !== originalPermission.can_view ||
                       permission.can_create !== originalPermission.can_create ||
                       permission.can_edit !== originalPermission.can_edit ||
-                      permission.can_delete !== originalPermission.can_delete);
+                      permission.can_delete !== originalPermission.can_delete));
 
                   return (
                     <div
@@ -5907,8 +6251,9 @@ export default function AdminPanel() {
                           type="button"
                           onClick={() => handleSaveMemberPermission(feature)}
                           disabled={
-                            !permission?.id ||
+                            !permission ||
                             !isDirty ||
+                            isCreatingMemberPermission ||
                             isUpdatingMemberPermission
                           }
                           className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white transition-all hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 cursor-pointer"
@@ -6499,6 +6844,7 @@ export default function AdminPanel() {
             {/* ATTACHMENTS */}
             {(activeTab === "forums" ||
               activeTab === "articles" ||
+              activeTab === "technicopro" ||
               activeTab === "trainings" ||
               activeTab === "events") && (
               <div className="space-y-4">
@@ -6509,7 +6855,7 @@ export default function AdminPanel() {
 
                 {(() => {
                   const attachmentUrls =
-                    activeTab === "articles"
+                    activeTab === "articles" || activeTab === "technicopro"
                       ? detailsItem?.structured_fields?.file_urls || []
                       : detailsItem?.attachments || [];
 
@@ -6631,7 +6977,7 @@ const Actions = ({
   onPermanentDelete?: () => void;
   deleteLabel?: string;
   deleteTitle?: string;
-  deleteVariant?: "delete" | "restore";
+  deleteVariant?: "archive" | "delete" | "restore";
 }) => {
   const { translate } = useI18n();
 
@@ -6669,11 +7015,15 @@ const Actions = ({
         className={`p-2 rounded-lg text-slate-400 transition-colors cursor-pointer ${
           deleteVariant === "restore"
             ? "hover:bg-emerald-50 hover:text-emerald-600"
+            : deleteVariant === "archive"
+              ? "hover:bg-amber-50 hover:text-amber-600"
             : "hover:bg-red-50 hover:text-red-600"
         }`}
       >
         {deleteVariant === "restore" ? (
           <RefreshCw className="w-4 h-4" />
+        ) : deleteVariant === "archive" ? (
+          <Archive className="w-4 h-4" />
         ) : (
           <Trash2 className="w-4 h-4" />
         )}

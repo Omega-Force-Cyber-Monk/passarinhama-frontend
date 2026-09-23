@@ -50,7 +50,7 @@ import { useI18n } from "../../i18n";
 
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
-import { useDirectUserPermissions } from "../../hooks/useDirectUserPermissions";
+import { usePermissions } from "../../hooks/usePermissions";
 import {
   useGetEventsQuery,
   useGetUpcomingEventsQuery,
@@ -223,11 +223,11 @@ export default function Agenda() {
   const { dateLocale, translate } = useI18n();
   const toast = useAppToast();
   const { user } = useSelector((state: RootState) => state.auth);
-  const { hasDirectPermission } = useDirectUserPermissions();
-  const canViewEvent = Boolean(user?.is_superuser) || hasDirectPermission("event", "view");
-  const canCreateEvent = hasDirectPermission("event", "create");
-  const canEditEvent = hasDirectPermission("event", "edit");
-  const canDeleteEventPermission = hasDirectPermission("event", "delete");
+  const { hasPermission } = usePermissions();
+  const canViewEvent = hasPermission("event", "view");
+  const canCreateEvent = hasPermission("event", "create");
+  const canEditEvent = hasPermission("event", "edit");
+  const canDeleteEventPermission = hasPermission("event", "delete");
   const navigate = useNavigate();
   const { agendaId } = useParams<{ agendaId?: string }>();
   const canSeeParticipants =

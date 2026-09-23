@@ -33,10 +33,8 @@ import Modal from '../components/ui/Modal';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import { useAppToast } from '../components/ui/AppToastProvider';
 
-import { useSelector } from 'react-redux';
-import { RootState } from '../redux/store';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ROLE_SLUGS } from '../redux/features/auth/authTypes';
+import { usePermissions } from '../hooks/usePermissions';
 import {
   useDeleteEventMutation,
   useGetEventsQuery,
@@ -46,8 +44,9 @@ import type { Event as ApiEvent } from '../redux/features/events/eventTypes';
 
 export default function Events() {
   const toast = useAppToast();
-  const { user } = useSelector((state: RootState) => state.auth);
-  const isAdmin = user?.role === ROLE_SLUGS.ADMIN;
+  const { user, hasPermission } = usePermissions();
+  const canCreateEvent = hasPermission("event", "create");
+  const canDeleteEvent = hasPermission("event", "delete");
   const navigate = useNavigate();
   const { eventId } = useParams<{ eventId?: string }>();
 
@@ -225,7 +224,7 @@ export default function Events() {
           <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm text-slate-600">
             <Download className="w-4 h-4" /> Export ICS
           </button>
-          {isAdmin && (
+          {canCreateEvent && (
             <button 
               onClick={() => setIsModalOpen(true)}
               className="flex items-center gap-2 px-6 py-2 bg-primary text-slate-900 rounded-xl text-sm font-bold shadow-sm hover:bg-primary-dark transition-all"
@@ -283,7 +282,7 @@ export default function Events() {
                             }`}
                           >
                              <span className="truncate">{event.title}</span>
-                             {isAdmin && (
+                             {canDeleteEvent && (
                                <button 
                                  onClick={(e) => confirmDeleteEvent(event.id, e)}
                                  className="opacity-0 group-hover/item:opacity-100 bg-white/50 rounded-sm"

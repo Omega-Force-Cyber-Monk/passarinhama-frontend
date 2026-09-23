@@ -21,7 +21,7 @@ const PermissionRoute: React.FC<PermissionRouteProps> = ({
   feature,
   action = 'view',
   allow,
-  redirectTo = '/dashboard',
+  redirectTo = '/',
 }) => {
   const location = useLocation();
   const { user, canAccessFeature, hasPermission } = usePermissions();

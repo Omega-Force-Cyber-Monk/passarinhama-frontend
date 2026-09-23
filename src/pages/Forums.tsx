@@ -1486,9 +1486,9 @@ export default function Forums() {
     }
   };
 
-  const canViewForum = isSuperuser || hasPermission("forum", "view");
+  const canViewForum = hasPermission("forum", "view");
   const canCreateForum = hasPermission("forum", "create");
-  const canCreateTopic = canViewForum;
+  const canCreateTopic = hasPermission("forum", "create");
   const canPostMessage = canViewForum;
   const canEditForum = hasPermission("forum", "edit");
   const canDeleteForum = hasPermission("forum", "delete");

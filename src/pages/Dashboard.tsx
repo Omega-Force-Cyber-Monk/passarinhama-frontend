@@ -8,7 +8,7 @@ import {
   useGetDashboardUpcomingEventsQuery,
 } from "../redux/features/dashboard/dashboardApi";
 import { useGetUsersOnlineQuery } from "../redux/features/members/membersApi";
-import { ROLE_SLUGS } from "../redux/features/auth/authTypes";
+import { usePermissions } from "../hooks/usePermissions";
 import {
   Users,
   MessageSquare,
@@ -323,8 +323,9 @@ export default function Dashboard() {
     notifySuccess(translate("dashboardPage.articlePublishedSuccess"));
   };
 
-  const isAdmin = user?.role === ROLE_SLUGS.ADMIN;
-  const isModerator = user?.role === ROLE_SLUGS.MODERATOR;
+  const { hasPermission } = usePermissions();
+  const isAdmin = hasPermission("user", "edit");
+  const isModerator = hasPermission("forum", "edit");
   const isExpert = isModerator;
   const statValues = {
     totalActiveMembers: stats?.total_active_members ?? 0,
