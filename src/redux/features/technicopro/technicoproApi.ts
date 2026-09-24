@@ -83,6 +83,23 @@ export const technicoProApi = apiSlice.injectEndpoints({
             ]
           : [{ type: "TechnicoPro", id: "LIST" }],
     }),
+    getMyTechnicoPros: builder.query<
+      PaginatedTechnicoPros,
+      { page?: number; pageSize?: number }
+    >({
+      query: ({ page = 1, pageSize = 20 }) =>
+        `/technicopro/my-technicopros?page=${page}&page_size=${pageSize}`,
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.results.map(({ id }) => ({
+                type: "TechnicoPro" as const,
+                id,
+              })),
+              { type: "TechnicoPro", id: "MY_LIST" },
+            ]
+          : [{ type: "TechnicoPro", id: "MY_LIST" }],
+    }),
     getTechnicoProCategories: builder.query<TechnicoProCategory[], void>({
       query: () => "/technicopro/technicopro-categories",
       providesTags: ["TechnicoProCategory"],
@@ -128,7 +145,10 @@ export const technicoProApi = apiSlice.injectEndpoints({
         method: "POST",
         body: buildTechnicoProFormData(data),
       }),
-      invalidatesTags: [{ type: "TechnicoPro", id: "LIST" }],
+      invalidatesTags: [
+        { type: "TechnicoPro", id: "LIST" },
+        { type: "TechnicoPro", id: "MY_LIST" },
+      ],
     }),
     getTechnicoProById: builder.query<TechnicoPro, string>({
       query: (id) => `/technicopro/technicopros/${id}`,
@@ -146,6 +166,7 @@ export const technicoProApi = apiSlice.injectEndpoints({
       invalidatesTags: (_result, _error, { id }) => [
         { type: "TechnicoPro", id },
         { type: "TechnicoPro", id: "LIST" },
+        { type: "TechnicoPro", id: "MY_LIST" },
       ],
     }),
     deleteTechnicoPro: builder.mutation<void, string>({
@@ -153,7 +174,10 @@ export const technicoProApi = apiSlice.injectEndpoints({
         url: `/technicopro/technicopros/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: [{ type: "TechnicoPro", id: "LIST" }],
+      invalidatesTags: [
+        { type: "TechnicoPro", id: "LIST" },
+        { type: "TechnicoPro", id: "MY_LIST" },
+      ],
     }),
     publishTechnicoPro: builder.mutation<PublishTechnicoProResponse, string>({
       query: (id) => ({
@@ -164,6 +188,7 @@ export const technicoProApi = apiSlice.injectEndpoints({
       invalidatesTags: (_result, _error, id) => [
         { type: "TechnicoPro", id },
         { type: "TechnicoPro", id: "LIST" },
+        { type: "TechnicoPro", id: "MY_LIST" },
       ],
     }),
     getTechnicoProPermissions: builder.query<TechnicoProPermission[], string>({
@@ -192,6 +217,7 @@ export const technicoProApi = apiSlice.injectEndpoints({
 
 export const {
   useGetTechnicoProsQuery,
+  useGetMyTechnicoProsQuery,
   useGetTechnicoProCategoriesQuery,
   useCreateTechnicoProCategoryMutation,
   useUpdateTechnicoProCategoryMutation,

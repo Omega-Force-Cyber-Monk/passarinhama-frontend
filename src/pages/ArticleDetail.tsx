@@ -7,62 +7,26 @@ import {
   Tag, 
   ArrowRight,
   File as FileIcon,
-  ExternalLink,
   Bookmark
 } from 'lucide-react';
 // import Markdown from 'react-markdown';
+import AccessRestrictedNotice from '../components/ui/AccessRestrictedNotice';
+import { FilePreviewCard } from '../components/ui/FileUploadPreview';
 import { useI18n } from '../i18n';
 import { 
   useGetArticleByIdQuery, 
   useGetArticlesQuery
 } from '../redux/features/articles/articlesApi';
-
-const getAttachmentType = (url: string) => {
-  const cleanUrl = url.split('?')[0].toLowerCase();
-
-  if (/\.(png|jpe?g|gif|webp|svg|avif)$/.test(cleanUrl)) {
-    return 'image' as const;
-  }
-
-  if (/\.(mp4|webm|ogg|mov|m4v)$/.test(cleanUrl)) {
-    return 'video' as const;
-  }
-
-  if (/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|txt|csv)$/.test(cleanUrl)) {
-    return 'document' as const;
-  }
-
-  return 'file' as const;
-};
+import { normalizeAttachments } from '../utils/attachments';
 
 const getAttachmentUrl = (attachment: string | { url: string }) =>
   typeof attachment === 'string' ? attachment : attachment.url;
 
-const getAttachmentName = (
-  attachment: string | { url: string; original_name?: string | null; file_name?: string | null },
-  fallback: string,
-) => {
-  if (typeof attachment !== 'string') {
-    return attachment.original_name || attachment.file_name || attachment.url.split('/').pop() || fallback;
+const getErrorStatus = (error: unknown) => {
+  if (error && typeof error === 'object' && 'status' in error) {
+    return (error as { status?: number | string }).status;
   }
-
-  return attachment.split('/').pop() || fallback;
-};
-
-const getAttachmentTypeLabel = (
-  type: ReturnType<typeof getAttachmentType>,
-  fallback: string,
-) => {
-  switch (type) {
-    case 'image':
-      return 'Image';
-    case 'video':
-      return 'Video';
-    case 'document':
-      return fallback;
-    default:
-      return 'File';
-  }
+  return undefined;
 };
 
 export default function ArticleDetail() {
@@ -70,7 +34,7 @@ export default function ArticleDetail() {
   const navigate = useNavigate();
   const { localeCode, translate } = useI18n();
   
-  const { data: article, isLoading, isError } = useGetArticleByIdQuery(slug || '');
+  const { data: article, isLoading, isError, error } = useGetArticleByIdQuery(slug || '');
   const { data: relatedArticlesData } = useGetArticlesQuery({ page: 1, pageSize: 5 });
 
   if (isLoading) {
@@ -80,6 +44,24 @@ export default function ArticleDetail() {
         <p className="text-slate-500 font-bold animate-pulse">
           {translate('articleDetailPage.loadingArticle')}
         </p>
+      </div>
+    );
+  }
+
+  const errorStatus = getErrorStatus(error);
+
+  if (errorStatus === 403) {
+    return (
+      <div className="min-h-screen bg-white px-4 py-12 sm:px-6">
+        <div className="mx-auto max-w-4xl">
+          <AccessRestrictedNotice />
+          <button
+            onClick={() => navigate('/articles')}
+            className="mt-6 px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl"
+          >
+            {translate('articleDetailPage.backToArticles')}
+          </button>
+        </div>
       </div>
     );
   }
@@ -118,11 +100,25 @@ export default function ArticleDetail() {
     article.structured_fields?.author || translate('articleDetailPage.defaultAuthor');
   const authorInitials = authorName.split(' ').map(n => n[0]).join('').toUpperCase();
   const featuredImageUrl = article.thumbnail_url || null;
+  const statusLabel = translate(
+    `articlesPage.status${article.status.charAt(0).toUpperCase()}${article.status.slice(1)}`,
+  );
+  const statusClass =
+    article.status === 'published'
+      ? 'bg-emerald-50 text-emerald-700'
+      : article.status === 'pending'
+        ? 'bg-amber-50 text-amber-700'
+        : 'bg-slate-100 text-slate-700';
   const attachmentUrls = (article.structured_fields?.file_urls || []).filter(
     (attachment) => {
       const url = getAttachmentUrl(attachment);
       return url && url !== featuredImageUrl;
     },
+  );
+  const attachments = normalizeAttachments(
+    attachmentUrls,
+    translate('articleDetailPage.attachmentFallback', { count: 1 }).replace('1', '').trim() ||
+      'Attachment',
   );
 
   return (
@@ -143,9 +139,14 @@ export default function ArticleDetail() {
       <article className="mx-auto max-w-4xl space-y-8 px-4 py-8 sm:px-6 sm:py-12">
         {/* Meta Info */}
         <header className="space-y-6 text-left">
-          <div className="flex items-center gap-2 text-xs font-bold text-primary-dark uppercase tracking-widest">
-            <Tag className="w-3 h-3" />
-            {categoryName}
+          <div className="flex flex-wrap items-center gap-3 text-xs font-bold uppercase tracking-widest">
+            <span className="flex items-center gap-2 text-primary-dark">
+              <Tag className="w-3 h-3" />
+              {categoryName}
+            </span>
+            <span className={`rounded-full px-3 py-1 ${statusClass}`}>
+              {statusLabel}
+            </span>
           </div>
           
           <h1 className="text-3xl font-extrabold leading-tight text-slate-900 sm:text-4xl md:text-5xl">
@@ -208,70 +209,26 @@ export default function ArticleDetail() {
         </div>
 
         {/* Attachments Section */}
-        {attachmentUrls.length > 0 && (
+        {attachments.length > 0 && (
           <div className="pt-12 border-t border-slate-100 space-y-4">
             <h3 className="text-lg font-bold text-slate-900 text-left flex items-center gap-2">
               <Bookmark className="w-5 h-5 text-primary" />
               {translate('articleDetailPage.attachmentsTitle')}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {attachmentUrls.map((attachment, idx) => {
-                const url = getAttachmentUrl(attachment);
-                const fileName =
-                  getAttachmentName(attachment, translate('articleDetailPage.attachmentFallback', {
-                    count: idx + 1,
-                  })) ||
-                  translate('articleDetailPage.attachmentFallback', {
-                    count: idx + 1,
-                  });
-                const attachmentType = getAttachmentType(url);
-
-                return (
-                  <a
-                    key={idx}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 group hover:bg-white hover:border-primary transition-all shadow-sm"
-                  >
-                    <div className="aspect-[4/3] bg-white border-b border-slate-100 overflow-hidden">
-                      {attachmentType === 'image' ? (
-                        <img
-                          src={url}
-                          alt={fileName}
-                          className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform"
-                        />
-                      ) : attachmentType === 'video' ? (
-                        <video
-                          src={url}
-                          className="w-full h-full object-cover"
-                          controls
-                          preload="metadata"
-                          onClick={(event) => event.stopPropagation()}
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
-                          <FileIcon className="w-12 h-12 text-slate-400" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between p-4">
-                      <div className="min-w-0 text-left">
-                        <p className="text-sm font-bold text-slate-700 truncate group-hover:text-primary transition-colors">
-                          {fileName}
-                        </p>
-                        <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-                          {getAttachmentTypeLabel(
-                            attachmentType,
-                            translate('articleDetailPage.documentType'),
-                          )}
-                        </p>
-                      </div>
-                      <ExternalLink className="w-4 h-4 text-slate-300 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
-                    </div>
-                  </a>
-                );
-              })}
+              {attachments.map((attachment) => (
+                <FilePreviewCard
+                  key={attachment.url}
+                  url={attachment.url}
+                  name={attachment.displayName}
+                  subtitle={
+                    attachment.fileSizeDisplay ||
+                    attachment.mimeType ||
+                    attachment.category.toUpperCase()
+                  }
+                  href={attachment.url}
+                />
+              ))}
             </div>
           </div>
         )}

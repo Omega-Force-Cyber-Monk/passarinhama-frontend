@@ -16,7 +16,6 @@ import {
   useCreateTechnicoProMutation,
   useDeleteTechnicoProCategoryMutation,
   useDeleteTechnicoProMutation,
-  useGetTechnicoProByIdQuery,
   useGetTechnicoProCategoriesQuery,
   useGetTechnicoProsQuery,
   useUpdateTechnicoProCategoryMutation,
@@ -74,17 +73,17 @@ const getAttachmentName = (attachment: Attachment) => {
   }
 };
 
-const getStatusLabel = (status: TechnicoProStatus) =>
-  status.charAt(0).toUpperCase() + status.slice(1);
+const getLocalizedStatusLabel = (
+  status: TechnicoProStatus,
+  translate: (key: string, values?: Record<string, string | number>) => string,
+) =>
+  translate(`articlesPage.status${status.charAt(0).toUpperCase()}${status.slice(1)}`);
 
 export default function TechnicoProPage() {
   const { translate, localeCode } = useI18n();
   const toast = useAppToast();
   const navigate = useNavigate();
-  const { categoryId, technicoproId } = useParams<{
-    categoryId?: string;
-    technicoproId?: string;
-  }>();
+  const { categoryId } = useParams<{ categoryId?: string }>();
   const { user } = useSelector((state: RootState) => state.auth);
   const { hasPermission } = usePermissions();
   const isSuperuser = Boolean(user?.is_superuser);
@@ -93,23 +92,21 @@ export default function TechnicoProPage() {
   const canEdit = hasPermission("technicopro", "edit");
   const canDelete = hasPermission("technicopro", "delete");
   const canManageCategories = canCreate || canEdit || isSuperuser;
+  const canViewLifecycleContent = canCreate || canEdit || canDelete || isSuperuser;
 
   const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<TechnicoProStatus>("published");
   const { data: categories = [] } = useGetTechnicoProCategoriesQuery();
   const { data, isLoading, isFetching } = useGetTechnicoProsQuery({
     page,
     pageSize: PAGE_SIZE,
     category_id: categoryId,
+    status: statusFilter,
     details: true,
   });
   const items = data?.results || [];
   const totalPages = data?.total_pages || 1;
   const selectedCategory = categories.find((category) => category.id === categoryId);
-  const listItem = items.find((item) => item.id === technicoproId);
-  const { data: fetchedItem } = useGetTechnicoProByIdQuery(technicoproId || "", {
-    skip: !technicoproId || Boolean(listItem),
-  });
-  const selectedItem = listItem || fetchedItem || null;
 
   const [createItem, { isLoading: isCreating }] = useCreateTechnicoProMutation();
   const [updateItem, { isLoading: isUpdating }] = useUpdateTechnicoProMutation();
@@ -135,7 +132,7 @@ export default function TechnicoProPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [categoryId]);
+  }, [categoryId, statusFilter]);
 
   useEffect(() => {
     if (!categoryId || !categories.length) return;
@@ -223,7 +220,6 @@ export default function TechnicoProPage() {
       await deleteItem(deletingId).unwrap();
       toast.success(translate("technicoproPage.success"));
       setDeletingId(null);
-      if (technicoproId === deletingId) navigate("/technicopro");
     } catch (error) {
       toast.error(getApiErrorDisplayMessage(error, translate, "apiErrors.default"));
     }
@@ -316,6 +312,25 @@ export default function TechnicoProPage() {
         </div>
       </header>
 
+      {canViewLifecycleContent ? (
+        <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+          {(["published", "pending", "draft"] as TechnicoProStatus[]).map((status) => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => setStatusFilter(status)}
+              className={`rounded-xl px-4 py-2 text-xs font-black uppercase tracking-widest transition-colors ${
+                statusFilter === status
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+              }`}
+            >
+              {getLocalizedStatusLabel(status, translate)}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {isLoading && !items.length ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm font-bold text-slate-500">
           {translate("common.loading")}
@@ -343,7 +358,7 @@ export default function TechnicoProPage() {
                     {item.category?.name || translate("common.technicopro")}
                   </span>
                   <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    {getStatusLabel(item.status)}
+                    {getLocalizedStatusLabel(item.status, translate)}
                   </span>
                 </div>
                 <h3 className="mt-4 line-clamp-2 text-lg font-bold text-slate-900">{item.title}</h3>
@@ -377,8 +392,7 @@ export default function TechnicoProPage() {
         </div>
       )}
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-end gap-3">
+      <div className="flex items-center justify-end gap-3">
           <button type="button" disabled={page <= 1 || isFetching} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold disabled:opacity-40">
             Previous
           </button>
@@ -386,25 +400,7 @@ export default function TechnicoProPage() {
           <button type="button" disabled={page >= totalPages || isFetching} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold disabled:opacity-40">
             Next
           </button>
-        </div>
-      )}
-
-      <Modal isOpen={Boolean(selectedItem)} onClose={() => navigate("/technicopro")} title={selectedItem?.title || translate("common.technicopro")} maxWidth="max-w-4xl">
-        {selectedItem ? (
-          <div className="space-y-6">
-            {selectedItem.thumbnail_url ? <img src={selectedItem.thumbnail_url} alt={selectedItem.title} className="aspect-video w-full rounded-2xl object-cover" /> : null}
-            {selectedItem.excerpt ? <p className="border-l-4 border-primary pl-4 text-lg font-medium italic text-slate-500">{selectedItem.excerpt}</p> : null}
-            <div className="tiptap-content prose prose-slate max-w-none" dangerouslySetInnerHTML={{ __html: selectedItem.body || "" }} />
-            {selectedItem.structured_fields?.file_urls?.length ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {selectedItem.structured_fields.file_urls.map((attachment) => (
-                  <FilePreviewCard key={getAttachmentUrl(attachment as Attachment)} url={getAttachmentUrl(attachment as Attachment)} name={getAttachmentName(attachment as Attachment)} href={getAttachmentUrl(attachment as Attachment)} />
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </Modal>
+      </div>
 
       <Modal isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} title={editingItem ? translate("technicoproPage.edit") : translate("technicoproPage.create")} maxWidth="max-w-4xl">
         <form noValidate onSubmit={handleSubmit} className="space-y-5">
@@ -419,9 +415,9 @@ export default function TechnicoProPage() {
           <TiptapEditor content={formData.body} onChange={(body) => setFormData((current) => ({ ...current, body }))} onImageUpload={handleImageUpload} />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <select value={formData.status} onChange={(event) => setFormData((current) => ({ ...current, status: event.target.value as TechnicoProStatus }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none">
-              <option value="draft">Draft</option>
-              <option value="pending">Pending</option>
-              <option value="published">Published</option>
+              <option value="draft">{getLocalizedStatusLabel("draft", translate)}</option>
+              <option value="pending">{getLocalizedStatusLabel("pending", translate)}</option>
+              <option value="published">{getLocalizedStatusLabel("published", translate)}</option>
             </select>
             <input type="file" accept="image/*" onChange={(event) => setFormData((current) => ({ ...current, thumbnail: event.target.files?.[0] || null }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold" />
           </div>

@@ -24,7 +24,6 @@ import {
   useDeleteTrainingCategoryMutation,
   useDeleteTrainingMutation,
   useGetTrainingsPaginatedQuery,
-  useGetTrainingByIdQuery,
   useGetTrainingCategoriesQuery,
   useUpdateTrainingCategoryMutation,
   useUpdateTrainingMutation,
@@ -81,14 +80,17 @@ const getAttachmentName = (attachment: Attachment) => {
   }
 };
 
-const getStatusLabel = (status: TrainingStatus) =>
-  status.charAt(0).toUpperCase() + status.slice(1);
+const getLocalizedStatusLabel = (
+  status: TrainingStatus,
+  translate: (key: string, values?: Record<string, string | number>) => string,
+) =>
+  translate(`articlesPage.status${status.charAt(0).toUpperCase()}${status.slice(1)}`);
 
 export default function Trainings() {
   const { translate, localeCode } = useI18n();
   const toast = useAppToast();
   const navigate = useNavigate();
-  const { categoryId, trainingId } = useParams<{ categoryId?: string; trainingId?: string }>();
+  const { categoryId } = useParams<{ categoryId?: string }>();
   const { user } = useSelector((state: RootState) => state.auth);
   const { hasPermission } = usePermissions();
   const isSuperuser = Boolean(user?.is_superuser);
@@ -97,24 +99,22 @@ export default function Trainings() {
   const canEditTraining = hasPermission("training", "edit");
   const canDeleteTraining = hasPermission("training", "delete");
   const canManageCategories = canCreateTraining || canEditTraining || isSuperuser;
+  const canViewLifecycleContent =
+    canCreateTraining || canEditTraining || canDeleteTraining || isSuperuser;
 
   const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<TrainingStatus>("published");
   const { data: categories = [] } = useGetTrainingCategoriesQuery();
   const { data: trainingsData, isLoading, isFetching } = useGetTrainingsPaginatedQuery({
     page,
     pageSize: PAGE_SIZE,
     category_id: categoryId,
+    status: statusFilter,
     details: true,
   });
   const selectedCategory = categories.find((category) => category.id === categoryId);
   const trainings = trainingsData?.results || [];
   const totalPages = trainingsData?.total_pages || 1;
-
-  const listTraining = trainings.find((training) => training.id === trainingId);
-  const { data: fetchedTraining } = useGetTrainingByIdQuery(trainingId || "", {
-    skip: !trainingId || Boolean(listTraining),
-  });
-  const selectedTraining = listTraining || fetchedTraining || null;
 
   const [createTraining, { isLoading: isCreating }] = useCreateTrainingMutation();
   const [updateTraining, { isLoading: isUpdating }] = useUpdateTrainingMutation();
@@ -137,7 +137,7 @@ export default function Trainings() {
 
   useEffect(() => {
     setPage(1);
-  }, [categoryId]);
+  }, [categoryId, statusFilter]);
 
   useEffect(() => {
     if (!categoryId || !categories.length) return;
@@ -231,7 +231,6 @@ export default function Trainings() {
       await deleteTraining(deletingId).unwrap();
       toast.success(translate("trainingsPage.success"));
       setDeletingId(null);
-      if (trainingId === deletingId) navigate("/trainings");
     } catch (error) {
       toast.error(getApiErrorDisplayMessage(error, translate, "apiErrors.default"));
     }
@@ -324,6 +323,25 @@ export default function Trainings() {
         </div>
       </header>
 
+      {canViewLifecycleContent ? (
+        <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+          {(["published", "pending", "draft"] as TrainingStatus[]).map((status) => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => setStatusFilter(status)}
+              className={`rounded-xl px-4 py-2 text-xs font-black uppercase tracking-widest transition-colors ${
+                statusFilter === status
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+              }`}
+            >
+              {getLocalizedStatusLabel(status, translate)}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {isLoading && !trainings.length ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm font-bold text-slate-500">
           {translate("common.loading")}
@@ -358,7 +376,7 @@ export default function Trainings() {
                     {training.category?.name || translate("common.training")}
                   </span>
                   <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    {getStatusLabel(training.status)}
+                    {getLocalizedStatusLabel(training.status, translate)}
                   </span>
                 </div>
                 <h3 className="mt-4 line-clamp-2 text-lg font-bold text-slate-900">
@@ -402,8 +420,7 @@ export default function Trainings() {
         </div>
       )}
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-end gap-3">
+      <div className="flex items-center justify-end gap-3">
           <button
             type="button"
             disabled={page <= 1 || isFetching}
@@ -423,48 +440,7 @@ export default function Trainings() {
           >
             Next
           </button>
-        </div>
-      )}
-
-      <Modal
-        isOpen={Boolean(selectedTraining)}
-        onClose={() => navigate("/trainings")}
-        title={selectedTraining?.title || translate("common.training")}
-        maxWidth="max-w-4xl"
-      >
-        {selectedTraining ? (
-          <div className="space-y-6">
-            {selectedTraining.thumbnail_url ? (
-              <img
-                src={selectedTraining.thumbnail_url}
-                alt={selectedTraining.title}
-                className="aspect-video w-full rounded-2xl object-cover"
-              />
-            ) : null}
-            {selectedTraining.excerpt ? (
-              <p className="border-l-4 border-primary pl-4 text-lg font-medium italic text-slate-500">
-                {selectedTraining.excerpt}
-              </p>
-            ) : null}
-            <div
-              className="tiptap-content prose prose-slate max-w-none"
-              dangerouslySetInnerHTML={{ __html: selectedTraining.description }}
-            />
-            {selectedTraining.attachments?.length ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {selectedTraining.attachments.map((attachment) => (
-                  <FilePreviewCard
-                    key={getAttachmentUrl(attachment as Attachment)}
-                    url={getAttachmentUrl(attachment as Attachment)}
-                    name={getAttachmentName(attachment as Attachment)}
-                    href={getAttachmentUrl(attachment as Attachment)}
-                  />
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </Modal>
+      </div>
 
       <Modal
         isOpen={isFormOpen}
@@ -532,9 +508,9 @@ export default function Trainings() {
                 onChange={(event) => setFormData((current) => ({ ...current, status: event.target.value as TrainingStatus }))}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/30"
               >
-                <option value="draft">Draft</option>
-                <option value="pending">Pending</option>
-                <option value="published">Published</option>
+                <option value="draft">{getLocalizedStatusLabel("draft", translate)}</option>
+                <option value="pending">{getLocalizedStatusLabel("pending", translate)}</option>
+                <option value="published">{getLocalizedStatusLabel("published", translate)}</option>
               </select>
             </label>
             <label className="space-y-2 text-left">

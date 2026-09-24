@@ -427,6 +427,7 @@ export default function Articles() {
 
   const navigate = useNavigate();
   const { categoryId } = useParams<{ categoryId?: string }>();
+  const [statusFilter, setStatusFilter] = useState<Extract<ArticleStatus, "published" | "pending" | "draft">>("published");
   const [publishedPage, setPublishedPage] = useState(1);
   const [pendingPage, setPendingPage] = useState(1);
   const [draftPage, setDraftPage] = useState(1);
@@ -659,6 +660,12 @@ export default function Articles() {
       roleIds: [userRolesData[0].id],
     }));
   }, [permissionData.roleIds.length, userRolesData]);
+
+  useEffect(() => {
+    setPublishedPage(1);
+    setPendingPage(1);
+    setDraftPage(1);
+  }, [categoryId, statusFilter]);
 
   const handleOpenModal = (article?: ApiArticle) => {
     if ((article && !canEditArticle) || (!article && !canCreateArticle)) {
@@ -977,6 +984,81 @@ export default function Articles() {
           ),
       )
     : 1;
+  const activeArticles =
+    statusFilter === "published"
+      ? publishedArticles
+      : statusFilter === "pending"
+        ? pendingArticles
+        : draftArticles;
+  const activeIsLoading =
+    statusFilter === "published"
+      ? isLoadingPublished
+      : statusFilter === "pending"
+        ? isLoadingPending
+        : isLoadingDrafts;
+  const activeIsFetching =
+    statusFilter === "published"
+      ? isFetchingPublished
+      : statusFilter === "pending"
+        ? isFetchingPending
+        : isFetchingDrafts;
+  const activeIsError =
+    statusFilter === "published"
+      ? isPublishedError
+      : statusFilter === "pending"
+        ? isPendingError
+        : isDraftsError;
+  const activePage =
+    statusFilter === "published"
+      ? publishedPage
+      : statusFilter === "pending"
+        ? pendingPage
+        : draftPage;
+  const activeTotalPages =
+    statusFilter === "published"
+      ? publishedTotalPages
+      : statusFilter === "pending"
+        ? pendingTotalPages
+        : draftTotalPages;
+  const activeTotal =
+    statusFilter === "published"
+      ? publishedArticlesData?.total || 0
+      : statusFilter === "pending"
+        ? pendingArticlesData?.total || 0
+        : draftArticlesData?.total || 0;
+  const setActivePage =
+    statusFilter === "published"
+      ? setPublishedPage
+      : statusFilter === "pending"
+        ? setPendingPage
+        : setDraftPage;
+  const activeEmptyMessage =
+    statusFilter === "published"
+      ? translate("articlesPage.noPublished")
+      : statusFilter === "pending"
+        ? translate("articlesPage.noPending")
+        : translate("articlesPage.noDrafts");
+  const activeErrorMessage =
+    statusFilter === "published"
+      ? translate("articlesPage.articlesLoadError")
+      : statusFilter === "pending"
+        ? translate("articlesPage.pendingLoadError")
+        : translate("articlesPage.draftsLoadError");
+  const activeShowingMessage =
+    statusFilter === "published"
+      ? translate("articlesPage.showingPublished", {
+          count: activeArticles.length,
+          total: activeTotal,
+        })
+      : statusFilter === "pending"
+        ? translate("articlesPage.showingPending", {
+            count: activeArticles.length,
+            total: activeTotal,
+          })
+        : translate("articlesPage.showingDrafts", {
+            count: activeArticles.length,
+            total: activeTotal,
+          });
   const showInitialPageSkeleton =
     isLoadingPublished &&
     publishedArticles.length === 0 &&
@@ -1057,211 +1139,47 @@ export default function Articles() {
         </div>
       </header>
 
-            {/* Published Articles Grid */}
+      {canManageArticleContent ? (
+        <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+          {(["published", "pending", "draft"] as const)
+            .filter((status) => status !== "pending" || isSuperuser)
+            .map((status) => (
+              <button
+                key={status}
+                type="button"
+                onClick={() => setStatusFilter(status)}
+                className={`rounded-xl px-4 py-2 text-xs font-black uppercase tracking-widest transition-colors ${
+                  statusFilter === status
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                }`}
+              >
+                {translate(`articlesPage.status${status.charAt(0).toUpperCase()}${status.slice(1)}`)}
+              </button>
+            ))}
+        </div>
+      ) : null}
+
       <section className="space-y-6">
-        {canManageArticleContent && (
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-1 bg-emerald-500 rounded-full" />
-            <h3 className="text-xl font-bold text-slate-900">
-              {translate("articlesPage.published")}
-            </h3>
-          </div>
-        )}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 lg:gap-8">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
           <AnimatePresence mode="popLayout">
-            {isLoadingPublished ? (
+            {activeIsLoading ? (
               <div className="col-span-full">
                 <ArticlesSectionSkeleton count={4} />
               </div>
-            ) : isPublishedError ? (
-              <div className="col-span-full bg-red-50 border border-red-100 rounded-3xl p-12 text-center">
-                <p className="text-red-600 font-bold">
-                  {translate("articlesPage.articlesLoadError")}
-                </p>
+            ) : activeIsError ? (
+              <div className="col-span-full rounded-3xl border border-red-100 bg-red-50 p-12 text-center">
+                <p className="font-bold text-red-600">{activeErrorMessage}</p>
               </div>
-            ) : publishedArticles.length === 0 ? (
-              <div className="col-span-full bg-slate-50 border border-slate-100 rounded-3xl p-12 text-center">
-                <p className="text-slate-500 font-bold">
-                  {translate("articlesPage.noPublished")}
-                </p>
+            ) : activeArticles.length === 0 ? (
+              <div className="col-span-full rounded-3xl border border-slate-100 bg-slate-50 p-12 text-center">
+                <p className="font-bold text-slate-500">{activeEmptyMessage}</p>
               </div>
             ) : (
-              publishedArticles.map((article) => (
-                  <ArticleCard 
-                    key={article.id} 
-                    article={article} 
-                    canPublishArticle={canPublishArticle}
-                    canEditArticle={canEditArticle}
-                    canDeleteArticle={canDeleteArticle}
-                    handlePublish={handlePublish}
-                    handleOpenModal={handleOpenModal}
-                    confirmDelete={confirmDelete}
-                    navigate={navigate}
-                  />
-                ))
-            )}
-          </AnimatePresence>
-        </div>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-slate-500">
-            {translate("articlesPage.showingPublished", {
-              count: publishedArticles.length,
-              total: publishedArticlesData?.total || 0,
-            })}
-            {isFetchingPublished && !isLoadingPublished
-              ? translate("articlesPage.refreshing")
-              : ""}
-          </p>
-          <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
-              {translate("articlesPage.pageOf", {
-                current: publishedPage,
-                total: publishedTotalPages,
-              })}
-            </span>
-            <button
-              onClick={() =>
-                setPublishedPage((currentPage) => Math.max(1, currentPage - 1))
-              }
-              className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
-              disabled={publishedPage <= 1 || isFetchingPublished}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() =>
-                setPublishedPage((currentPage) =>
-                  Math.min(publishedTotalPages, currentPage + 1),
-                )
-              }
-              className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
-              disabled={publishedPage >= publishedTotalPages || isFetchingPublished}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Admin/Moderator Drafts Section */}
-      {isSuperuser && (
-        <section className="space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-1 bg-sky-500 rounded-full" />
-            <h3 className="text-xl font-bold text-slate-900">
-              {translate("articlesPage.pending")}
-            </h3>
-            <span className="px-2 py-0.5 bg-sky-100 text-sky-700 text-[10px] font-bold rounded-full">
-              {pendingArticlesData?.total || 0}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 lg:gap-8">
-            <AnimatePresence mode="popLayout">
-              {isLoadingPending ? (
-                <div className="col-span-full">
-                  <ArticlesSectionSkeleton count={4} />
-                </div>
-              ) : isPendingError ? (
-                <div className="col-span-full bg-red-50 border border-red-100 rounded-3xl p-12 text-center">
-                  <p className="text-red-600 font-bold">
-                    {translate("articlesPage.pendingLoadError")}
-                  </p>
-                </div>
-              ) : pendingArticles.length === 0 ? (
-                <div className="col-span-full bg-slate-50 border border-slate-100 rounded-3xl p-12 text-center">
-                  <p className="text-slate-500 font-bold">
-                    {translate("articlesPage.noPending")}
-                  </p>
-                </div>
-              ) : (
-                pendingArticles.map((article) => (
-                  <ArticleCard
-                    key={article.id}
-                    article={article}
-                    canPublishArticle={canPublishArticle}
-                    canEditArticle={canEditArticle}
-                    canDeleteArticle={canDeleteArticle}
-                    handlePublish={handlePublish}
-                    handleOpenModal={handleOpenModal}
-                    confirmDelete={confirmDelete}
-                    navigate={navigate}
-                  />
-                ))
-              )}
-            </AnimatePresence>
-          </div>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-slate-500">
-              {translate("articlesPage.showingPending", {
-                count: pendingArticles.length,
-                total: pendingArticlesData?.total || 0,
-              })}
-              {isFetchingPending && !isLoadingPending
-                ? translate("articlesPage.refreshing")
-                : ""}
-            </p>
-            <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-              <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                {translate("articlesPage.pageOf", {
-                  current: pendingPage,
-                  total: pendingTotalPages,
-                })}
-              </span>
-              <button
-                onClick={() => setPendingPage((currentPage) => Math.max(1, currentPage - 1))}
-                className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
-                disabled={pendingPage <= 1 || isFetchingPending}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() =>
-                  setPendingPage((currentPage) => Math.min(pendingTotalPages, currentPage + 1))
-                }
-                className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
-                disabled={pendingPage >= pendingTotalPages || isFetchingPending}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {canManageArticleContent && (
-        <section className="space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-1 bg-amber-500 rounded-full" />
-            <h3 className="text-xl font-bold text-slate-900">
-              {translate("articlesPage.drafts")}
-            </h3>
-            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full">
-              {draftArticlesData?.total || 0}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 lg:gap-8">
-            <AnimatePresence mode="popLayout">
-              {isLoadingDrafts ? (
-                <div className="col-span-full">
-                  <ArticlesSectionSkeleton count={4} />
-                </div>
-              ) : isDraftsError ? (
-                <div className="col-span-full bg-red-50 border border-red-100 rounded-3xl p-12 text-center">
-                  <p className="text-red-600 font-bold">
-                    {translate("articlesPage.draftsLoadError")}
-                  </p>
-                </div>
-              ) : draftArticles.length === 0 ? (
-                <div className="col-span-full bg-slate-50 border border-slate-100 rounded-3xl p-12 text-center">
-                  <p className="text-slate-500 font-bold">
-                    {translate("articlesPage.noDrafts")}
-                  </p>
-                </div>
-              ) : (
-                draftArticles.map((article) => (
-                <ArticleCard 
-                  key={article.id} 
-                  article={article} 
+              activeArticles.map((article) => (
+                <ArticleCard
+                  key={article.id}
+                  article={article}
                   canPublishArticle={canPublishArticle}
                   canEditArticle={canEditArticle}
                   canDeleteArticle={canDeleteArticle}
@@ -1270,47 +1188,45 @@ export default function Articles() {
                   confirmDelete={confirmDelete}
                   navigate={navigate}
                 />
-                ))
-              )}
-            </AnimatePresence>
-          </div>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-slate-500">
-              {translate("articlesPage.showingDrafts", {
-                count: draftArticles.length,
-                total: draftArticlesData?.total || 0,
+              ))
+            )}
+          </AnimatePresence>
+        </div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-slate-500">
+            {activeShowingMessage}
+            {activeIsFetching && !activeIsLoading
+              ? translate("articlesPage.refreshing")
+              : ""}
+          </p>
+          <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
+              {translate("articlesPage.pageOf", {
+                current: activePage,
+                total: activeTotalPages,
               })}
-              {isFetchingDrafts && !isLoadingDrafts
-                ? translate("articlesPage.refreshing")
-                : ""}
-            </p>
-            <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-              <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                {translate("articlesPage.pageOf", {
-                  current: draftPage,
-                  total: draftTotalPages,
-                })}
-              </span>
-              <button
-                onClick={() => setDraftPage((currentPage) => Math.max(1, currentPage - 1))}
-                className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
-                disabled={draftPage <= 1 || isFetchingDrafts}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() =>
-                  setDraftPage((currentPage) => Math.min(draftTotalPages, currentPage + 1))
-                }
-                className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
-                disabled={draftPage >= draftTotalPages || isFetchingDrafts}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+            </span>
+            <button
+              type="button"
+              onClick={() => setActivePage((currentPage) => Math.max(1, currentPage - 1))}
+              className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50 disabled:opacity-30"
+              disabled={activePage <= 1 || activeIsFetching}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setActivePage((currentPage) => Math.min(activeTotalPages, currentPage + 1))
+              }
+              className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50 disabled:opacity-30"
+              disabled={activePage >= activeTotalPages || activeIsFetching}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
-        </section>
-      )}
+        </div>
+      </section>
 
 
       {/* <div className="bg-slate-100/50 p-12 rounded-3xl flex flex-col items-center text-center marker-class">

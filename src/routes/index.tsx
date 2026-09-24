@@ -16,7 +16,9 @@ const Articles = lazy(() => import('../pages/Articles'));
 const Agenda = lazy(() => import('../pages/Agenda/Agenda'));
 const Events = lazy(() => import('../pages/Events'));
 const Trainings = lazy(() => import('../pages/Trainings'));
+const TrainingDetail = lazy(() => import('../pages/TrainingDetail'));
 const TechnicoPro = lazy(() => import('../pages/TechnicoPro'));
+const TechnicoProDetail = lazy(() => import('../pages/TechnicoProDetail'));
 const DocumentLibrary = lazy(() => import('../pages/DocumentLibrary'));
 const AdminPanel = lazy(() => import('../pages/AdminPanel'));
 const Profile = lazy(() => import('../pages/Profile'));
@@ -135,7 +137,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'trainings/:trainingId',
-        element: <PermissionRoute feature="training"><Trainings /></PermissionRoute>,
+        element: <PermissionRoute feature="training"><TrainingDetail /></PermissionRoute>,
         errorElement: <RouteError />,
       },
       {
@@ -150,7 +152,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'technicopro/:technicoproId',
-        element: <PermissionRoute feature="technicopro"><TechnicoPro /></PermissionRoute>,
+        element: <PermissionRoute feature="technicopro"><TechnicoProDetail /></PermissionRoute>,
         errorElement: <RouteError />,
       },
       {

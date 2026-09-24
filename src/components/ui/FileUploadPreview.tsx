@@ -1,45 +1,30 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
+  Download,
   ExternalLink,
   File as FileIcon,
   FileText,
+  Music,
   Image as ImageIcon,
   Trash2,
   Upload,
   Video,
 } from "lucide-react";
+import {
+  formatFileSize,
+  getAttachmentCategory,
+  getFileExtension,
+  getUrlDisplayName,
+  downloadUrlAsFile,
+  openUrlAsBlob,
+  type AttachmentCategory,
+} from "../../utils/attachments";
 
-type PreviewKind = "image" | "video" | "file";
-
-const IMAGE_EXTENSIONS = new Set([
-  "jpg",
-  "jpeg",
-  "png",
-  "gif",
-  "webp",
-  "svg",
-  "bmp",
-  "avif",
-]);
-
-const VIDEO_EXTENSIONS = new Set([
-  "mp4",
-  "webm",
-  "ogg",
-  "mov",
-  "m4v",
-]);
-
-const getExtension = (value: string) =>
-  value.includes(".") ? value.split(".").pop()?.toLowerCase() || "" : "";
+type PreviewKind = AttachmentCategory;
 
 export const getPreviewName = (value: string) => {
-  try {
-    return decodeURIComponent(value.split("/").pop() || value);
-  } catch {
-    return value.split("/").pop() || value;
-  }
+  return getUrlDisplayName(value, value);
 };
 
 export const getPreviewKind = ({
@@ -51,8 +36,12 @@ export const getPreviewKind = ({
   url?: string | null;
   name?: string | null;
 }): PreviewKind => {
-  if (file?.type.startsWith("image/")) return "image";
-  if (file?.type.startsWith("video/")) return "video";
+  if (file?.type) {
+    return getAttachmentCategory({
+      extension: getFileExtension(file.name),
+      mimeType: file.type,
+    });
+  }
 
   const lookupValues = [
     file?.name,
@@ -61,20 +50,17 @@ export const getPreviewKind = ({
   ].filter(Boolean) as string[];
 
   for (const lookupValue of lookupValues) {
-    const extension = getExtension(lookupValue);
+    const category = getAttachmentCategory({
+      extension: getFileExtension(lookupValue),
+    });
 
-    if (IMAGE_EXTENSIONS.has(extension)) return "image";
-    if (VIDEO_EXTENSIONS.has(extension)) return "video";
+    if (category !== "file") return category;
   }
 
   return "file";
 };
 
-export const formatPreviewSize = (size: number) => {
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-};
+export const formatPreviewSize = (size: number) => formatFileSize(size) || `${size} B`;
 
 const PreviewMedia = ({
   file,
@@ -120,6 +106,14 @@ const PreviewMedia = ({
     );
   }
 
+  if (kind === "audio" && source) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-slate-50 p-4">
+        <audio src={source} controls className="w-full" preload="metadata" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full w-full items-center justify-center bg-slate-50">
       <div className="rounded-2xl bg-white p-4 text-slate-400 shadow-sm">
@@ -152,6 +146,8 @@ export const FilePreviewCard = ({
   mediaShapeClassName?: string;
   className?: string;
 }) => {
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isOpening, setIsOpening] = useState(false);
   const resolvedName = useMemo(() => {
     if (name) return name;
     if (file?.name) return file.name;
@@ -160,7 +156,46 @@ export const FilePreviewCard = ({
   }, [emptyLabel, file?.name, name, url]);
   const kind = getPreviewKind({ file, url, name: resolvedName });
   const resolvedSubtitle =
-    subtitle || (file ? formatPreviewSize(file.size) : href ? "Open file" : null);
+    subtitle || (file ? formatPreviewSize(file.size) : kind.toUpperCase());
+  const fallbackMimeType =
+    kind === "pdf"
+      ? "application/pdf"
+      : kind === "text"
+        ? "text/plain"
+        : kind === "audio"
+          ? "audio/mpeg"
+          : kind === "video"
+            ? "video/mp4"
+            : kind === "image"
+              ? "image/*"
+              : undefined;
+
+  const handleDownload = async () => {
+    if (!url || isDownloading) return;
+
+    setIsDownloading(true);
+    try {
+      await downloadUrlAsFile(url, resolvedName, fallbackMimeType);
+    } catch (error) {
+      window.alert("Download failed. Open the file and download it from the viewer if available.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleOpen = async () => {
+    const targetUrl = href || url;
+    if (!targetUrl || isOpening) return;
+
+    setIsOpening(true);
+    try {
+      await openUrlAsBlob(targetUrl, fallbackMimeType);
+    } catch (error) {
+      window.alert("Unable to open this file. The server rejected the file request.");
+    } finally {
+      setIsOpening(false);
+    }
+  };
 
   return (
     <div className={`overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ${className}`}>
@@ -180,6 +215,8 @@ export const FilePreviewCard = ({
               <ImageIcon className="h-4 w-4 shrink-0 text-primary" />
             ) : kind === "video" ? (
               <Video className="h-4 w-4 shrink-0 text-primary" />
+            ) : kind === "audio" ? (
+              <Music className="h-4 w-4 shrink-0 text-primary" />
             ) : (
               <FileIcon className="h-4 w-4 shrink-0 text-primary" />
             )}
@@ -192,15 +229,27 @@ export const FilePreviewCard = ({
           ) : null}
         </div>
         <div className="flex items-center gap-1">
-          {href ? (
-            <a
-              href={href}
-              target="_blank"
-              rel="noreferrer"
+          {url ? (
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="rounded-full p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+              title="Download"
+            >
+              <Download className="h-4 w-4" />
+            </button>
+          ) : null}
+          {href || url ? (
+            <button
+              type="button"
+              onClick={handleOpen}
+              disabled={isOpening}
               className="rounded-full p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+              title="Open"
             >
               <ExternalLink className="h-4 w-4" />
-            </a>
+            </button>
           ) : null}
           {onRemove ? (
             <button
