@@ -475,7 +475,10 @@ export default function Articles() {
       skip: !canManageArticleContent,
     } as any,
   );
-  const { data: categoriesData } = useGetArticleCategoriesQuery();
+  const { data: categoriesResponse } = useGetArticleCategoriesQuery({
+    pageSize: 100,
+  });
+  const categoriesData = categoriesResponse?.results ?? [];
   const { data: userRolesData = [] } = useGetUserRolesQuery();
 
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(

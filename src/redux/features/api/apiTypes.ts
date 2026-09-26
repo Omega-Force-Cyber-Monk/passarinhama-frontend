@@ -8,9 +8,18 @@ export interface StatsResponse {
 export interface PaginatedResponse<T> {
   total: number;
   page: number;
-  page_size?: number;
-  total_pages?: number;
+  page_size: number;
+  limit: number;
+  total_pages: number;
   results: T[];
+}
+
+export interface CategoryQueryParams {
+  page?: number;
+  pageSize?: number;
+  page_size?: number;
+  limit?: number;
+  search?: string | null;
 }
 
 export interface DynamicCategory {

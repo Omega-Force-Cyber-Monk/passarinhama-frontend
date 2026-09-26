@@ -104,7 +104,10 @@ export default function Trainings() {
 
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<TrainingStatus>("published");
-  const { data: categories = [] } = useGetTrainingCategoriesQuery();
+  const { data: categoriesResponse } = useGetTrainingCategoriesQuery({
+    pageSize: 100,
+  });
+  const categories = categoriesResponse?.results ?? [];
   const { data: trainingsData, isLoading, isFetching } = useGetTrainingsPaginatedQuery({
     page,
     pageSize: PAGE_SIZE,

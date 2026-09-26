@@ -247,7 +247,10 @@ export default function Agenda() {
     isLoading: isLoadingUpcoming,
     isError: isUpcomingError,
   } = useGetUpcomingEventsQuery({ limit: 6 });
-  const { data: eventCategories = [] } = useGetEventCategoriesQuery();
+  const { data: eventCategoriesResponse } = useGetEventCategoriesQuery({
+    pageSize: 100,
+  });
+  const eventCategories = eventCategoriesResponse?.results ?? [];
 
   const [createEvent, { isLoading: isCreatingEvent }] =
     useCreateEventMutation();

@@ -118,8 +118,8 @@ export default function Home() {
     Boolean((location.state as { accessRestricted?: boolean } | null)?.accessRestricted) ||
     !canViewAnyHomeSection;
 
-  const { data: forums = [], isLoading: isForumsLoading } = useGetForumsQuery(
-    undefined,
+  const { data: forumsData, isLoading: isForumsLoading } = useGetForumsQuery(
+    { pageSize: MAX_SECTION_CARDS },
     { skip: !canViewForum } as any,
   );
   const { data: upcomingEvents = [], isLoading: isEventsLoading } =
@@ -148,6 +148,7 @@ export default function Home() {
 
   const articles = (articlesData?.results || []).slice(0, MAX_SECTION_CARDS);
   const trainings = (trainingsData?.results || []).slice(0, MAX_SECTION_CARDS);
+  const forums = forumsData?.results ?? [];
   const visibleForums = forums.slice(0, MAX_SECTION_CARDS);
   const visibleEvents = upcomingEvents.slice(0, MAX_SECTION_CARDS);
 

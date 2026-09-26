@@ -20,10 +20,23 @@ import {
 import { RootState } from "../redux/store";
 import { logout, setUser } from "../redux/features/auth/authSlice";
 import { ROLE_SLUGS } from "../redux/features/auth/authTypes";
-import { useGetForumsQuery } from "../redux/features/forum/forumApi";
-import { useGetArticleCategoriesQuery } from "../redux/features/articles/articlesApi";
-import { useGetTrainingCategoriesQuery } from "../redux/features/trainings/trainingsApi";
-import { useGetTechnicoProCategoriesQuery } from "../redux/features/technicopro/technicoproApi";
+import {
+  useGetForumsQuery,
+  useLazyGetForumsQuery,
+} from "../redux/features/forum/forumApi";
+import {
+  useGetArticleCategoriesQuery,
+  useLazyGetArticleCategoriesQuery,
+} from "../redux/features/articles/articlesApi";
+import {
+  useGetTrainingCategoriesQuery,
+  useLazyGetTrainingCategoriesQuery,
+} from "../redux/features/trainings/trainingsApi";
+import {
+  useGetTechnicoProCategoriesQuery,
+  useLazyGetTechnicoProCategoriesQuery,
+} from "../redux/features/technicopro/technicoproApi";
+import SidebarCategorySection from "./SidebarCategorySection";
 import {
   useGetUsersMeQuery,
   useGetUsersOnlineQuery,
@@ -127,19 +140,6 @@ const DashboardLayout: React.FC = () => {
   const { data: profileData } = useGetUsersMeQuery(undefined, {
     skip: !isAuthenticated,
   });
-  const { data: forumsData } = useGetForumsQuery(undefined, {
-    skip: !isAuthenticated,
-  });
-  const { data: articleCategoriesData } = useGetArticleCategoriesQuery(undefined, {
-    skip: !isAuthenticated || !canAccessFeature("article"),
-  });
-  const { data: trainingCategoriesData } = useGetTrainingCategoriesQuery(undefined, {
-    skip: !isAuthenticated || !canAccessFeature("training"),
-  });
-  const { data: technicoProCategoriesData } =
-    useGetTechnicoProCategoriesQuery(undefined, {
-      skip: !isAuthenticated || !canAccessFeature("technicopro"),
-    });
   const { data: onlineUsersData } = useGetUsersOnlineQuery(undefined, {
     skip: !isAuthenticated,
   });
@@ -297,8 +297,6 @@ const DashboardLayout: React.FC = () => {
     user?.avatarInitials ||
     buildInitials(user?.first_name, user?.last_name);
   const onlineUsers = onlineUsersData?.users || [];
-  const showForumsActive =
-    location.pathname === "/forums" || location.pathname.startsWith("/forums/");
   const hasSearchResults =
     Boolean(searchResults?.articles.length) ||
     Boolean(searchResults?.topics.length) ||
@@ -378,119 +376,75 @@ const DashboardLayout: React.FC = () => {
                   : location.pathname === item.path ||
                     location.pathname.startsWith(`${item.path}/`);
 
-              const dynamicNavConfig =
-                item.path === "/articles"
-                  ? {
-                      isOpen: articlesDropdownOpen,
-                      setOpen: setArticlesDropdownOpen,
-                      isActive: location.pathname.startsWith("/articles"),
-                      allPath: "/articles",
-                      allLabel: translate("layout.allNews"),
-                      children: (articleCategoriesData || []).map((category) => ({
-                        id: category.id,
-                        name: category.name,
-                        path: `/articles/category/${category.id}`,
-                      })),
-                    }
-                  : item.path === "/forums"
-                    ? {
-                        isOpen: forumsDropdownOpen,
-                        setOpen: setForumsDropdownOpen,
-                        isActive: showForumsActive,
-                        allPath: "/forums",
-                        allLabel: translate("layout.allDiscussions"),
-                        children: (forumsData || []).map((forum) => ({
-                          id: forum.id,
-                          name: forum.name,
-                          path: `/forums/${forum.id}`,
-                        })),
-                      }
-                    : item.path === "/trainings"
-                      ? {
-                          isOpen: trainingsDropdownOpen,
-                          setOpen: setTrainingsDropdownOpen,
-                          isActive: location.pathname.startsWith("/trainings"),
-                          allPath: "/trainings",
-                          allLabel: translate("layout.allTraining"),
-                          children: (trainingCategoriesData || []).map((category) => ({
-                            id: category.id,
-                            name: category.name,
-                            path: `/trainings/category/${category.id}`,
-                          })),
-                        }
-                      : item.path === "/technicopro"
-                        ? {
-                            isOpen: technicoProDropdownOpen,
-                            setOpen: setTechnicoProDropdownOpen,
-                            isActive: location.pathname.startsWith("/technicopro"),
-                            allPath: "/technicopro",
-                            allLabel: translate("layout.allTechnicoPro"),
-                            children: (technicoProCategoriesData || []).map((category) => ({
-                              id: category.id,
-                              name: category.name,
-                              path: `/technicopro/category/${category.id}`,
-                            })),
-                          }
-                        : null;
-
-              if (dynamicNavConfig) {
+              if (item.path === "/articles") {
                 return (
-                  <div key={item.path} className="rounded-[12px]">
-                    <button
-                      type="button"
-                      onClick={() => dynamicNavConfig.setOpen((value) => !value)}
-                      className={`flex w-full items-center gap-2.5 rounded-[10px] px-2.5 py-[9px] text-left text-[15px] font-semibold transition-all cursor-pointer ${
-                        dynamicNavConfig.isActive
-                          ? "bg-[var(--archi-accent)] text-[var(--archi-text)]"
-                          : "text-[var(--archi-text)] hover:bg-[var(--archi-surface-soft)]"
-                      }`}
-                    >
-                      <item.icon className="h-[18px] w-[18px] shrink-0" />
-                      <span>{item.name}</span>
-                      <ChevronDown
-                        className={`ml-auto h-4 w-4 shrink-0 transition-transform ${
-                          dynamicNavConfig.isOpen ? "rotate-180" : ""
-                        }`}
-                      />
-                    </button>
+                  <SidebarCategorySection
+                    key={item.path}
+                    name={item.name}
+                    icon={item.icon}
+                    basePath="/articles"
+                    allLabel={translate("layout.allNews")}
+                    isOpen={articlesDropdownOpen}
+                    onToggle={() => setArticlesDropdownOpen((prev) => !prev)}
+                    skip={!isAuthenticated || !canAccessFeature("article")}
+                    useGetQuery={useGetArticleCategoriesQuery}
+                    useLazyQuery={useLazyGetArticleCategoriesQuery}
+                    getItemPath={(category) => `/articles/category/${category.id}`}
+                  />
+                );
+              }
 
-                    <div
-                      className={`relative ml-3.5 overflow-hidden pl-4 transition-all duration-300 ${
-                        dynamicNavConfig.isOpen
-                          ? "max-h-[600px] py-1 opacity-100"
-                          : "max-h-0 py-0 opacity-0"
-                      }`}
-                    >
-                      <div className="absolute bottom-1.5 left-[6px] top-1.5 w-px bg-[var(--archi-border)]" />
-                      <Link
-                        to={dynamicNavConfig.allPath}
-                        className={`relative flex items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-[12.5px] font-medium transition-all ${
-                          location.pathname === dynamicNavConfig.allPath
-                            ? "bg-[var(--archi-surface-soft)] text-[var(--archi-text)]"
-                            : "text-[var(--archi-secondary)] hover:bg-[var(--archi-surface-soft)] hover:text-[var(--archi-text)]"
-                        }`}
-                      >
-                        <span className="h-[5px] w-[5px] rounded-full bg-[var(--archi-muted)]" />
-                        {dynamicNavConfig.allLabel}
-                      </Link>
+              if (item.path === "/forums") {
+                return (
+                  <SidebarCategorySection
+                    key={item.path}
+                    name={item.name}
+                    icon={item.icon}
+                    basePath="/forums"
+                    allLabel={translate("layout.allDiscussions")}
+                    isOpen={forumsDropdownOpen}
+                    onToggle={() => setForumsDropdownOpen((prev) => !prev)}
+                    skip={!isAuthenticated}
+                    useGetQuery={useGetForumsQuery}
+                    useLazyQuery={useLazyGetForumsQuery}
+                    getItemPath={(forum) => `/forums/${forum.id}`}
+                  />
+                );
+              }
 
-                      {dynamicNavConfig.children.map((child) => (
-                        <Link
-                          key={child.id}
-                          to={child.path}
-                          className={`relative flex items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-[12.5px] font-medium transition-all ${
-                            location.pathname === child.path ||
-                            location.pathname.startsWith(`${child.path}/`)
-                              ? "bg-[var(--archi-surface-soft)] text-[var(--archi-text)]"
-                              : "text-[var(--archi-secondary)] hover:bg-[var(--archi-surface-soft)] hover:text-[var(--archi-text)]"
-                          }`}
-                        >
-                          <span className="h-[5px] w-[5px] rounded-full bg-[var(--archi-muted)]" />
-                          <span className="truncate">{child.name}</span>
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
+              if (item.path === "/trainings") {
+                return (
+                  <SidebarCategorySection
+                    key={item.path}
+                    name={item.name}
+                    icon={item.icon}
+                    basePath="/trainings"
+                    allLabel={translate("layout.allTraining")}
+                    isOpen={trainingsDropdownOpen}
+                    onToggle={() => setTrainingsDropdownOpen((prev) => !prev)}
+                    skip={!isAuthenticated || !canAccessFeature("training")}
+                    useGetQuery={useGetTrainingCategoriesQuery}
+                    useLazyQuery={useLazyGetTrainingCategoriesQuery}
+                    getItemPath={(category) => `/trainings/category/${category.id}`}
+                  />
+                );
+              }
+
+              if (item.path === "/technicopro") {
+                return (
+                  <SidebarCategorySection
+                    key={item.path}
+                    name={item.name}
+                    icon={item.icon}
+                    basePath="/technicopro"
+                    allLabel={translate("layout.allTechnicoPro")}
+                    isOpen={technicoProDropdownOpen}
+                    onToggle={() => setTechnicoProDropdownOpen((prev) => !prev)}
+                    skip={!isAuthenticated || !canAccessFeature("technicopro")}
+                    useGetQuery={useGetTechnicoProCategoriesQuery}
+                    useLazyQuery={useLazyGetTechnicoProCategoriesQuery}
+                    getItemPath={(category) => `/technicopro/category/${category.id}`}
+                  />
                 );
               }
 

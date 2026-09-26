@@ -313,8 +313,20 @@ const DocumentLibraryPageSkeleton = () => (
   </div>
 );
 
+const getFolderItemCount = (folder: DocumentFolder): number =>
+  (folder.document_count ?? 0) + (folder.children?.length ?? 0);
+
 export default function DocumentLibrary() {
   const { translate } = useI18n();
+
+  const formatFolderItemCount = (folder: DocumentFolder) => {
+    const itemCount = getFolderItemCount(folder);
+    const key =
+      itemCount === 1
+        ? "documentLibraryPage.itemLabel"
+        : "documentLibraryPage.itemsLabel";
+    return translate(key, { count: itemCount });
+  };
   const { user } = useSelector((state: RootState) => state.auth);
   const { hasPermission } = usePermissions();
   const isSuperuser = Boolean(user?.is_superuser);
@@ -1085,9 +1097,7 @@ export default function DocumentLibrary() {
                               {folder.name}
                             </h4>
                             <p className="text-xs text-slate-400 mt-1">
-                              {translate("documentLibraryPage.filesLabel", {
-                                count: folder.document_count,
-                              })}{" "}
+                              {formatFolderItemCount(folder)}{" "}
                               •{" "}
                               {folder.can_upload
                                 ? translate("documentLibraryPage.uploadEnabled")
@@ -1115,7 +1125,7 @@ export default function DocumentLibrary() {
                           {translate("documentLibraryPage.name")}
                         </th>
                         <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">
-                          {translate("documentLibraryPage.files")}
+                          {translate("documentLibraryPage.items")}
                         </th>
                         <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">
                           {translate("documentLibraryPage.permissions")}
@@ -1141,9 +1151,7 @@ export default function DocumentLibrary() {
                             </div>
                           </td>
                           <td className="px-6 py-4 text-slate-500 hidden md:table-cell">
-                            {translate("documentLibraryPage.filesLabel", {
-                              count: folder.document_count,
-                            })}
+                            {formatFolderItemCount(folder)}
                           </td>
                           <td className="px-6 py-4 text-slate-500 hidden md:table-cell">
                             {folder.can_upload

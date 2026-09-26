@@ -1,4 +1,5 @@
 import { apiSlice as baseApi } from '../api/apiSlice';
+import type { CategoryQueryParams, PaginatedResponse } from '../api/apiTypes';
 import {
   Event,
   EventCategory,
@@ -76,8 +77,26 @@ export const eventsApi = baseApi.injectEndpoints({
       providesTags: ['Event'],
     }),
 
-    getEventCategories: builder.query<EventCategory[], void>({
-      query: () => '/events/event-categories',
+    getEventCategories: builder.query<
+      PaginatedResponse<EventCategory>,
+      CategoryQueryParams | void
+    >({
+      query: (arg) => {
+        const params = arg && typeof arg === 'object' ? arg : undefined;
+        const searchParams = new URLSearchParams();
+        if (params?.page) {
+          searchParams.set('page', String(params.page));
+        }
+        const pageSize = params?.pageSize ?? params?.page_size ?? params?.limit;
+        if (pageSize) {
+          searchParams.set('page_size', String(pageSize));
+        }
+        if (params?.search?.trim()) {
+          searchParams.set('search', params.search.trim());
+        }
+        const queryString = searchParams.toString();
+        return `/events/event-categories${queryString ? `?${queryString}` : ''}`;
+      },
       providesTags: ['EventCategory'],
     }),
 

@@ -42,6 +42,8 @@ export interface ForumListItem {
   can_post: boolean;
 }
 
+export type ForumCategory = ForumListItem;
+
 export interface ForumDetails {
   id: string;
   slug: string;

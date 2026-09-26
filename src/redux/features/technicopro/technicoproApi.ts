@@ -1,4 +1,5 @@
 import { apiSlice } from "../api/apiSlice";
+import type { CategoryQueryParams, PaginatedResponse } from "../api/apiTypes";
 import {
   BulkTechnicoProPermissionResponse,
   CreateTechnicoProCategoryRequest,
@@ -100,8 +101,26 @@ export const technicoProApi = apiSlice.injectEndpoints({
             ]
           : [{ type: "TechnicoPro", id: "MY_LIST" }],
     }),
-    getTechnicoProCategories: builder.query<TechnicoProCategory[], void>({
-      query: () => "/technicopro/technicopro-categories",
+    getTechnicoProCategories: builder.query<
+      PaginatedResponse<TechnicoProCategory>,
+      CategoryQueryParams | void
+    >({
+      query: (arg) => {
+        const params = arg && typeof arg === "object" ? arg : undefined;
+        const searchParams = new URLSearchParams();
+        if (params?.page) {
+          searchParams.set("page", String(params.page));
+        }
+        const pageSize = params?.pageSize ?? params?.page_size ?? params?.limit;
+        if (pageSize) {
+          searchParams.set("page_size", String(pageSize));
+        }
+        if (params?.search?.trim()) {
+          searchParams.set("search", params.search.trim());
+        }
+        const queryString = searchParams.toString();
+        return `/technicopro/technicopro-categories${queryString ? `?${queryString}` : ""}`;
+      },
       providesTags: ["TechnicoProCategory"],
     }),
     createTechnicoProCategory: builder.mutation<
@@ -219,6 +238,7 @@ export const {
   useGetTechnicoProsQuery,
   useGetMyTechnicoProsQuery,
   useGetTechnicoProCategoriesQuery,
+  useLazyGetTechnicoProCategoriesQuery,
   useCreateTechnicoProCategoryMutation,
   useUpdateTechnicoProCategoryMutation,
   useDeleteTechnicoProCategoryMutation,

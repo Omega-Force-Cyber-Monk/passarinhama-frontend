@@ -547,7 +547,9 @@ export default function Forums() {
     forumId?: string;
     topicId?: string;
   }>();
-  const { data: forumData, isLoading: isForumsLoading } = useGetForumsQuery();
+  const { data: forumData, isLoading: isForumsLoading } = useGetForumsQuery({
+    pageSize: 100,
+  });
   const {
     data: pinnedTopics = [],
     isLoading: isPinnedTopicsLoading,
@@ -730,7 +732,7 @@ export default function Forums() {
   );
 
   const forums = useMemo<ForumWithMeta[]>(() => {
-    const apiForums = (forumData || []).map((forum, index) => ({
+    const apiForums = (forumData?.results || []).map((forum, index) => ({
       id: forum.id,
       name: forum.name,
       forum_type: forum.forum_type,

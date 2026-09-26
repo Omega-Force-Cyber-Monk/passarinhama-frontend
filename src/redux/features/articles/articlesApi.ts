@@ -1,4 +1,5 @@
 import { apiSlice } from '../api/apiSlice';
+import type { CategoryQueryParams, PaginatedResponse } from '../api/apiTypes';
 import {
   Article,
   ArticleCategory,
@@ -90,8 +91,26 @@ export const articlesApi = apiSlice.injectEndpoints({
             ]
           : [{ type: 'Article', id: 'LIST' }],
     }),
-    getArticleCategories: builder.query<ArticleCategory[], void>({
-      query: () => '/articles/article-categories',
+    getArticleCategories: builder.query<
+      PaginatedResponse<ArticleCategory>,
+      CategoryQueryParams | void
+    >({
+      query: (arg) => {
+        const params = arg && typeof arg === 'object' ? arg : undefined;
+        const searchParams = new URLSearchParams();
+        if (params?.page) {
+          searchParams.set('page', String(params.page));
+        }
+        const pageSize = params?.pageSize ?? params?.page_size ?? params?.limit;
+        if (pageSize) {
+          searchParams.set('page_size', String(pageSize));
+        }
+        if (params?.search?.trim()) {
+          searchParams.set('search', params.search.trim());
+        }
+        const queryString = searchParams.toString();
+        return `/articles/article-categories${queryString ? `?${queryString}` : ''}`;
+      },
       providesTags: ['Article'],
     }),
     createArticle: builder.mutation<Article, CreateArticleRequest>({
@@ -221,6 +240,7 @@ export const articlesApi = apiSlice.injectEndpoints({
 export const {
   useGetArticlesQuery,
   useGetArticleCategoriesQuery,
+  useLazyGetArticleCategoriesQuery,
   useCreateArticleMutation,
   useGetMyArticlesQuery,
   useGetArticleByIdQuery,

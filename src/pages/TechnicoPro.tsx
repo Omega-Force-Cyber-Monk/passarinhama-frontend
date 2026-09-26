@@ -96,7 +96,10 @@ export default function TechnicoProPage() {
 
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<TechnicoProStatus>("published");
-  const { data: categories = [] } = useGetTechnicoProCategoriesQuery();
+  const { data: categoriesResponse } = useGetTechnicoProCategoriesQuery({
+    pageSize: 100,
+  });
+  const categories = categoriesResponse?.results ?? [];
   const { data, isLoading, isFetching } = useGetTechnicoProsQuery({
     page,
     pageSize: PAGE_SIZE,

@@ -692,7 +692,8 @@ export default function AdminPanel() {
     role_id: memberRoleFilter !== "all" ? memberRoleFilter : undefined,
     status: memberStatusFilter !== "all" ? memberStatusFilter : undefined,
   });
-  const { data: forumsData } = useGetForumsQuery();
+  const { data: forumsResponse } = useGetForumsQuery({ pageSize: 100 });
+  const forumsData = forumsResponse?.results ?? [];
   const {
     data: articlesData,
     isLoading: isLoadingArticles,
@@ -713,7 +714,10 @@ export default function AdminPanel() {
     year: new Date().getFullYear(),
     month: new Date().getMonth() + 1,
   });
-  const { data: eventCategories = [] } = useGetEventCategoriesQuery();
+  const { data: eventCategoriesResponse } = useGetEventCategoriesQuery({
+    pageSize: 100,
+  });
+  const eventCategories = eventCategoriesResponse?.results ?? [];
   const { data: trainingsData } = useGetAllTrainingsQuery();
   const { data: userRolesData = [] } = useGetUserRolesQuery();
   const forumPermissionRoleOptions = React.useMemo(
@@ -974,9 +978,17 @@ export default function AdminPanel() {
     skip: !singleSelectedTrainingId || !isTrainingPermissionModalOpen,
   });
 
-  const { data: articleCategories } = useGetArticleCategoriesQuery();
-  const { data: technicoproCategories = [] } = useGetTechnicoProCategoriesQuery();
-  const { data: trainingCategories = [] } = useGetTrainingCategoriesQuery();
+  const { data: articleCategoriesResponse } = useGetArticleCategoriesQuery({
+    pageSize: 100,
+  });
+  const articleCategories = articleCategoriesResponse?.results ?? [];
+  const { data: technicoproCategoriesResponse } =
+    useGetTechnicoProCategoriesQuery({ pageSize: 100 });
+  const technicoproCategories = technicoproCategoriesResponse?.results ?? [];
+  const { data: trainingCategoriesResponse } = useGetTrainingCategoriesQuery({
+    pageSize: 100,
+  });
+  const trainingCategories = trainingCategoriesResponse?.results ?? [];
 
   // Fetch specific entity data when in edit mode
   const {
@@ -2534,7 +2546,7 @@ export default function AdminPanel() {
           id: "forums",
           icon: Database,
           label: getTabLabel("forums"),
-          count: forumsData?.length || 0,
+          count: forumsResponse?.total ?? forumsData.length,
         }
       : null,
     canViewArticles

@@ -1,4 +1,5 @@
 import { apiSlice } from "../api/apiSlice";
+import type { CategoryQueryParams, PaginatedResponse } from "../api/apiTypes";
 import {
   CreateTopicPostRequest,
   CreateForumTopicRequest,
@@ -108,14 +109,30 @@ const buildForumUpdateSearchParams = (
 
 export const forumApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getForums: builder.query<ForumListItem[], void>({
-      query: () => FORUMS_BASE_PATH,
-      transformResponse: (response: ListResponse<ForumListItem>) =>
-        normalizeListResponse(response),
+    getForums: builder.query<
+      PaginatedResponse<ForumListItem>,
+      CategoryQueryParams | void
+    >({
+      query: (arg) => {
+        const params = arg && typeof arg === "object" ? arg : undefined;
+        const searchParams = new URLSearchParams();
+        if (params?.page) {
+          searchParams.set("page", String(params.page));
+        }
+        const pageSize = params?.pageSize ?? params?.page_size ?? params?.limit;
+        if (pageSize) {
+          searchParams.set("page_size", String(pageSize));
+        }
+        if (params?.search?.trim()) {
+          searchParams.set("search", params.search.trim());
+        }
+        const queryString = searchParams.toString();
+        return `${FORUMS_BASE_PATH}${queryString ? `?${queryString}` : ""}`;
+      },
       providesTags: (result) =>
         result
           ? [
-              ...result.map(({ id }) => ({ type: "Forum" as const, id })),
+              ...result.results.map(({ id }) => ({ type: "Forum" as const, id })),
               { type: "Forum" as const, id: "LIST" },
             ]
           : [{ type: "Forum" as const, id: "LIST" }],
@@ -373,6 +390,7 @@ export const forumApi = apiSlice.injectEndpoints({
 
 export const {
   useGetForumsQuery,
+  useLazyGetForumsQuery,
   useCreateForumMutation,
   useDeleteForumMutation,
   useUpdateForumMutation,
