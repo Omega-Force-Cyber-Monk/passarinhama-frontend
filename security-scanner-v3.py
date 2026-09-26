@@ -305,8 +305,14 @@ class AdvancedSecurityScanner:
                 (re.compile(r'(?im)(?:resolved|tarball|url|registry|source)\s*[=:]\s*["\x27]?http://[^\s"\x27]+'), 'INSECURE_DEPENDENCY_SOURCE', 'HIGH'),
                 (REMOTE_SOURCE, 'NON_REGISTRY_DEPENDENCY_SOURCE', 'MEDIUM'),
             ]:
-                match = pattern.search(content)
-                if match:
+                has_threat = False
+                for match in pattern.finditer(content):
+                    m_text = match.group(0).lower()
+                    if 'registry.npmjs.org' in m_text or 'registry.yarnpkg.com' in m_text:
+                        continue
+                    has_threat = True
+                    break
+                if has_threat:
                     self._add(path, category, severity, 'Lockfile contains a dependency source needing review.')
             if path.name in {'package-lock.json', 'npm-shrinkwrap.json', 'Pipfile.lock'}:
                 try:
@@ -406,10 +412,7 @@ class AdvancedSecurityScanner:
                 self._add(path, 'COCOAPODS_BUILD_HOOK', 'MEDIUM', 'CocoaPods install/build hook requires review.')
         if '.husky' in parts or '.githooks' in parts or name in {'Makefile', 'Procfile'} or 'ci_scripts' in parts:
             self._add(path, 'AUTOMATIC_COMMAND_SURFACE', 'LOW', 'Git hook, task, or build script contains executable commands.')
-        if name in {'vite.config.ts', 'vite.config.js', 'next.config.js', 'next.config.mjs',
-                    'webpack.config.js', 'babel.config.js', 'jest.config.js',
-                    'playwright.config.ts', 'vitest.config.ts', 'eslint.config.js'}:
-            self._add(path, 'NODE_EXECUTABLE_CONFIG', 'LOW', 'Node tooling executes this configuration file.')
+        # (Removed generic NODE_EXECUTABLE_CONFIG flag to reduce false positives)
         if name in {'Dockerfile', 'Makefile', 'gradlew'} or name.endswith(('.sh', '.ps1', '.bat')):
             self._check_command(path, content, name)
 
