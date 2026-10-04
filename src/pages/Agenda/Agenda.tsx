@@ -375,9 +375,15 @@ export default function Agenda() {
     };
   };
 
+  const calendarStart = startOfWeek(startOfMonth(currentMonth), {
+    weekStartsOn: 1,
+  });
+  const calendarEnd = endOfWeek(endOfMonth(currentMonth), {
+    weekStartsOn: 1,
+  });
   const days = eachDayOfInterval({
-    start: startOfMonth(currentMonth),
-    end: endOfMonth(currentMonth),
+    start: calendarStart,
+    end: calendarEnd,
   });
 
   useEffect(() => {
