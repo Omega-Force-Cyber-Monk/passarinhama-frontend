@@ -13,4 +13,4 @@ temp_interactive_push.bat
 .gitignore
 branch_structure.json
 config.bat
-security-scanner-v3
+security-scanner-v3.py

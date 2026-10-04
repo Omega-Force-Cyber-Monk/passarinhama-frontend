@@ -24,14 +24,12 @@ const PermissionRoute: React.FC<PermissionRouteProps> = ({
   redirectTo = '/',
 }) => {
   const location = useLocation();
-  const { user, canAccessFeature, hasPermission } = usePermissions();
+  const { user, hasPermission } = usePermissions();
 
   const isAllowed = allow
     ? allow(user)
     : feature
-      ? action
-        ? hasPermission(feature, action)
-        : canAccessFeature(feature)
+      ? hasPermission(feature, action)
       : true;
 
   if (!isAllowed) {

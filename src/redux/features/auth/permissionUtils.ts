@@ -144,7 +144,7 @@ export const hasAnyPermission = (
 export const canAccessFeature = (
   user: UserProfile | null | undefined,
   feature: PermissionFeature,
-): boolean => hasAnyPermission(user, feature);
+): boolean => hasPermission(user, feature, 'view');
 
 export const canAccessAdminPanel = (user: UserProfile | null | undefined) =>
   Boolean(user?.is_superuser);

@@ -133,7 +133,7 @@ const DashboardLayout: React.FC = () => {
   const { translate } = useI18n();
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
   const lastSyncedProfileRef = useRef<string>("");
-  const { canAccessFeature, canAccessAdminPanel } =
+  const { hasPermission, canAccessAdminPanel } =
     usePermissions();
   const isSuperuser = Boolean(user?.is_superuser);
 
@@ -210,7 +210,7 @@ const DashboardLayout: React.FC = () => {
       { name: translate("common.home"), path: "/", icon: Home },
     ];
 
-    if (canAccessFeature("event")) {
+    if (hasPermission("event", "view")) {
       items.push({
         name: translate("common.agenda"),
         path: "/agenda",
@@ -218,7 +218,7 @@ const DashboardLayout: React.FC = () => {
       });
     }
 
-    if (canAccessFeature("article")) {
+    if (hasPermission("article", "view")) {
       items.push({
         name: translate("common.articles"),
         path: "/articles",
@@ -226,7 +226,7 @@ const DashboardLayout: React.FC = () => {
       });
     }
 
-    if (canAccessFeature("forum")) {
+    if (hasPermission("forum", "view")) {
       items.push({
         name: translate("common.forums"),
         path: "/forums",
@@ -234,7 +234,7 @@ const DashboardLayout: React.FC = () => {
       });
     }
 
-    if (canAccessFeature("training")) {
+    if (hasPermission("training", "view")) {
       items.push({
         name: translate("common.training"),
         path: "/trainings",
@@ -242,7 +242,7 @@ const DashboardLayout: React.FC = () => {
       });
     }
 
-    if (canAccessFeature("technicopro")) {
+    if (hasPermission("technicopro", "view")) {
       items.push({
         name: translate("common.technicopro"),
         path: "/technicopro",
@@ -250,7 +250,7 @@ const DashboardLayout: React.FC = () => {
       });
     }
 
-    if (canAccessFeature("document")) {
+    if (hasPermission("document", "view")) {
       items.push({
         name: translate("common.documents"),
         path: "/documents",
@@ -258,7 +258,7 @@ const DashboardLayout: React.FC = () => {
       });
     }
 
-    if (canAccessFeature("user")) {
+    if (hasPermission("user", "view")) {
       items.push({
         name: translate("common.members"),
         path: "/directory",
@@ -277,7 +277,7 @@ const DashboardLayout: React.FC = () => {
     return items;
   }, [
     canAccessAdminPanel,
-    canAccessFeature,
+    hasPermission,
     translate,
   ]);
 
@@ -386,7 +386,7 @@ const DashboardLayout: React.FC = () => {
                     allLabel={translate("layout.allNews")}
                     isOpen={articlesDropdownOpen}
                     onToggle={() => setArticlesDropdownOpen((prev) => !prev)}
-                    skip={!isAuthenticated || !canAccessFeature("article")}
+                    skip={!isAuthenticated || !hasPermission("article", "view")}
                     useGetQuery={useGetArticleCategoriesQuery}
                     useLazyQuery={useLazyGetArticleCategoriesQuery}
                     getItemPath={(category) => `/articles/category/${category.id}`}
@@ -422,7 +422,7 @@ const DashboardLayout: React.FC = () => {
                     allLabel={translate("layout.allTraining")}
                     isOpen={trainingsDropdownOpen}
                     onToggle={() => setTrainingsDropdownOpen((prev) => !prev)}
-                    skip={!isAuthenticated || !canAccessFeature("training")}
+                    skip={!isAuthenticated || !hasPermission("training", "view")}
                     useGetQuery={useGetTrainingCategoriesQuery}
                     useLazyQuery={useLazyGetTrainingCategoriesQuery}
                     getItemPath={(category) => `/trainings/category/${category.id}`}
@@ -440,7 +440,7 @@ const DashboardLayout: React.FC = () => {
                     allLabel={translate("layout.allTechnicoPro")}
                     isOpen={technicoProDropdownOpen}
                     onToggle={() => setTechnicoProDropdownOpen((prev) => !prev)}
-                    skip={!isAuthenticated || !canAccessFeature("technicopro")}
+                    skip={!isAuthenticated || !hasPermission("technicopro", "view")}
                     useGetQuery={useGetTechnicoProCategoriesQuery}
                     useLazyQuery={useLazyGetTechnicoProCategoriesQuery}
                     getItemPath={(category) => `/technicopro/category/${category.id}`}
