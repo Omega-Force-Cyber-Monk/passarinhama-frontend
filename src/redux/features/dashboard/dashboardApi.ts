@@ -37,72 +37,41 @@ export interface DashboardUpcomingEventItem {
   is_public: boolean;
 }
 
-export interface DashboardSearchArticle {
+export type GlobalSearchResultType =
+  | 'agenda'
+  | 'articles'
+  | 'technicopro'
+  | 'trainings'
+  | 'forums'
+  | 'forum_topics'
+  | 'forum_posts'
+  | 'documents'
+  | 'document_folders';
+
+export type GlobalSearchExtra = Record<string, unknown>;
+
+export interface GlobalSearchResult {
+  index: number;
+  score: number;
+  type: GlobalSearchResultType;
   id: string;
   title: string;
-  excerpt: string | null;
-  status: string;
-  published_at: string | null;
-  created_at: string;
-  structured_fields?: {
-    author?: string;
-    tags?: string[];
-    difficulty?: string;
-    estimated_read_time_minutes?: number;
-    file_urls?: string[];
-  } | null;
-  category_name?: string | null;
-  author_name?: string | null;
+  matched_fields: string[];
+  snippet: string | null;
+  created_at: string | null;
+  extra: GlobalSearchExtra;
 }
 
-export interface DashboardSearchTopic {
-  id: string;
-  title: string;
-  content?: string | null;
-  forum_id?: string | null;
-  forum?: {
-    id: string;
-    name?: string;
-    slug?: string;
-  } | null;
+export interface GlobalSearchMeta {
+  query: string;
+  limit: number;
+  total_results: number;
+  totals_by_type: Record<GlobalSearchResultType, number>;
 }
 
-export interface DashboardSearchEvent {
-  id: string;
-  title: string;
-  event_type: string;
-  event_date: string;
-  event_time: number | null;
-  location: string | null;
-  is_public: boolean;
-}
-
-export interface DashboardSearchTraining {
-  id: string;
-  title: string;
-  excerpt?: string | null;
-  category_name?: string | null;
-  status: string;
-  published_at?: string | null;
-  created_at?: string | null;
-  attachments?: string[] | null;
-}
-
-export interface DashboardSearchResponse {
-  articles: DashboardSearchArticle[];
-  topics: DashboardSearchTopic[];
-  events: DashboardSearchEvent[];
-  trainings: DashboardSearchTraining[];
-  meta: {
-    query: string;
-    limit_per_category: number;
-    totals: {
-      articles: number;
-      topics: number;
-      events: number;
-      trainings: number;
-    };
-  };
+export interface GlobalSearchResponse {
+  results: GlobalSearchResult[];
+  meta: GlobalSearchMeta;
 }
 
 export const dashboardApi = apiSlice.injectEndpoints({
@@ -120,14 +89,18 @@ export const dashboardApi = apiSlice.injectEndpoints({
       providesTags: ['Event'],
     }),
     getDashboardSearch: builder.query<
-      DashboardSearchResponse,
-      { q: string; limit?: number }
+      GlobalSearchResponse,
+      { q: string; limit?: number; type?: GlobalSearchResultType }
     >({
-      query: ({ q, limit = 5 }) => {
+      query: ({ q, limit = 10, type }) => {
         const params = new URLSearchParams({
           q: q.trim(),
           limit: String(limit),
         });
+
+        if (type) {
+          params.set('type', type);
+        }
 
         return `/home/?${params.toString()}`;
       },

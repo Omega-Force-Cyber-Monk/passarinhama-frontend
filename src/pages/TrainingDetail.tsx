@@ -139,18 +139,6 @@ export default function TrainingDetail() {
           </div>
         </header>
 
-        <div className="aspect-video w-full overflow-hidden rounded-[24px] border border-slate-100 bg-slate-100 shadow-2xl sm:rounded-[40px]">
-          {training.thumbnail_url ? (
-            <img src={training.thumbnail_url} alt={training.title} className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-primary">
-              <span className="select-none text-5xl font-black tracking-normal text-slate-900 md:text-7xl">
-                ARCHICOPRO
-              </span>
-            </div>
-          )}
-        </div>
-
         <div className="prose prose-slate max-w-none text-left prose-headings:font-bold prose-headings:text-slate-900 prose-p:leading-relaxed prose-p:text-slate-600">
           {training.excerpt ? (
             <p className="mb-8 border-l-4 border-slate-200 pl-6 text-xl font-medium italic text-slate-500">
@@ -166,7 +154,7 @@ export default function TrainingDetail() {
               <Bookmark className="h-5 w-5 text-primary" />
               {translate("articleDetailPage.attachmentsTitle")}
             </h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 justify-items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {attachments.map((attachment) => {
                 return (
                   <FilePreviewCard
@@ -179,6 +167,9 @@ export default function TrainingDetail() {
                       attachment.category.toUpperCase()
                     }
                     href={attachment.url}
+                    aspectClassName="h-36"
+                    mediaShapeClassName="rounded-xl"
+                    className="w-full sm:max-w-[280px]"
                   />
                 );
               })}

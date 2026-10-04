@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   MessageSquare,
+  Search,
   Settings,
   Users,
   X,
@@ -41,7 +42,11 @@ import {
   useGetUsersMeQuery,
   useGetUsersOnlineQuery,
 } from "../redux/features/members/membersApi";
-import { useLazyGetDashboardSearchQuery } from "../redux/features/dashboard/dashboardApi";
+import {
+  useLazyGetDashboardSearchQuery,
+  type GlobalSearchResult,
+  type GlobalSearchResultType,
+} from "../redux/features/dashboard/dashboardApi";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import { useI18n } from "../i18n";
 import { usePermissions } from "../hooks/usePermissions";
@@ -72,25 +77,6 @@ const buildInitials = (...values: Array<string | null | undefined>) => {
     .join("");
 };
 
-const getSearchResultPath = (
-  type: "article" | "topic" | "event" | "training",
-  id: string,
-  forumId?: string | null,
-) => {
-  switch (type) {
-    case "article":
-      return `/articles/${id}`;
-    case "topic":
-      return forumId ? `/forums/${forumId}/topics/${id}` : "/forums";
-    case "event":
-      return `/agenda/${id}`;
-    case "training":
-      return `/trainings/${id}`;
-    default:
-      return "/";
-  }
-};
-
 const formatSearchDate = (value?: string | null) => {
   if (!value) return "";
 
@@ -101,6 +87,93 @@ const formatSearchDate = (value?: string | null) => {
     month: "short",
     day: "numeric",
   }).format(date);
+};
+
+const getSearchExtraString = (
+  extra: Record<string, unknown>,
+  key: string,
+): string | null => {
+  const value = extra[key];
+  if (typeof value === "string" && value.trim()) return value;
+  if (value && typeof value === "object" && "id" in value) {
+    const id = (value as { id?: unknown }).id;
+    return typeof id === "string" && id.trim() ? id : null;
+  }
+
+  return null;
+};
+
+const getSearchExtraStringFrom = (
+  extra: Record<string, unknown>,
+  keys: string[],
+): string | null => {
+  for (const key of keys) {
+    const value = getSearchExtraString(extra, key);
+    if (value) return value;
+  }
+
+  return null;
+};
+
+const getSearchResultPath = (result: GlobalSearchResult): string | null => {
+  switch (result.type) {
+    case "agenda":
+      return `/agenda/${result.id}`;
+    case "articles":
+      return `/articles/${result.id}`;
+    case "technicopro":
+      return `/technicopro/${result.id}`;
+    case "trainings":
+      return `/trainings/${result.id}`;
+    case "forums":
+      return `/forums/${result.id}`;
+    case "forum_topics": {
+      const forumId = getSearchExtraStringFrom(result.extra, [
+        "forum_id",
+        "forum",
+      ]);
+      return forumId ? `/forums/${forumId}/topics/${result.id}` : null;
+    }
+    case "forum_posts": {
+      const forumId = getSearchExtraStringFrom(result.extra, [
+        "forum_id",
+        "forum",
+      ]);
+      const topicId = getSearchExtraStringFrom(result.extra, [
+        "topic_id",
+        "topic",
+      ]);
+      return forumId && topicId ? `/forums/${forumId}/topics/${topicId}` : null;
+    }
+    case "documents": {
+      const folderId = getSearchExtraStringFrom(result.extra, [
+        "folder_id",
+        "document_folder_id",
+        "parent_id",
+      ]);
+      return folderId
+        ? `/documents/folder/${folderId}/file/${result.id}`
+        : null;
+    }
+    case "document_folders":
+      return `/documents/folder/${result.id}`;
+    default:
+      return null;
+  }
+};
+
+const SEARCH_PERMISSION_FEATURES: Partial<
+  Record<GlobalSearchResultType, Parameters<ReturnType<typeof usePermissions>["hasPermission"]>[0]>
+> = {
+  agenda: "event",
+  articles: "article",
+  technicopro: "technicopro",
+  trainings: "training",
+  forums: "forum",
+  forum_topics: "forum",
+  forum_posts: "forum",
+  documents: "document",
+  document_folders: "document",
 };
 
 const OutletLoadingFallback = () => (
@@ -126,12 +199,16 @@ const DashboardLayout: React.FC = () => {
   const [technicoProDropdownOpen, setTechnicoProDropdownOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const dispatch = useDispatch();
   const location = useLocation();
   const isAdminRoute = location.pathname === "/admin";
   const navigate = useNavigate();
   const { translate } = useI18n();
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
+  const mobileSearchContainerRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const lastSearchQueryRef = useRef("");
   const lastSyncedProfileRef = useRef<string>("");
   const { hasPermission, canAccessAdminPanel } =
     usePermissions();
@@ -174,13 +251,14 @@ const DashboardLayout: React.FC = () => {
     setTechnicoProDropdownOpen(location.pathname.startsWith("/technicopro"));
     setSidebarOpen(false);
     setSearchOpen(false);
+    setMobileSearchOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
-        searchContainerRef.current &&
-        !searchContainerRef.current.contains(event.target as Node)
+        !searchContainerRef.current?.contains(event.target as Node) &&
+        !mobileSearchContainerRef.current?.contains(event.target as Node)
       ) {
         setSearchOpen(false);
       }
@@ -189,6 +267,11 @@ const DashboardLayout: React.FC = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!mobileSearchOpen) return;
+    window.setTimeout(() => searchInputRef.current?.focus(), 0);
+  }, [mobileSearchOpen]);
 
   const getRoleLabel = (role?: string | null) => {
     const roleDetailsName = user?.role_details?.name;
@@ -297,25 +380,57 @@ const DashboardLayout: React.FC = () => {
     user?.avatarInitials ||
     buildInitials(user?.first_name, user?.last_name);
   const onlineUsers = onlineUsersData?.users || [];
-  const hasSearchResults =
-    Boolean(searchResults?.articles.length) ||
-    Boolean(searchResults?.topics.length) ||
-    Boolean(searchResults?.events.length) ||
-    Boolean(searchResults?.trainings.length);
+  const visibleSearchResults = useMemo(() => {
+    const results = searchResults?.results ?? [];
+    if (!isAuthenticated) return results;
 
-  const handleSearchSubmit = async () => {
-    const trimmedQuery = searchTerm.trim();
+    return results.filter((result) => {
+      const feature = SEARCH_PERMISSION_FEATURES[result.type];
+      return feature ? hasPermission(feature, "view") : true;
+    });
+  }, [hasPermission, isAuthenticated, searchResults?.results]);
+  const hasSearchResults = visibleSearchResults.length > 0;
+  const searchResultCount = searchResults?.meta.total_results ?? 0;
+  const trimmedSearchTerm = searchTerm.trim();
+
+  const executeSearch = async (query: string, force = false) => {
+    const trimmedQuery = query.trim();
     if (!trimmedQuery) {
       setSearchOpen(false);
+      lastSearchQueryRef.current = "";
+      return;
+    }
+
+    setSearchOpen(true);
+    if (!force && trimmedQuery === lastSearchQueryRef.current) {
       return;
     }
 
     try {
-      await triggerDashboardSearch({ q: trimmedQuery, limit: 5 }).unwrap();
-      setSearchOpen(true);
+      lastSearchQueryRef.current = trimmedQuery;
+      await triggerDashboardSearch({ q: trimmedQuery, limit: 10 }).unwrap();
     } catch {
       setSearchOpen(true);
     }
+  };
+
+  useEffect(() => {
+    const trimmedQuery = searchTerm.trim();
+    if (!trimmedQuery) {
+      setSearchOpen(false);
+      lastSearchQueryRef.current = "";
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void executeSearch(trimmedQuery);
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  const handleSearchSubmit = async () => {
+    await executeSearch(searchTerm);
   };
 
   const handleSearchKeyDown = async (
@@ -333,8 +448,126 @@ const DashboardLayout: React.FC = () => {
 
   const handleResultNavigation = (path: string) => {
     setSearchOpen(false);
+    setMobileSearchOpen(false);
     navigate(path);
   };
+
+  const handleClearSearch = () => {
+    setSearchTerm("");
+    setSearchOpen(false);
+    lastSearchQueryRef.current = "";
+    searchInputRef.current?.focus();
+  };
+
+  const getResultIcon = (type: GlobalSearchResultType) => {
+    switch (type) {
+      case "agenda":
+        return Calendar;
+      case "articles":
+        return FileText;
+      case "technicopro":
+        return Wrench;
+      case "trainings":
+        return BookOpen;
+      case "forums":
+      case "forum_topics":
+      case "forum_posts":
+        return MessageSquare;
+      case "documents":
+      case "document_folders":
+        return FolderOpen;
+      default:
+        return FileText;
+    }
+  };
+
+  const getResultTypeLabel = (type: GlobalSearchResultType) =>
+    translate(`layout.searchType${type
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join("")}`);
+
+  const buildResultMeta = (result: GlobalSearchResult) =>
+    [
+      result.snippet,
+      formatSearchDate(result.created_at),
+      result.matched_fields.length
+        ? translate("layout.searchMatchedFields", {
+            fields: result.matched_fields.slice(0, 2).join(", "),
+          })
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" • ");
+
+  const renderSearchResults = () => (
+    <div className="overflow-hidden rounded-[14px] border border-[var(--archi-border)] bg-white shadow-[0_20px_50px_rgba(15,23,42,0.12)]">
+      {isSearchFetching ? (
+        <div className="px-4 py-3 text-[12px] font-medium text-[var(--archi-secondary)]">
+          {translate("layout.searching")}
+        </div>
+      ) : isSearchError ? (
+        <div className="px-4 py-3 text-[12px] font-medium text-[var(--archi-red)]">
+          {translate("layout.searchFailed")}
+        </div>
+      ) : trimmedSearchTerm && hasSearchResults ? (
+        <div>
+          <div className="border-b border-slate-100 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--archi-muted)]">
+            {translate("layout.searchResultsCount", {
+              count: searchResultCount,
+            })}
+          </div>
+          <div className="max-h-[420px] overflow-y-auto py-2">
+            {visibleSearchResults.map((result) => {
+              const ResultIcon = getResultIcon(result.type);
+              const path = getSearchResultPath(result);
+              const meta = buildResultMeta(result);
+
+              return (
+                <button
+                  key={`${result.type}-${result.id}-${result.index}`}
+                  type="button"
+                  disabled={!path}
+                  onClick={() => {
+                    if (path) {
+                      handleResultNavigation(path);
+                    }
+                  }}
+                  className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--archi-surface-soft)] disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                >
+                  <ResultIcon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--archi-muted)]" />
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex min-w-0 items-center gap-2">
+                      <span className="rounded-full bg-slate-100 px-2 py-[2px] text-[9px] font-bold uppercase tracking-[0.08em] text-slate-500">
+                        {getResultTypeLabel(result.type)}
+                      </span>
+                      {!path ? (
+                        <span className="text-[10px] font-semibold text-[var(--archi-red)]">
+                          {translate("layout.searchUnavailable")}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="truncate text-[12.5px] font-semibold text-[var(--archi-text)]">
+                      {result.title}
+                    </div>
+                    {meta ? (
+                      <div className="line-clamp-2 text-[11px] text-[var(--archi-secondary)]">
+                        {meta}
+                      </div>
+                    ) : null}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : trimmedSearchTerm ? (
+        <div className="px-4 py-3 text-[12px] font-medium text-[var(--archi-secondary)]">
+          {translate("layout.searchNoResults", { query: trimmedSearchTerm })}
+        </div>
+      ) : null}
+    </div>
+  );
 
   return (
     <div className="flex min-h-screen bg-[var(--archi-bg)] text-[var(--archi-text)]">
@@ -584,201 +817,65 @@ const DashboardLayout: React.FC = () => {
 
           <div
             ref={searchContainerRef}
-            className="relative hidden w-[320px] md:block"
+            className="relative hidden w-[420px] md:block"
           >
-            <div className="flex items-center gap-2 rounded-[10px] border border-[var(--archi-border)] bg-[var(--archi-surface-soft)] px-3 py-[7px] transition-all focus-within:border-[var(--archi-accent)] focus-within:bg-white focus-within:archi-surface-ring">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="shrink-0 text-[var(--archi-muted)]"
+            <div className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-[10px] border border-[var(--archi-border)] bg-[var(--archi-surface-soft)] px-3 py-[7px] transition-all focus-within:border-[var(--archi-accent)] focus-within:bg-white focus-within:archi-surface-ring">
+                <Search className="h-4 w-4 shrink-0 text-[var(--archi-muted)]" />
+                <input
+                  type="text"
+                  placeholder={translate("layout.searchPlaceholder")}
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  onFocus={() => {
+                    if (searchResults || isSearchError) {
+                      setSearchOpen(true);
+                    }
+                  }}
+                  onKeyDown={handleSearchKeyDown}
+                  className="w-full border-0 bg-transparent text-[13px] outline-none placeholder:text-[var(--archi-muted)]"
+                />
+                {searchTerm ? (
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="shrink-0 text-[var(--archi-muted)] transition-colors hover:text-[var(--archi-text)]"
+                    aria-label={translate("layout.searchClear")}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={handleSearchSubmit}
+                disabled={!trimmedSearchTerm}
+                className="inline-flex h-[38px] shrink-0 items-center justify-center gap-2 rounded-[10px] border border-[var(--archi-border)] bg-white px-3 text-[12px] font-semibold text-[var(--archi-secondary)] transition-all hover:border-[var(--archi-border-strong)] hover:bg-[var(--archi-surface-soft)] hover:text-[var(--archi-text)] disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label={translate("layout.searchButton")}
               >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <input
-                type="text"
-                placeholder={translate("layout.searchPlaceholder")}
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                onFocus={() => {
-                  if (searchResults || isSearchError) {
-                    setSearchOpen(true);
-                  }
-                }}
-                onKeyDown={handleSearchKeyDown}
-                className="w-full border-0 bg-transparent text-[13px] outline-none placeholder:text-[var(--archi-muted)]"
-              />
+                <Search className="h-3.5 w-3.5" />
+                <span>{translate("layout.searchButton")}</span>
+              </button>
             </div>
 
             {searchOpen ? (
-              <div className="absolute right-0 top-[calc(100%+10px)] z-40 w-full overflow-hidden rounded-[14px] border border-[var(--archi-border)] bg-white shadow-[0_20px_50px_rgba(15,23,42,0.12)]">
-                {isSearchFetching ? (
-                  <div className="px-4 py-3 text-[12px] font-medium text-[var(--archi-secondary)]">
-                    Searching...
-                  </div>
-                ) : isSearchError ? (
-                  <div className="px-4 py-3 text-[12px] font-medium text-[var(--archi-red)]">
-                    Search failed. Please try again.
-                  </div>
-                ) : hasSearchResults && searchResults ? (
-                  <div className="max-h-[420px] overflow-y-auto py-2">
-                    {searchResults.articles.length ? (
-                      <div className="px-2 pb-2">
-                        <div className="px-2 pb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--archi-muted)]">
-                          Articles
-                        </div>
-                        {searchResults.articles.map((article) => (
-                          <button
-                            key={article.id}
-                            type="button"
-                            onClick={() =>
-                              handleResultNavigation(
-                                getSearchResultPath("article", article.id),
-                              )
-                            }
-                            className="flex w-full items-start gap-3 rounded-[10px] px-2 py-2 text-left transition-colors hover:bg-[var(--archi-surface-soft)] cursor-pointer"
-                          >
-                            <FileText className="mt-0.5 h-4 w-4 shrink-0 text-[var(--archi-muted)]" />
-                            <div className="min-w-0">
-                              <div className="truncate text-[12.5px] font-semibold text-[var(--archi-text)]">
-                                {article.title}
-                              </div>
-                              <div className="line-clamp-2 text-[11px] text-[var(--archi-secondary)]">
-                                {article.excerpt ||
-                                  article.category_name ||
-                                  article.author_name}
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    {searchResults.topics.length ? (
-                      <div className="px-2 pb-2">
-                        <div className="px-2 pb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--archi-muted)]">
-                          Topics
-                        </div>
-                        {searchResults.topics.map((topic) => {
-                          const forumId = topic.forum?.id || topic.forum_id;
-
-                          return (
-                            <button
-                              key={topic.id}
-                              type="button"
-                              onClick={() =>
-                                handleResultNavigation(
-                                  getSearchResultPath(
-                                    "topic",
-                                    topic.id,
-                                    forumId,
-                                  ),
-                                )
-                              }
-                              className="flex w-full items-start gap-3 rounded-[10px] px-2 py-2 text-left transition-colors hover:bg-[var(--archi-surface-soft)] cursor-pointer"
-                            >
-                              <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-[var(--archi-muted)]" />
-                              <div className="min-w-0">
-                                <div className="truncate text-[12.5px] font-semibold text-[var(--archi-text)]">
-                                  {topic.title}
-                                </div>
-                                <div className="truncate text-[11px] text-[var(--archi-secondary)]">
-                                  {topic.forum?.name ||
-                                    translate("common.forums")}
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-
-                    {searchResults.events.length ? (
-                      <div className="px-2 pb-2">
-                        <div className="px-2 pb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--archi-muted)]">
-                          Events
-                        </div>
-                        {searchResults.events.map((event) => (
-                          <button
-                            key={event.id}
-                            type="button"
-                            onClick={() =>
-                              handleResultNavigation(
-                                getSearchResultPath("event", event.id),
-                              )
-                            }
-                            className="flex w-full items-start gap-3 rounded-[10px] px-2 py-2 text-left transition-colors hover:bg-[var(--archi-surface-soft)] cursor-pointer"
-                          >
-                            <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-[var(--archi-muted)]" />
-                            <div className="min-w-0">
-                              <div className="truncate text-[12.5px] font-semibold text-[var(--archi-text)]">
-                                {event.title}
-                              </div>
-                              <div className="truncate text-[11px] text-[var(--archi-secondary)]">
-                                {[
-                                  formatSearchDate(event.event_date),
-                                  event.location,
-                                ]
-                                  .filter(Boolean)
-                                  .join(" • ")}
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    {searchResults.trainings.length ? (
-                      <div className="px-2 pb-2">
-                        <div className="px-2 pb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--archi-muted)]">
-                          Trainings
-                        </div>
-                        {searchResults.trainings.map((training) => (
-                          <button
-                            key={training.id}
-                            type="button"
-                            onClick={() =>
-                              handleResultNavigation(
-                                getSearchResultPath("training", training.id),
-                              )
-                            }
-                            className="flex w-full items-start gap-3 rounded-[10px] px-2 py-2 text-left transition-colors hover:bg-[var(--archi-surface-soft)] cursor-pointer"
-                          >
-                            <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-[var(--archi-muted)]" />
-                            <div className="min-w-0">
-                              <div className="truncate text-[12.5px] font-semibold text-[var(--archi-text)]">
-                                {training.title}
-                              </div>
-                              <div className="truncate text-[11px] text-[var(--archi-secondary)]">
-                                {[
-                                  training.category_name,
-                                  training.excerpt,
-                                  formatSearchDate(
-                                    training.published_at ||
-                                      training.created_at,
-                                  ),
-                                ]
-                                  .filter(Boolean)
-                                  .join(" • ")}
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="px-4 py-3 text-[12px] font-medium text-[var(--archi-secondary)]">
-                    No results found.
-                  </div>
-                )}
+              <div className="absolute right-0 top-[calc(100%+10px)] z-40 w-full">
+                {renderSearchResults()}
               </div>
             ) : null}
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMobileSearchOpen(true);
+              setSearchOpen(Boolean(trimmedSearchTerm));
+            }}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] text-[var(--archi-secondary)] transition-all hover:bg-[var(--archi-surface-soft)] hover:text-[var(--archi-text)] md:hidden"
+            aria-label={translate("layout.searchButton")}
+          >
+            <Search className="h-5 w-5" />
+          </button>
 
           {/* <div className="hidden items-center gap-2 text-xs text-[var(--archi-secondary)] md:flex">
             <span className="h-[7px] w-[7px] rounded-full bg-[var(--archi-green)] shadow-[0_0_6px_rgba(22,163,74,.55)]" />
@@ -812,6 +909,50 @@ const DashboardLayout: React.FC = () => {
             )}
           </Link> */}
         </header>
+
+        {mobileSearchOpen ? (
+          <div
+            ref={mobileSearchContainerRef}
+            className="sticky top-[60px] z-30 border-b border-[var(--archi-border)] bg-white p-3 shadow-sm md:hidden"
+          >
+            <div className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-[10px] border border-[var(--archi-border)] bg-[var(--archi-surface-soft)] px-3 py-2 focus-within:border-[var(--archi-accent)] focus-within:bg-white">
+                <Search className="h-4 w-4 shrink-0 text-[var(--archi-muted)]" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder={translate("layout.searchPlaceholder")}
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  onFocus={() => {
+                    if (searchResults || isSearchError || trimmedSearchTerm) {
+                      setSearchOpen(true);
+                    }
+                  }}
+                  onKeyDown={handleSearchKeyDown}
+                  className="w-full border-0 bg-transparent text-[13px] outline-none placeholder:text-[var(--archi-muted)]"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleSearchSubmit}
+                disabled={!trimmedSearchTerm}
+                className="inline-flex h-[38px] shrink-0 items-center justify-center gap-1.5 rounded-[10px] border border-[var(--archi-border)] bg-white px-2.5 text-[12px] font-semibold text-[var(--archi-secondary)] transition-all hover:border-[var(--archi-border-strong)] hover:bg-[var(--archi-surface-soft)] hover:text-[var(--archi-text)] disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label={translate("layout.searchButton")}
+              >
+                <Search className="h-3.5 w-3.5" />
+                <span className="hidden min-[380px]:inline">
+                  {translate("layout.searchButton")}
+                </span>
+              </button>
+            </div>
+            {searchOpen ? (
+              <div className="mt-2">
+                {renderSearchResults()}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <main className="flex-1">
           <Suspense fallback={<OutletLoadingFallback />}>

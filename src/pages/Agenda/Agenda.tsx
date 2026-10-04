@@ -138,9 +138,6 @@ const getAttachmentPreviewType = (url: string) => {
   return "file" as const;
 };
 
-const getOfficePreviewUrl = (url: string) =>
-  `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
-
 const YOUTUBE_ALLOW =
   "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
 
@@ -294,7 +291,11 @@ export default function Agenda() {
   const selectedEventFromList = (apiEvents || []).find(
     (event) => event.id === detailEventId,
   );
-  const { data: selectedEventDetails, isLoading: isLoadingSelectedEvent } =
+  const {
+    data: selectedEventDetails,
+    isError: isSelectedEventError,
+    isLoading: isLoadingSelectedEvent,
+  } =
     useGetEventByIdQuery(detailEventId, {
       skip: !detailEventId || Boolean(selectedEventFromList),
     });
@@ -400,7 +401,12 @@ export default function Agenda() {
       return;
     }
 
-    if (!isLoadingEvents && !isLoadingSelectedEvent && !selectedEventDetails) {
+    if (
+      !isLoadingEvents &&
+      !isLoadingSelectedEvent &&
+      isSelectedEventError &&
+      !selectedEventDetails
+    ) {
       navigate("/agenda", { replace: true });
       return;
     }
@@ -414,6 +420,7 @@ export default function Agenda() {
     apiEvents,
     isLoadingEvents,
     isLoadingSelectedEvent,
+    isSelectedEventError,
     navigate,
     selectedEventDetails,
   ]);
@@ -1635,17 +1642,19 @@ export default function Agenda() {
                     </div>
 
                     {selectedEvent.attachments?.length ? (
-                      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                         {selectedEvent.attachments.map((attachmentUrl, index) => {
                           const fileName = getAttachmentName(attachmentUrl);
                           const previewType = getAttachmentPreviewType(attachmentUrl);
+                          const isMediaPreview =
+                            previewType === "image" || previewType === "video";
 
                           return (
                             <div
                               key={`${attachmentUrl}-${index}`}
-                              className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm"
+                              className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
                             >
-                              <div className="aspect-[4/3] overflow-hidden border-b border-slate-200 bg-white">
+                              <div className="h-28 overflow-hidden border-b border-slate-200 bg-slate-50">
                                 {previewType === "image" ? (
                                   <a
                                     href={attachmentUrl}
@@ -1666,18 +1675,6 @@ export default function Agenda() {
                                     preload="metadata"
                                     className="h-full w-full bg-slate-950 object-cover"
                                   />
-                                ) : previewType === "pdf" ? (
-                                  <iframe
-                                    src={attachmentUrl}
-                                    title={fileName}
-                                    className="h-full w-full bg-white"
-                                  />
-                                ) : previewType === "document" ? (
-                                  <iframe
-                                    src={getOfficePreviewUrl(attachmentUrl)}
-                                    title={fileName}
-                                    className="h-full w-full bg-white"
-                                  />
                                 ) : (
                                   <div className="flex h-full w-full items-center justify-center bg-slate-50">
                                     <div className="rounded-2xl bg-white p-4 text-slate-400 shadow-sm">
@@ -1691,14 +1688,16 @@ export default function Agenda() {
                                 href={attachmentUrl}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-white"
+                                className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-slate-50"
                               >
                                 <div className="min-w-0">
-                                  <p className="truncate text-sm font-bold text-slate-900">
+                                  <p className="truncate text-xs font-bold text-slate-900" title={fileName}>
                                     {fileName}
                                   </p>
-                                  <p className="text-xs text-slate-500">
-                                    {translate("agendaPage.openAttachment")}
+                                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                    {isMediaPreview
+                                      ? translate("agendaPage.openAttachment")
+                                      : previewType.toUpperCase()}
                                   </p>
                                 </div>
                                 <ExternalLink className="w-4 h-4 shrink-0 text-slate-400" />

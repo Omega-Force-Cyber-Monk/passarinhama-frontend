@@ -1,5 +1,14 @@
+import { useEffect, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { BookOpen, Calendar, FileText, MapPin, MessageSquare } from "lucide-react";
+import {
+  BookOpen,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  MapPin,
+  MessageSquare,
+} from "lucide-react";
 import { useSelector } from "react-redux";
 import AccessRestrictedNotice from "../components/ui/AccessRestrictedNotice";
 import {
@@ -96,13 +105,117 @@ const PostCardSkeleton = () => (
   </div>
 );
 
+const MAX_SECTION_CARDS = 4;
+const HOME_SECTION_FETCH_LIMIT = 100;
+
+type SectionCarouselProps<T> = {
+  items: T[];
+  getKey: (item: T) => string;
+  renderItem: (item: T) => ReactNode;
+  previousLabel: string;
+  nextLabel: string;
+};
+
+const SectionCarousel = <T,>({
+  items,
+  getKey,
+  renderItem,
+  previousLabel,
+  nextLabel,
+}: SectionCarouselProps<T>) => {
+  const [startIndex, setStartIndex] = useState(0);
+  const hasNavigation = items.length > MAX_SECTION_CARDS;
+  const maxStartIndex = Math.max(0, items.length - MAX_SECTION_CARDS);
+  const visibleItems = items.slice(
+    startIndex,
+    startIndex + MAX_SECTION_CARDS,
+  );
+
+  useEffect(() => {
+    setStartIndex((current) => Math.min(current, maxStartIndex));
+  }, [maxStartIndex]);
+
+  const goPrevious = () => {
+    setStartIndex((current) =>
+      Math.max(0, current - MAX_SECTION_CARDS),
+    );
+  };
+
+  const goNext = () => {
+    setStartIndex((current) =>
+      Math.min(maxStartIndex, current + MAX_SECTION_CARDS),
+    );
+  };
+
+  if (!hasNavigation) {
+    return (
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {items.map((item) => (
+          <div key={getKey(item)}>{renderItem(item)}</div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      <button
+        type="button"
+        onClick={goPrevious}
+        disabled={startIndex === 0}
+        aria-label={previousLabel}
+        className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-[var(--archi-border)] bg-white text-[var(--archi-secondary)] shadow-[var(--archi-shadow-sm)] transition-all hover:border-[var(--archi-border-strong)] hover:bg-[var(--archi-surface-soft)] hover:text-[var(--archi-text)] disabled:cursor-not-allowed disabled:opacity-40 sm:inline-flex"
+      >
+        <ChevronLeft className="h-5 w-5" />
+      </button>
+
+      <div className="min-w-0 flex-1">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {visibleItems.map((item) => (
+            <div key={getKey(item)}>{renderItem(item)}</div>
+          ))}
+        </div>
+        <div className="mt-3 flex justify-center gap-2 sm:hidden">
+          <button
+            type="button"
+            onClick={goPrevious}
+            disabled={startIndex === 0}
+            aria-label={previousLabel}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--archi-border)] bg-white text-[var(--archi-secondary)] shadow-[var(--archi-shadow-sm)] transition-all hover:bg-[var(--archi-surface-soft)] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={goNext}
+            disabled={startIndex >= maxStartIndex}
+            aria-label={nextLabel}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--archi-border)] bg-white text-[var(--archi-secondary)] shadow-[var(--archi-shadow-sm)] transition-all hover:bg-[var(--archi-surface-soft)] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={goNext}
+        disabled={startIndex >= maxStartIndex}
+        aria-label={nextLabel}
+        className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-[var(--archi-border)] bg-white text-[var(--archi-secondary)] shadow-[var(--archi-shadow-sm)] transition-all hover:border-[var(--archi-border-strong)] hover:bg-[var(--archi-surface-soft)] hover:text-[var(--archi-text)] disabled:cursor-not-allowed disabled:opacity-40 sm:inline-flex"
+      >
+        <ChevronRight className="h-5 w-5" />
+      </button>
+    </div>
+  );
+};
+
 export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
   const { localeCode, translate } = useI18n();
   const { user } = useSelector((state: RootState) => state.auth);
   const { hasPermission } = usePermissions();
-  const MAX_SECTION_CARDS = 4;
   const canViewForum = hasPermission("forum", "view");
   const canViewArticle = hasPermission("article", "view");
   const canViewEvent = hasPermission("event", "view");
@@ -119,18 +232,18 @@ export default function Home() {
     !canViewAnyHomeSection;
 
   const { data: forumsData, isLoading: isForumsLoading } = useGetForumsQuery(
-    { pageSize: MAX_SECTION_CARDS },
+    { pageSize: HOME_SECTION_FETCH_LIMIT },
     { skip: !canViewForum } as any,
   );
   const { data: upcomingEvents = [], isLoading: isEventsLoading } =
     useGetUpcomingEventsQuery(
-      { limit: MAX_SECTION_CARDS },
+      { limit: HOME_SECTION_FETCH_LIMIT },
       { skip: !canViewEvent } as any,
     );
   const { data: articlesData, isLoading: isArticlesLoading } = useGetArticlesQuery(
     {
       page: 1,
-      pageSize: MAX_SECTION_CARDS,
+      pageSize: HOME_SECTION_FETCH_LIMIT,
       status: "published",
     },
     { skip: !canViewArticle } as any,
@@ -139,18 +252,16 @@ export default function Home() {
     useGetTrainingsPaginatedQuery(
       {
         page: 1,
-        pageSize: MAX_SECTION_CARDS,
+        pageSize: HOME_SECTION_FETCH_LIMIT,
         status: "published",
         details: true,
       },
       { skip: !canViewTraining } as any,
     );
 
-  const articles = (articlesData?.results || []).slice(0, MAX_SECTION_CARDS);
-  const trainings = (trainingsData?.results || []).slice(0, MAX_SECTION_CARDS);
+  const articles = articlesData?.results || [];
+  const trainings = trainingsData?.results || [];
   const forums = forumsData?.results ?? [];
-  const visibleForums = forums.slice(0, MAX_SECTION_CARDS);
-  const visibleEvents = upcomingEvents.slice(0, MAX_SECTION_CARDS);
 
 const formatDate = (value?: string | null) => {
     if (!value) return "";
@@ -218,14 +329,17 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
               <ForumCardSkeleton key={index} />
             ))}
           </div>
-        ) : visibleForums.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {visibleForums.map((forum) => (
+        ) : forums.length > 0 ? (
+          <SectionCarousel
+            items={forums}
+            getKey={(forum) => forum.id}
+            previousLabel={translate("memberHome.previous")}
+            nextLabel={translate("memberHome.next")}
+            renderItem={(forum) => (
               <button
                 type="button"
-                key={forum.id}
                 onClick={() => navigate(`/forums/${forum.id}`)}
-                className="cursor-pointer group flex flex-col overflow-hidden rounded-[14px] border border-[var(--archi-border)] bg-white text-left shadow-[var(--archi-shadow-sm)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--archi-border-strong)] hover:shadow-[var(--archi-shadow-md)]"
+                className="cursor-pointer group flex h-full w-full flex-col overflow-hidden rounded-[14px] border border-[var(--archi-border)] bg-white text-left shadow-[var(--archi-shadow-sm)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--archi-border-strong)] hover:shadow-[var(--archi-shadow-md)]"
               >
                 {forum.thumbnail_url ? (
                   <div className="relative h-[120px] overflow-hidden">
@@ -259,8 +373,8 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
                   </div>
                 </div>
               </button>
-            ))}
-          </div>
+            )}
+          />
         ) : (
           <div className="rounded-[14px] border border-dashed border-[var(--archi-border-strong)] bg-white px-6 py-10 text-center text-sm text-[var(--archi-secondary)]">
             {translate("memberHome.noForums")}
@@ -308,17 +422,20 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
               <TrainingCardSkeleton key={index} />
             ))}
           </div>
-        ) : visibleEvents.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-4 md:grid-cols-2">
-            {visibleEvents.map((event) => {
+        ) : upcomingEvents.length > 0 ? (
+          <SectionCarousel
+            items={upcomingEvents}
+            getKey={(event) => event.id}
+            previousLabel={translate("memberHome.previous")}
+            nextLabel={translate("memberHome.next")}
+            renderItem={(event) => {
               const eventDate = new Date(event.event_date);
 
               return (
                 <button
                   type="button"
-                  key={event.id}
                   onClick={() => navigate(`/agenda/${event.id}`)}
-                  className="cursor-pointer flex items-center gap-4 rounded-[24px] border border-[#e7e3dd] bg-white px-6 py-5 text-left shadow-[0_4px_18px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_26px_rgba(15,23,42,0.1)]"
+                  className="cursor-pointer flex h-full w-full items-center gap-4 rounded-[24px] border border-[#e7e3dd] bg-white px-6 py-5 text-left shadow-[0_4px_18px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_26px_rgba(15,23,42,0.1)]"
                 >
                   <div className="flex h-[88px] w-[88px] shrink-0 flex-col items-center justify-center rounded-[20px] border border-[#d7d8df] bg-[#f4f5f8] text-center">
                     <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8b92a4]">
@@ -344,8 +461,8 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
                   </div>
                 </button>
               );
-            })}
-          </div>
+            }}
+          />
         ) : (
           <div className="rounded-[14px] border border-dashed border-[var(--archi-border-strong)] bg-white px-6 py-10 text-center text-sm text-[var(--archi-secondary)]">
             {translate("agendaPage.noUpcomingEvents")}
@@ -394,8 +511,12 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
             ))}
           </div>
         ) : trainings.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {trainings.map((training) => {
+          <SectionCarousel
+            items={trainings}
+            getKey={(training) => training.id}
+            previousLabel={translate("memberHome.previous")}
+            nextLabel={translate("memberHome.next")}
+            renderItem={(training) => {
               const trainingImage =
                 training.thumbnail_url || getAttachmentUrl(training.attachments?.[0]) || null;
               const trainingMeta =
@@ -412,9 +533,8 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
               return (
               <button
                 type="button"
-                key={training.id}
                 onClick={() => navigate(`/trainings/${training.id}`)}
-                className="cursor-pointer group overflow-hidden rounded-[14px] border border-[var(--archi-border)] bg-white text-left shadow-[var(--archi-shadow-sm)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--archi-border-strong)] hover:shadow-[var(--archi-shadow-md)]"
+                className="cursor-pointer group h-full w-full overflow-hidden rounded-[14px] border border-[var(--archi-border)] bg-white text-left shadow-[var(--archi-shadow-sm)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--archi-border-strong)] hover:shadow-[var(--archi-shadow-md)]"
               >
                 {trainingImage ? (
                   <div className="relative h-[150px] overflow-hidden">
@@ -452,8 +572,8 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
                 </div>
               </button>
             );
-            })}
-          </div>
+            }}
+          />
         ) : (
           <div className="rounded-[14px] border border-dashed border-[var(--archi-border-strong)] bg-white px-6 py-10 text-center text-sm text-[var(--archi-secondary)]">
             {translate("memberHome.noTrainings")}
@@ -502,8 +622,12 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
             ))}
           </div>
         ) : articles.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {articles.map((article) => {
+          <SectionCarousel
+            items={articles}
+            getKey={(article) => article.id}
+            previousLabel={translate("memberHome.previous")}
+            nextLabel={translate("memberHome.next")}
+            renderItem={(article) => {
               const articleImage =
                 article.thumbnail_url ||
                 getAttachmentUrl(article.structured_fields?.file_urls?.[0]) ||
@@ -512,9 +636,8 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
               return (
               <button
                 type="button"
-                key={article.id}
                 onClick={() => navigate(`/articles/${article.id}`)}
-                className="cursor-pointer group flex h-full flex-col overflow-hidden rounded-[14px] border border-[var(--archi-border)] bg-white text-left shadow-[var(--archi-shadow-sm)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--archi-border-strong)] hover:shadow-[var(--archi-shadow-md)]"
+                className="cursor-pointer group flex h-full w-full flex-col overflow-hidden rounded-[14px] border border-[var(--archi-border)] bg-white text-left shadow-[var(--archi-shadow-sm)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--archi-border-strong)] hover:shadow-[var(--archi-shadow-md)]"
               >
                 {articleImage ? (
                   <div className="relative h-[140px] overflow-hidden">
@@ -553,8 +676,8 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
                 </div>
               </button>
             );
-            })}
-          </div>
+            }}
+          />
         ) : (
           <div className="rounded-[14px] border border-dashed border-[var(--archi-border-strong)] bg-white px-6 py-10 text-center text-sm text-[var(--archi-secondary)]">
             {translate("memberHome.noArticles")}

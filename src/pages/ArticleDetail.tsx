@@ -178,23 +178,6 @@ export default function ArticleDetail() {
           </div>
         </header>
 
-        {/* Featured Image */}
-        <div className="aspect-video w-full overflow-hidden rounded-[24px] border border-slate-100 bg-slate-100 shadow-2xl sm:rounded-[40px]">
-          {featuredImageUrl ? (
-            <img
-              src={featuredImageUrl}
-              alt={article.title}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full bg-primary flex items-center justify-center">
-              <span className="text-6xl md:text-8xl font-black text-slate-900 tracking-tighter select-none">
-                ARCHICOPRO
-              </span>
-            </div>
-          )}
-        </div>
-
         {/* Content Body */}
         <div className="markdown-body prose prose-slate max-w-none prose-headings:font-bold prose-headings:text-slate-900 prose-p:text-slate-600 prose-p:leading-relaxed prose-a:text-primary prose-blockquote:border-l-primary prose-blockquote:bg-slate-50 prose-blockquote:px-6 prose-blockquote:py-2 prose-blockquote:rounded-r-xl text-left">
           {article.excerpt && (
@@ -215,7 +198,7 @@ export default function ArticleDetail() {
               <Bookmark className="w-5 h-5 text-primary" />
               {translate('articleDetailPage.attachmentsTitle')}
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 justify-items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {attachments.map((attachment) => (
                 <FilePreviewCard
                   key={attachment.url}
@@ -227,6 +210,9 @@ export default function ArticleDetail() {
                     attachment.category.toUpperCase()
                   }
                   href={attachment.url}
+                  aspectClassName="h-36"
+                  mediaShapeClassName="rounded-xl"
+                  className="w-full sm:max-w-[280px]"
                 />
               ))}
             </div>
