@@ -1,5 +1,95 @@
 {
+  "modalBatchFour": {
+    "personalInformation": "Informations personnelles",
+    "organizationLocation": "Organisation et localisation",
+    "accountInformation": "Informations du compte"
+  },
+  "modalBatchTwo": {
+    "title": "Titre",
+    "trainingContent": "Contenu de la formation",
+    "technicalContent": "Contenu technique",
+    "technicalMedia": "Fichiers techniques et miniature"
+  },
+  "modalBatchOne": {
+    "articleContent": "Contenu de l'article",
+    "basicInformation": "Informations de base",
+    "mediaAttachments": "Médias et pièces jointes"
+  },
+  "modalFoundation": {
+    "noFiles": "Aucun fichier sélectionné",
+    "file": "Fichier",
+    "open": "Ouvrir",
+    "download": "Télécharger",
+    "remove": "Retirer",
+    "openNamed": "Ouvrir {name}",
+    "downloadNamed": "Télécharger {name}",
+    "removeNamed": "Retirer {name}",
+    "browseFiles": "Glissez un fichier ici ou choisissez un fichier",
+    "downloadOnly": "Téléchargez ce fichier pour l’ouvrir dans une application compatible.",
+    "invalidFile": "Ce fichier ne possède pas de lien valide.",
+    "openError": "Impossible d’ouvrir ce fichier. Vérifiez votre accès et autorisez les fenêtres contextuelles, puis réessayez.",
+    "downloadError": "Impossible de télécharger ce fichier. Veuillez réessayer."
+  },
+  "adminUi": {
+    "roles": "Rôles",
+    "rolesDescription": "Créer et gérer les noms et descriptions des rôles.",
+    "neutralStatus": "—",
+    "tableScroll": "Tableau de gestion. Faites défiler horizontalement pour voir toutes les colonnes.",
+    "search": "Rechercher dans les données administratives"
+  },
+  "contentDetail": {
+    "download": "Télécharger",
+    "invalidFile": "Ce fichier ne possède pas de lien valide.",
+    "openError": "Impossible d’ouvrir ce fichier. Autorisez les fenêtres contextuelles et vérifiez votre accès, puis réessayez.",
+    "downloadError": "Impossible de télécharger ce fichier. Vérifiez votre accès et réessayez.",
+    "breadcrumbs": "Fil d’Ariane du contenu",
+    "details": "Détails",
+    "created": "Créé le",
+    "published": "Publié le",
+    "readingTime": "Temps de lecture",
+    "author": "Auteur",
+    "creator": "Créateur",
+    "imageUnavailable": "Image indisponible",
+    "attachment": "Pièce jointe",
+    "trainingNotFoundTitle": "Formation introuvable",
+    "trainingNotFoundMessage": "Cette formation n’existe pas, a été supprimée ou ne vous est pas accessible.",
+    "technicoproNotFoundTitle": "Contenu TechnicoPro introuvable",
+    "technicoproNotFoundMessage": "Ce contenu n’existe pas, a été supprimé ou ne vous est pas accessible."
+  },
+  "forumUi": {
+    "topicUnavailable": "Cette discussion n’est pas disponible dans la page actuelle du forum. Utilisez Retour pour afficher la liste des discussions.",
+    "back": "Retour à la vue précédente du forum",
+    "breadcrumbs": "Fil d’Ariane du forum",
+    "noForums": "Aucun forum disponible pour le moment.",
+    "noActivity": "Aucune activité récente.",
+    "loadError": "Impossible de charger le contenu du forum. Veuillez réessayer."
+  },
+  "contentListing": {
+    "preserveStatus": "Statut actuel : {status}. Il reste inchangé sauf si vous choisissez explicitement Publié ou Brouillon.",
+    "keepStatus": "Conserver le statut actuel",
+    "loadError": "Impossible de charger le contenu. Veuillez réessayer.",
+    "previous": "Précédent",
+    "next": "Suivant"
+  },
+  "categoryManager": {
+    "title": "Catégories",
+    "add": "Ajouter une catégorie",
+    "edit": "Modifier la catégorie",
+    "delete": "Supprimer la catégorie",
+    "create": "Créer la catégorie",
+    "save": "Enregistrer les modifications",
+    "name": "Nom de la catégorie",
+    "color": "Couleur de la catégorie",
+    "close": "Fermer la fenêtre",
+    "editNamed": "Modifier {name}",
+    "deleteNamed": "Supprimer {name}",
+    "deleteMessage": "Supprimer « {name} » ? Cette action peut être irréversible. Les contenus associés restent soumis aux règles existantes du serveur.",
+    "empty": "Aucune catégorie pour le moment.",
+    "loadError": "Impossible de charger les catégories.",
+    "retry": "Réessayer"
+  },
   "common": {
+    "close": "Fermer la fenêtre",
     "home": "Accueil",
     "dashboard": "Tableau de bord",
     "forums": "Forums",
@@ -202,6 +292,10 @@
     }
   },
   "memberDirectory": {
+    "showPassword": "Afficher le mot de passe",
+    "hidePassword": "Masquer le mot de passe",
+    "previousPage": "Page précédente",
+    "nextPage": "Page suivante",
     "title": "Annuaire des membres",
     "description": "Retrouvez vos collègues et entrez en contact avec eux.",
     "exportCsv": "Exporter le CSV",
@@ -456,6 +550,11 @@
     "continueReading": "Poursuivre la lecture"
   },
   "agendaPage": {
+    "month": "Mois",
+    "year": "Année",
+    "previousMonth": "Mois précédent",
+    "nextMonth": "Mois suivant",
+    "eventsOnDate": "{count} événements le {date}",
     "operationSuccessful": "Opération réussie !",
     "eventCreatedSuccess": "Événement créé avec succès !",
     "eventUpdatedSuccess": "Événement mis à jour avec succès !",
@@ -637,6 +736,11 @@
     "selectTrainingPrompt": "Sélectionnez une formation pour consulter les autorisations"
   },
   "documentLibraryPage": {
+    "location": "Emplacement du dossier",
+    "displayMode": "Mode d’affichage",
+    "gridView": "Vue en grille",
+    "listView": "Vue en liste",
+    "openItem": "Ouvrir {name}",
     "success": "Opération réussie !",
     "root": "Racine",
     "title": "Bibliothèque de documents",

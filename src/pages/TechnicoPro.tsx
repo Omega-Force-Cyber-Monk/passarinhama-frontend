@@ -1,5 +1,9 @@
+import { ModalFieldGrid, ModalFullWidth, ModalSection, ModalMediaSplit, ModalSubmitButton } from "../components/ui/ModalLayout";
+import "./ResourceEditorModals.css";
+import { ContentCard, ContentCardSkeleton, ContentPageHeader, ContentStatusField, ContentStatusTabs, useListingStatus } from "../components/ui/ContentListing";
+import CategoryManagerDialog, { type CategoryValues } from "../components/ui/CategoryManagerDialog";
 import React, { useEffect, useState } from "react";
-import { CheckCircle2, Edit2, FileText, Grid, Plus, Trash2, Wrench } from "lucide-react";
+import { CheckCircle2, Edit2, Trash2, Wrench } from "lucide-react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useSelector } from "react-redux";
 import Modal from "../components/ui/Modal";
@@ -23,7 +27,6 @@ import {
 } from "../redux/features/technicopro/technicoproApi";
 import type {
   TechnicoPro,
-  TechnicoProCategory,
   TechnicoProRequest,
   TechnicoProStatus,
 } from "../redux/features/technicopro/technicoproTypes";
@@ -95,19 +98,19 @@ export default function TechnicoProPage() {
   const canViewLifecycleContent = canCreate || canEdit || canDelete || isSuperuser;
 
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<TechnicoProStatus>("published");
-  const { data: categoriesResponse } = useGetTechnicoProCategoriesQuery({
+  const [statusFilter, setStatusFilter] = useListingStatus(canViewLifecycleContent);
+  const { data: categoriesResponse, isLoading: isLoadingCategories, error: categoriesError, refetch: refetchCategories } = useGetTechnicoProCategoriesQuery({
     pageSize: 100,
   });
   const categories = categoriesResponse?.results ?? [];
-  const { data, isLoading, isFetching } = useGetTechnicoProsQuery({
+  const { currentData: data, isLoading, isFetching, isError } = useGetTechnicoProsQuery({
     page,
     pageSize: PAGE_SIZE,
     category_id: categoryId,
     status: statusFilter,
     details: true,
   });
-  const items = data?.results || [];
+  const items = (data?.results || []).filter((item) => item.status === statusFilter);
   const totalPages = data?.total_pages || 1;
   const selectedCategory = categories.find((category) => category.id === categoryId);
 
@@ -115,11 +118,11 @@ export default function TechnicoProPage() {
   const [updateItem, { isLoading: isUpdating }] = useUpdateTechnicoProMutation();
   const [deleteItem, { isLoading: isDeleting }] = useDeleteTechnicoProMutation();
   const [uploadFile] = useUploadFileMutation();
-  const [createCategory, { isLoading: isCreatingCategory }] =
+  const [createCategory] =
     useCreateTechnicoProCategoryMutation();
-  const [updateCategory, { isLoading: isUpdatingCategory }] =
+  const [updateCategory] =
     useUpdateTechnicoProCategoryMutation();
-  const [deleteCategory, { isLoading: isDeletingCategory }] =
+  const [deleteCategory] =
     useDeleteTechnicoProCategoryMutation();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -129,9 +132,6 @@ export default function TechnicoProPage() {
   const [removedFileUrls, setRemovedFileUrls] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<TechnicoProCategory | null>(null);
-  const [categoryForm, setCategoryForm] = useState({ name: "", description: "" });
-  const [categoryDeletingId, setCategoryDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     setPage(1);
@@ -228,50 +228,20 @@ export default function TechnicoProPage() {
     }
   };
 
-  const resetCategoryForm = () => {
-    setEditingCategory(null);
-    setCategoryForm({ name: "", description: "" });
+  const handleCreateCategory = async (values: CategoryValues) => {
+    await createCategory({ name: values.name, description: values.description }).unwrap();
+    toast.success(translate("technicoproPage.success"));
   };
 
-  const handleSaveCategory = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!categoryForm.name.trim()) {
-      toast.error(translate("common.requiredField", { field: "Category" }));
-      return;
-    }
-
-    try {
-      if (editingCategory) {
-        await updateCategory({
-          id: editingCategory.id,
-          name: categoryForm.name.trim(),
-          description: categoryForm.description.trim() || null,
-        }).unwrap();
-      } else {
-        await createCategory({
-          name: categoryForm.name.trim(),
-          description: categoryForm.description.trim() || null,
-        }).unwrap();
-      }
-      resetCategoryForm();
-      setIsCategoryModalOpen(false);
-      toast.success(translate("technicoproPage.success"));
-    } catch (error) {
-      toast.error(getApiErrorDisplayMessage(error, translate, "apiErrors.default"));
-    }
+  const handleUpdateCategory = async (id: string, values: CategoryValues) => {
+    await updateCategory({ id, name: values.name, description: values.description }).unwrap();
+    toast.success(translate("technicoproPage.success"));
   };
 
   const handleDeleteCategory = async (id: string) => {
-    setCategoryDeletingId(id);
-    try {
-      await deleteCategory(id).unwrap();
-      toast.success(translate("technicoproPage.success"));
-      if (categoryId === id) navigate("/technicopro");
-    } catch (error) {
-      toast.error(getApiErrorDisplayMessage(error, translate, "apiErrors.default"));
-    } finally {
-      setCategoryDeletingId(null);
-    }
+    await deleteCategory(id).unwrap();
+    if (categoryId === id) navigate("/technicopro");
+    toast.success(translate("technicoproPage.success"));
   };
 
   if (!canView) {
@@ -279,114 +249,42 @@ export default function TechnicoProPage() {
   }
 
   return (
-    <div className="space-y-8 p-4 text-slate-900 sm:p-6 lg:p-8">
-      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900 underline decoration-primary decoration-4 underline-offset-8 sm:text-3xl">
-            {selectedCategory?.name || translate("common.technicopro")}
-          </h2>
-          {selectedCategory?.description ? (
-            <p className="mt-3 max-w-2xl text-sm font-medium text-slate-500">
-              {selectedCategory.description}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          {canManageCategories && (
-            <button
-              type="button"
-              onClick={() => setIsCategoryModalOpen(true)}
-              className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold shadow-sm hover:bg-slate-50"
-            >
-              <Grid className="h-5 w-5 text-primary" />
-              {translate("articlesPage.newCategory")}
-            </button>
-          )}
-          {canCreate && (
-            <button
-              type="button"
-              onClick={openCreateForm}
-              className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-lg hover:bg-slate-800"
-            >
-              <Plus className="h-5 w-5 text-primary" />
-              {translate("technicoproPage.create")}
-            </button>
-          )}
-        </div>
-      </header>
+    <div className="content-page">
+      <ContentPageHeader
+        title={selectedCategory?.name || translate("common.technicopro")}
+        description={selectedCategory?.description}
+        canManageCategories={canManageCategories}
+        onCategories={() => setIsCategoryModalOpen(true)}
+        canCreate={canCreate}
+        onCreate={openCreateForm}
+        createLabel={translate("technicoproPage.create")}
+      />
+      {canViewLifecycleContent ? <ContentStatusTabs value={statusFilter} onChange={setStatusFilter} /> : null}
 
-      {canViewLifecycleContent ? (
-        <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-          {(["published", "pending", "draft"] as TechnicoProStatus[]).map((status) => (
-            <button
-              key={status}
-              type="button"
-              onClick={() => setStatusFilter(status)}
-              className={`rounded-xl px-4 py-2 text-xs font-black uppercase tracking-widest transition-colors ${
-                statusFilter === status
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-              }`}
-            >
-              {getLocalizedStatusLabel(status, translate)}
-            </button>
-          ))}
+      {(isLoading || isFetching) && !items.length ? (
+        <div className="content-list-grid">
+          {Array.from({ length: 4 }).map((_, index) => <ContentCardSkeleton key={index} />)}
         </div>
-      ) : null}
-
-      {isLoading && !items.length ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm font-bold text-slate-500">
-          {translate("common.loading")}
-        </div>
+      ) : isError ? (
+        <div role="alert" className="rounded-2xl border border-red-100 bg-red-50 p-6 text-center text-sm font-semibold text-red-700">{translate("contentListing.loadError")}</div>
       ) : items.length ? (
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="content-list-grid">
           {items.map((item) => (
-            <article key={item.id} className="flex min-h-[22rem] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <button
-                type="button"
-                onClick={() => navigate(`/technicopro/${item.id}`)}
-                className="aspect-video bg-slate-100 text-left"
-              >
-                {item.thumbnail_url ? (
-                  <img src={item.thumbnail_url} alt={item.title} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-slate-300">
-                    <Wrench className="h-14 w-14" />
-                  </div>
-                )}
-              </button>
-              <div className="flex flex-1 flex-col p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="rounded-full bg-primary/15 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-900">
-                    {item.category?.name || translate("common.technicopro")}
-                  </span>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    {getLocalizedStatusLabel(item.status, translate)}
-                  </span>
-                </div>
-                <h3 className="mt-4 line-clamp-2 text-lg font-bold text-slate-900">{item.title}</h3>
-                <p className="mt-3 line-clamp-3 text-sm font-medium leading-6 text-slate-500">
-                  {item.excerpt || stripRichText(item.body || "")}
-                </p>
-                <div className="mt-auto flex items-center justify-between pt-5">
-                  <span className="text-xs font-semibold text-slate-400">
-                    {new Date(item.created_at).toLocaleDateString(localeCode)}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    {canEdit && (
-                      <button type="button" onClick={() => openEditForm(item)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-900">
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-                    )}
-                    {canDelete && (
-                      <button type="button" onClick={() => setDeletingId(item.id)} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </article>
+            <ContentCard
+              key={item.id}
+              image={item.thumbnail_url}
+              fallbackIcon={<Wrench className="h-8 w-8" />}
+              category={item.category?.name || translate("common.technicopro")}
+              status={getLocalizedStatusLabel(item.status, translate)}
+              title={item.title}
+              description={item.excerpt || stripRichText(item.body || "")}
+              metadata={new Date(item.created_at).toLocaleDateString(localeCode)}
+              onNavigate={() => navigate('/technicopro/' + item.id)}
+              actions={[
+                ...(canEdit ? [{ label: translate("technicoproPage.edit"), icon: <Edit2 className="h-4 w-4" />, onClick: () => openEditForm(item) }] : []),
+                ...(canDelete ? [{ label: translate("technicoproPage.delete"), icon: <Trash2 className="h-4 w-4" />, onClick: () => setDeletingId(item.id) }] : []),
+              ]}
+            />
           ))}
         </div>
       ) : (
@@ -395,82 +293,147 @@ export default function TechnicoProPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-end gap-3">
+      <div className="flex flex-wrap items-center justify-end gap-3">
           <button type="button" disabled={page <= 1 || isFetching} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold disabled:opacity-40">
-            Previous
+            {translate("contentListing.previous")}
           </button>
           <span className="text-xs font-bold uppercase tracking-widest text-slate-400">{page} / {totalPages}</span>
           <button type="button" disabled={page >= totalPages || isFetching} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold disabled:opacity-40">
-            Next
+            {translate("contentListing.next")}
           </button>
       </div>
 
-      <Modal isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} title={editingItem ? translate("technicoproPage.edit") : translate("technicoproPage.create")} maxWidth="max-w-4xl">
-        <form noValidate onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <input value={formData.title} onChange={(event) => setFormData((current) => ({ ...current, title: event.target.value }))} placeholder={translate("trainingsPage.trainingTitle")} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none" />
-            <select value={formData.category_id} onChange={(event) => setFormData((current) => ({ ...current, category_id: event.target.value }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none">
-              <option value="">{translate("articlesPage.selectCategory")}</option>
-              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-            </select>
-          </div>
-          <textarea value={formData.excerpt} onChange={(event) => setFormData((current) => ({ ...current, excerpt: event.target.value }))} placeholder={translate("articlesPage.excerpt")} className="min-h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none" />
-          <TiptapEditor content={formData.body} onChange={(body) => setFormData((current) => ({ ...current, body }))} onImageUpload={handleImageUpload} />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <select value={formData.status} onChange={(event) => setFormData((current) => ({ ...current, status: event.target.value as TechnicoProStatus }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none">
-              <option value="draft">{getLocalizedStatusLabel("draft", translate)}</option>
-              <option value="pending">{getLocalizedStatusLabel("pending", translate)}</option>
-              <option value="published">{getLocalizedStatusLabel("published", translate)}</option>
-            </select>
-            <input type="file" accept="image/*" onChange={(event) => setFormData((current) => ({ ...current, thumbnail: event.target.files?.[0] || null }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold" />
-          </div>
-          <input type="file" multiple onChange={(event) => setSelectedFiles(Array.from(event.target.files || []))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold" />
-          <SelectedFilesPreview files={selectedFiles} onRemove={(index) => setSelectedFiles((current) => current.filter((_, idx) => idx !== index))} />
-          {formData.file_urls.length ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {formData.file_urls.map((attachment) => {
-                const url = getAttachmentUrl(attachment);
-                return <FilePreviewCard key={url} url={url} name={getAttachmentName(attachment)} href={url} onRemove={() => {
-                  setRemovedFileUrls((current) => [...current, url]);
-                  setFormData((current) => ({ ...current, file_urls: current.file_urls.filter((item) => getAttachmentUrl(item) !== url) }));
-                }} />;
-              })}
-            </div>
-          ) : null}
-          <button type="submit" disabled={!canSubmitForm || isCreating || isUpdating} className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-4 text-sm font-bold uppercase tracking-widest text-white disabled:opacity-50">
-            <CheckCircle2 className="h-5 w-5 text-primary" />
-            {translate("technicoproPage.save")}
-          </button>
+      <Modal
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        title={editingItem ? translate("technicoproPage.edit") : translate("technicoproPage.create")}
+        layout="sectioned"
+        className="resource-editor-modal"
+        footer={(<ModalSubmitButton
+          formId="technicopro-editor-form"
+          disabled={!canSubmitForm || isCreating || isUpdating}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold uppercase tracking-widest text-white disabled:opacity-50">
+          <CheckCircle2 className="h-5 w-5 text-primary" />
+          {translate("technicoproPage.save")}
+        </ModalSubmitButton>)}>
+        <form
+          id="technicopro-editor-form"
+          noValidate
+          onSubmit={handleSubmit}
+          className="resource-editor-form">
+          <ModalSection title={translate("modalBatchOne.basicInformation")}>
+            <ModalFieldGrid>
+              <ModalFullWidth>
+                <label className="block space-y-2 text-left">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{translate("modalBatchTwo.title")}</span>
+                  <input
+                    value={formData.title}
+                    onChange={(event) => setFormData((current) => ({ ...current, title: event.target.value }))}
+                    placeholder={translate("trainingsPage.trainingTitle")}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none" />
+                </label>
+              </ModalFullWidth>
+              <label className="block space-y-2 text-left">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{translate("articlesPage.category")}</span>
+                <select
+                  value={formData.category_id}
+                  onChange={(event) => setFormData((current) => ({ ...current, category_id: event.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none">
+                  <option value="">{translate("articlesPage.selectCategory")}</option>
+                  {categories.map((category) =>
+                    <option key={category.id} value={category.id}>{category.name}</option>)}
+                </select>
+              </label>
+              <ContentStatusField value={formData.status} onChange={(status) => setFormData((current) => ({ ...current, status }))} />
+              <ModalFullWidth>
+                <label className="block space-y-2 text-left">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{translate("articlesPage.excerpt")}</span>
+                  <textarea
+                    value={formData.excerpt}
+                    onChange={(event) => setFormData((current) => ({ ...current, excerpt: event.target.value }))}
+                    placeholder={translate("articlesPage.excerpt")}
+                    className="min-h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none" />
+                </label>
+              </ModalFullWidth>
+            </ModalFieldGrid>
+          </ModalSection>
+          <ModalSection title={translate("modalBatchTwo.technicalContent")}>
+            <ModalFullWidth>
+              <div role="group" aria-label={translate("modalBatchTwo.technicalContent")}>
+                <TiptapEditor
+                  content={formData.body}
+                  onChange={(body) => setFormData((current) => ({ ...current, body }))}
+                  onImageUpload={handleImageUpload} />
+              </div>
+            </ModalFullWidth>
+          </ModalSection>
+          <ModalSection title={translate("modalBatchTwo.technicalMedia")}>
+            <ModalMediaSplit preview={formData.thumbnail || formData.thumbnail_url ? (
+              <FilePreviewCard
+                presentation="compact"
+                file={formData.thumbnail}
+                url={formData.thumbnail_url || undefined}
+                name={formData.thumbnail?.name || getAttachmentName(formData.thumbnail_url || "")} />
+            ) : <p className="resource-editor-empty">{translate("modalFoundation.noFiles")}</p>}>
+              <label className="block space-y-2 text-left">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{translate("trainingsPage.thumbnailLabel")}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => setFormData((current) => ({ ...current, thumbnail: event.target.files?.[0] || null }))}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold" />
+              </label>
+            </ModalMediaSplit>
+            <ModalMediaSplit preview={<SelectedFilesPreview
+              presentation="compact"
+              files={selectedFiles}
+              onRemove={(index) => setSelectedFiles((current) => current.filter((_, idx) => idx !== index))} />}>
+              <label className="block space-y-2 text-left">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{translate("articlesPage.attachmentsOptional")}</span>
+                <input
+                  type="file"
+                  multiple
+                  onChange={(event) => setSelectedFiles(Array.from(event.target.files || []))}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold" />
+              </label>
+            </ModalMediaSplit>
+            {formData.file_urls.length ? (
+              <ModalFieldGrid>
+                {formData.file_urls.map((attachment) => {
+                  const url = getAttachmentUrl(attachment);
+                  return <FilePreviewCard
+                    presentation="compact"
+                    key={url}
+                    url={url}
+                    name={getAttachmentName(attachment)}
+                    href={url}
+                    onRemove={() => {
+                      setRemovedFileUrls((current) => [...current, url]);
+                      setFormData((current) => ({ ...current, file_urls: current.file_urls.filter((item) => getAttachmentUrl(item) !== url) }));
+                    }} />;
+                })}
+              </ModalFieldGrid>
+            ) : null}
+          </ModalSection>
         </form>
       </Modal>
 
-      <Modal isOpen={isCategoryModalOpen} onClose={() => { setIsCategoryModalOpen(false); setEditingCategory(null); setCategoryForm({ name: "", description: "" }); }} title={editingCategory ? translate("articlesPage.updateCategory") : translate("articlesPage.addNewCategory")}>
-        <form noValidate onSubmit={handleSaveCategory} className="space-y-4">
-          <input autoFocus value={categoryForm.name} onChange={(event) => setCategoryForm((current) => ({ ...current, name: event.target.value }))} placeholder={translate("articlesPage.categoryNamePlaceholder")} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none" />
-          <textarea value={categoryForm.description} onChange={(event) => setCategoryForm((current) => ({ ...current, description: event.target.value }))} placeholder={translate("articlesPage.categoryDescriptionPlaceholder")} className="min-h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none" />
-          {categories.length ? (
-            <div className="space-y-2 border-t border-slate-100 pt-4">
-              {categories.map((category) => (
-                <div key={category.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <div className="min-w-0 text-left">
-                    <p className="truncate text-sm font-bold text-slate-900">{category.name}</p>
-                    {category.description ? <p className="line-clamp-2 text-xs text-slate-500">{category.description}</p> : null}
-                  </div>
-                  <div className="flex gap-1">
-                    <button type="button" onClick={() => { setEditingCategory(category); setCategoryForm({ name: category.name, description: category.description || "" }); }} className="rounded-lg p-2 text-slate-500 hover:bg-slate-200"><Edit2 className="h-4 w-4" /></button>
-                    <button type="button" disabled={categoryDeletingId === category.id || isDeletingCategory} onClick={() => handleDeleteCategory(category.id)} className="rounded-lg p-2 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"><Trash2 className="h-4 w-4" /></button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : null}
-          <button type="submit" disabled={!categoryForm.name.trim() || isCreatingCategory || isUpdatingCategory} className="w-full rounded-xl bg-slate-900 px-5 py-4 text-sm font-bold uppercase tracking-widest text-white disabled:opacity-50">
-            {editingCategory ? translate("articlesPage.updateCategory") : translate("articlesPage.createCategory")}
-          </button>
-        </form>
-      </Modal>
+      <CategoryManagerDialog
+        isOpen={isCategoryModalOpen && canManageCategories}
+        onClose={() => setIsCategoryModalOpen(false)}
+        categories={categories}
+        isLoading={isLoadingCategories}
+        error={categoriesError}
+        onRetry={() => { void refetchCategories(); }}
+        canCreate={canManageCategories}
+        canEdit={canManageCategories}
+        canDelete={canManageCategories}
+        onCreate={handleCreateCategory}
+        onUpdate={handleUpdateCategory}
+        onDelete={handleDeleteCategory}
+      />
 
-      <ConfirmModal isOpen={Boolean(deletingId)} onClose={() => setDeletingId(null)} onConfirm={handleDelete} title={translate("technicoproPage.delete")} message={translate("technicoproPage.deleteConfirm")} isLoading={isDeleting} closeOnConfirm={false} />
+      <ConfirmModal presentation="compact" isOpen={Boolean(deletingId)} onClose={() => setDeletingId(null)} onConfirm={handleDelete} title={translate("technicoproPage.delete")} message={translate("technicoproPage.deleteConfirm")} isLoading={isDeleting} closeOnConfirm={false} />
     </div>
   );
 }

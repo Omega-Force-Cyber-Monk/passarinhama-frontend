@@ -1,5 +1,95 @@
 {
+  "modalBatchFour": {
+    "personalInformation": "Personal information",
+    "organizationLocation": "Organization and location",
+    "accountInformation": "Account information"
+  },
+  "modalBatchTwo": {
+    "title": "Title",
+    "trainingContent": "Training content",
+    "technicalContent": "Technical content",
+    "technicalMedia": "Technical files and thumbnail"
+  },
+  "modalBatchOne": {
+    "articleContent": "Article content",
+    "basicInformation": "Basic information",
+    "mediaAttachments": "Media and attachments"
+  },
+  "modalFoundation": {
+    "noFiles": "No files selected",
+    "file": "File",
+    "open": "Open",
+    "download": "Download",
+    "remove": "Remove",
+    "openNamed": "Open {name}",
+    "downloadNamed": "Download {name}",
+    "removeNamed": "Remove {name}",
+    "browseFiles": "Drag and drop here, or choose a file",
+    "downloadOnly": "Download this file to open it in a compatible application.",
+    "invalidFile": "This file has no valid link.",
+    "openError": "Unable to open this file. Check your access and allow popups, then try again.",
+    "downloadError": "Unable to download this file. Please try again."
+  },
+  "adminUi": {
+    "roles": "Roles",
+    "rolesDescription": "Create and manage role names and descriptions.",
+    "neutralStatus": "—",
+    "tableScroll": "Management table. Scroll horizontally to see all columns.",
+    "search": "Search administration records"
+  },
+  "contentDetail": {
+    "download": "Download",
+    "invalidFile": "This file has no valid link.",
+    "openError": "Unable to open this file. Allow popups and check your access, then try again.",
+    "downloadError": "Unable to download this file. Check your access and try again.",
+    "breadcrumbs": "Content breadcrumbs",
+    "details": "Details",
+    "created": "Created",
+    "published": "Published",
+    "readingTime": "Reading time",
+    "author": "Author",
+    "creator": "Creator",
+    "imageUnavailable": "Image unavailable",
+    "attachment": "Attachment",
+    "trainingNotFoundTitle": "Training not found",
+    "trainingNotFoundMessage": "The training does not exist, has been removed, or is not available to you.",
+    "technicoproNotFoundTitle": "TechnicoPro content not found",
+    "technicoproNotFoundMessage": "This content does not exist, has been removed, or is not available to you."
+  },
+  "forumUi": {
+    "topicUnavailable": "This discussion is not available in the current forum page. Use Back to return to the topic list.",
+    "back": "Back to the previous forum view",
+    "breadcrumbs": "Forum breadcrumbs",
+    "noForums": "No forums available yet.",
+    "noActivity": "No recent activity.",
+    "loadError": "Unable to load forum content. Please try again."
+  },
+  "contentListing": {
+    "preserveStatus": "Current status: {status}. It stays unchanged unless you explicitly choose Published or Draft.",
+    "keepStatus": "Keep current status",
+    "loadError": "Unable to load content. Please try again.",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "categoryManager": {
+    "title": "Categories",
+    "add": "Add Category",
+    "edit": "Edit Category",
+    "delete": "Delete Category",
+    "create": "Create Category",
+    "save": "Save Changes",
+    "name": "Category name",
+    "color": "Category color",
+    "close": "Close dialog",
+    "editNamed": "Edit {name}",
+    "deleteNamed": "Delete {name}",
+    "deleteMessage": "Delete \"{name}\"? This action may be irreversible. Related content remains subject to the existing server rules.",
+    "empty": "No categories yet.",
+    "loadError": "Unable to load categories.",
+    "retry": "Retry"
+  },
   "common": {
+    "close": "Close dialog",
     "home": "Home",
     "dashboard": "Dashboard",
     "forums": "Forums",
@@ -202,6 +292,10 @@
     }
   },
   "memberDirectory": {
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
     "title": "Member Directory",
     "description": "Find your colleagues and connect with them.",
     "exportCsv": "Export CSV",
@@ -456,6 +550,11 @@
     "continueReading": "Continue Reading"
   },
   "agendaPage": {
+    "month": "Month",
+    "year": "Year",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "eventsOnDate": "{count} events on {date}",
     "operationSuccessful": "Operation successful!",
     "eventCreatedSuccess": "Event created successfully!",
     "eventUpdatedSuccess": "Event updated successfully!",
@@ -637,6 +736,11 @@
     "selectTrainingPrompt": "Select a training to review permissions"
   },
   "documentLibraryPage": {
+    "location": "Folder location",
+    "displayMode": "Display mode",
+    "gridView": "Grid view",
+    "listView": "List view",
+    "openItem": "Open {name}",
     "success": "Operation successful!",
     "root": "Root",
     "title": "Document Library",

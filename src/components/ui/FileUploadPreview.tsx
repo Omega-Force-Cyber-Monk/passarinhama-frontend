@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useI18n } from "../../i18n";
+import { createObjectUrlLease, downloadLocalFile, localPreviewMime, openLocalFile } from "./localFilePreview";
+import "./FileUploadPreview.css";
 import {
   CheckCircle2,
   Download,
@@ -13,6 +16,7 @@ import {
 } from "lucide-react";
 import {
   formatFileSize,
+  resolveAttachmentUrl,
   getAttachmentCategory,
   getFileExtension,
   getUrlDisplayName,
@@ -123,6 +127,13 @@ const PreviewMedia = ({
   );
 };
 
+export type FilePreviewCardProps = {
+  file?: File | null; url?: string | null; name?: string | null; subtitle?: string | null;
+  onRemove?: () => void; href?: string; emptyLabel?: string; aspectClassName?: string;
+  mediaShapeClassName?: string; className?: string; presentation?: "legacy" | "compact";
+  mimeType?: string | null; fileSize?: number | null;
+};
+
 export const FilePreviewCard = ({
   file,
   url,
@@ -130,22 +141,14 @@ export const FilePreviewCard = ({
   subtitle,
   onRemove,
   href,
+  presentation = "legacy",
+  mimeType,
+  fileSize,
   emptyLabel = "No file selected",
   aspectClassName = "aspect-[4/3]",
   mediaShapeClassName = "",
   className = "",
-}: {
-  file?: File | null;
-  url?: string | null;
-  name?: string | null;
-  subtitle?: string | null;
-  onRemove?: () => void;
-  href?: string;
-  emptyLabel?: string;
-  aspectClassName?: string;
-  mediaShapeClassName?: string;
-  className?: string;
-}) => {
+}: FilePreviewCardProps) => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
   const resolvedName = useMemo(() => {
@@ -196,6 +199,8 @@ export const FilePreviewCard = ({
       setIsOpening(false);
     }
   };
+
+  if (presentation === "compact") return <CompactFilePreviewCard file={file} url={url} href={href} name={name} subtitle={subtitle} onRemove={onRemove} emptyLabel={emptyLabel} className={className} mimeType={mimeType} fileSize={fileSize} />;
 
   return (
     <div className={`overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ${className}`}>
@@ -266,12 +271,69 @@ export const FilePreviewCard = ({
   );
 };
 
+function CompactFilePreviewCard({ file, url, href, name, subtitle, onRemove, emptyLabel, className = "", mimeType, fileSize }: FilePreviewCardProps) {
+  const { translate } = useI18n();
+  const [localUrl, setLocalUrl] = useState<{ file: File; url: string } | null>(null);
+  const [failedSource, setFailedSource] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [opening, setOpening] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const displayName = name || file?.name || (url ? getPreviewName(url) : emptyLabel && emptyLabel !== "No file selected" ? emptyLabel : null) || translate("modalFoundation.file");
+  const kind = mimeType && !file ? getAttachmentCategory({ extension: getFileExtension(displayName), mimeType }) : getPreviewKind({ file, url, name: displayName });
+  useEffect(() => {
+    if (!file || !["image", "video", "audio"].includes(kind)) { setLocalUrl(null); return; }
+    try {
+      const lease = createObjectUrlLease(file);
+      setLocalUrl({ file, url: lease.url });
+      return lease.release;
+    } catch { setLocalUrl(null); }
+  }, [file, kind]);
+  useEffect(() => { setError(""); }, [file, url, href]);
+  const source = (file ? localUrl?.file === file ? localUrl.url : "" : url && resolveAttachmentUrl(url)) || "";
+  const validRemote = (href || url) ? resolveAttachmentUrl(href || url || "") : null;
+  const sizeBytes = file?.size ?? fileSize;
+  const size = sizeBytes === 0 ? "0 B" : formatFileSize(sizeBytes);
+  const type = file?.type || mimeType || getFileExtension(displayName).toUpperCase() || kind.toUpperCase();
+  const metadata = [...new Set([type, size, subtitle].filter(Boolean))].join(" · ");
+  const canOpen = file ? Boolean(localPreviewMime(file)) : Boolean(validRemote);
+  const canDownload = Boolean(file || (url && resolveAttachmentUrl(url)));
+  const Icon = kind === "image" ? ImageIcon : kind === "video" ? Video : kind === "audio" ? Music : kind === "pdf" || kind === "text" ? FileText : FileIcon;
+  return <div className={`compact-file-card ${className}`}>
+    <div className="compact-file-row">
+      <div className="compact-file-thumbnail">
+        {kind === "image" && source && failedSource !== source ? <img src={source} alt={displayName} onError={() => setFailedSource(source)} /> : <Icon aria-hidden="true" className="h-6 w-6" />}
+      </div>
+      <div className="compact-file-info"><p title={displayName}>{displayName}</p><span>{metadata}</span></div>
+      <div className="compact-file-actions">
+        {canOpen ? <button type="button" disabled={opening} aria-label={translate("modalFoundation.openNamed", { name: displayName })} title={translate("modalFoundation.open")} onClick={() => {
+          setError("");
+          if (file) { try { openLocalFile(file); } catch { setError(translate("modalFoundation.openError")); } return; }
+          setOpening(true);
+          void openUrlAsBlob(validRemote!, mimeType).catch(() => setError(translate("modalFoundation.openError"))).finally(() => setOpening(false));
+        }}><ExternalLink aria-hidden="true" className="h-4 w-4" /></button> : null}
+        {canDownload ? <button type="button" disabled={downloading} aria-label={translate("modalFoundation.downloadNamed", { name: displayName })} title={translate("modalFoundation.download")} onClick={() => {
+          setError("");
+          if (file) { try { downloadLocalFile(file); } catch { setError(translate("modalFoundation.downloadError")); } return; }
+          setDownloading(true);
+          void downloadUrlAsFile(url!, displayName, mimeType).catch(() => setError(translate("modalFoundation.downloadError"))).finally(() => setDownloading(false));
+        }}><Download aria-hidden="true" className="h-4 w-4" /></button> : null}
+        {onRemove ? <button type="button" onClick={onRemove} aria-label={translate("modalFoundation.removeNamed", { name: displayName })} title={translate("modalFoundation.remove")}><Trash2 aria-hidden="true" className="h-4 w-4" /></button> : null}
+      </div>
+    </div>
+    {!canOpen && file ? <p className="compact-file-note">{translate("modalFoundation.downloadOnly")}</p> : null}
+    {!file && (href || url) && !validRemote ? <p role="alert" className="compact-file-error">{translate("modalFoundation.invalidFile")}</p> : null}
+    {error ? <p role="alert" className="compact-file-error">{error}</p> : null}
+  </div>;
+}
+
 export const SelectedFilesPreview = ({
   files,
   onRemove,
+  presentation = "legacy",
   emptyLabel = "No files selected",
   className = "",
 }: {
+  presentation?: "legacy" | "compact";
   files: File[];
   onRemove: (index: number) => void;
   emptyLabel?: string;
@@ -280,20 +342,21 @@ export const SelectedFilesPreview = ({
   if (!files.length) {
     return (
       <div
-        className={`flex min-h-[220px] items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-6 text-center text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 ${className}`}
+        className={`${presentation === "compact" ? "compact-file-empty " : ""}flex min-h-[220px] items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-6 text-center text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 ${className}`}
       >
-        {emptyLabel}
+        {presentation === "compact" && emptyLabel === "No files selected" ? <CompactEmptyFilesLabel /> : emptyLabel}
       </div>
     );
   }
 
   return (
     <div
-      className={`max-h-[336px] space-y-3 overflow-y-auto rounded-3xl border border-slate-200 bg-slate-50 p-3 ${className}`}
+      className={`${presentation === "compact" ? "compact-file-list " : ""}max-h-[336px] space-y-3 overflow-y-auto rounded-3xl border border-slate-200 bg-slate-50 p-3 ${className}`}
     >
       {files.map((file, index) => (
         <FilePreviewCard
           key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+          presentation={presentation}
           file={file}
           onRemove={() => onRemove(index)}
           className="bg-white"
@@ -303,7 +366,18 @@ export const SelectedFilesPreview = ({
   );
 };
 
+function CompactBrowseLabel() {
+  const { translate } = useI18n();
+  return <>{translate("modalFoundation.browseFiles")}</>;
+}
+
+function CompactEmptyFilesLabel() {
+  const { translate } = useI18n();
+  return <>{translate("modalFoundation.noFiles")}</>;
+}
+
 export const FileUploadDropzone = ({
+  presentation = "legacy",
   inputId,
   title,
   hint,
@@ -315,6 +389,7 @@ export const FileUploadDropzone = ({
   emptyPreview,
   className = "",
 }: {
+  presentation?: "legacy" | "compact";
   inputId: string;
   title: string;
   hint: string;
@@ -350,7 +425,7 @@ export const FileUploadDropzone = ({
           onFilesSelected(files);
         }
       }}
-      className={`group relative flex cursor-pointer flex-col items-center justify-center gap-4 overflow-hidden rounded-3xl border-2 border-dashed px-6 py-8 text-center transition-all sm:px-8 ${
+      className={`${presentation === "compact" ? "compact-file-dropzone " : ""}group relative flex cursor-pointer flex-col items-center justify-center gap-4 overflow-hidden rounded-3xl border-2 border-dashed px-6 py-8 text-center transition-all sm:px-8 ${
         isDragging
           ? "border-primary bg-primary/5 shadow-[0_12px_30px_rgba(13,110,253,0.12)]"
           : "border-slate-200 bg-white hover:border-primary/50 hover:bg-slate-50 hover:shadow-sm"
@@ -364,7 +439,7 @@ export const FileUploadDropzone = ({
         type="file"
         accept={accept}
         multiple={multiple}
-        className="hidden"
+        className={presentation === "compact" ? "compact-file-input" : "hidden"}
         onChange={(event) => {
           const files = event.target.files ? Array.from(event.target.files) : [];
           if (files.length) {
@@ -374,7 +449,7 @@ export const FileUploadDropzone = ({
         }}
       />
       <div
-        className={`relative z-[1] flex h-16 w-16 items-center justify-center rounded-2xl border transition-colors ${
+        className={`${presentation === "compact" ? "compact-file-upload-icon " : ""}relative z-[1] flex h-16 w-16 items-center justify-center rounded-2xl border transition-colors ${
           isDragging
             ? "border-primary/30 bg-primary/15"
             : "border-slate-200 bg-slate-50"
@@ -389,7 +464,7 @@ export const FileUploadDropzone = ({
           {title}
         </p>
         <p className="text-xs font-medium text-slate-500">
-          Drag and drop here, or click to browse
+          {presentation === "compact" ? <CompactBrowseLabel /> : "Drag and drop here, or click to browse"}
         </p>
         {selectedLabel ? (
           <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-100">
@@ -407,6 +482,10 @@ export const FileUploadDropzone = ({
   if (!preview && !emptyPreview) {
     return content;
   }
+
+  if (presentation === "compact") return <div className="compact-file-split-boundary"><div className="compact-file-split">
+    {content}<div className="compact-file-split-preview">{preview || emptyPreview}</div>
+  </div></div>;
 
   return (
     <div className="grid items-stretch gap-4 md:grid-cols-[minmax(0,1.35fr)_280px]">

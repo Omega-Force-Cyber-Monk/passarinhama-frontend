@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Mail, ArrowLeft, Send, CheckCircle2, Lock } from 'lucide-react';
+import { Mail, ArrowLeft, Send, CheckCircle2, Lock, Eye, EyeOff } from 'lucide-react';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useAppToast } from '../components/ui/AppToastProvider';
 import { useI18n } from '../i18n';
@@ -24,6 +24,9 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState(routeState.email || '');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const passwordFieldId = useId();
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const { translate } = useI18n();
   const toast = useAppToast();
@@ -170,13 +173,25 @@ export default function ForgotPassword() {
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <input
-                        type="password"
+                        id={`${passwordFieldId}-new`}
+                        type={showNewPassword ? 'text' : 'password'}
                         required
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all text-sm"
+                        className="w-full pl-10 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all text-sm"
                         placeholder="••••••••"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                       />
+                      <button
+                        type="button"
+                        aria-controls={`${passwordFieldId}-new`}
+                        aria-pressed={showNewPassword}
+                        aria-label={`${translate(showNewPassword ? 'memberDirectory.hidePassword' : 'memberDirectory.showPassword')}: ${translate('forgotPassword.newPassword')}`}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => setShowNewPassword((visible) => !visible)}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      >
+                        {showNewPassword ? <EyeOff aria-hidden="true" className="h-5 w-5" /> : <Eye aria-hidden="true" className="h-5 w-5" />}
+                      </button>
                     </div>
                   </div>
 
@@ -187,13 +202,25 @@ export default function ForgotPassword() {
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <input
-                        type="password"
+                        id={`${passwordFieldId}-confirm`}
+                        type={showConfirmPassword ? 'text' : 'password'}
                         required
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all text-sm"
+                        className="w-full pl-10 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all text-sm"
                         placeholder="••••••••"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                       />
+                      <button
+                        type="button"
+                        aria-controls={`${passwordFieldId}-confirm`}
+                        aria-pressed={showConfirmPassword}
+                        aria-label={`${translate(showConfirmPassword ? 'memberDirectory.hidePassword' : 'memberDirectory.showPassword')}: ${translate('forgotPassword.confirmNewPassword')}`}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => setShowConfirmPassword((visible) => !visible)}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      >
+                        {showConfirmPassword ? <EyeOff aria-hidden="true" className="h-5 w-5" /> : <Eye aria-hidden="true" className="h-5 w-5" />}
+                      </button>
                     </div>
                   </div>
                 </>

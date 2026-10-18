@@ -40,6 +40,7 @@ interface TiptapEditorProps {
   placeholder?: string;
   onImageUpload?: (file: File) => Promise<string>;
   variant?: "default" | "compact";
+  ariaLabelledBy?: string;
 }
 
 const MenuButton = ({ 
@@ -244,6 +245,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   placeholder = "Write something...",
   onImageUpload,
   variant = "default",
+  ariaLabelledBy,
 }) => {
   const editor = useEditor({
     extensions: [
@@ -295,6 +297,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     },
     editorProps: {
       attributes: {
+        ...(ariaLabelledBy ? { role: 'textbox', 'aria-multiline': 'true', 'aria-labelledby': ariaLabelledBy } : {}),
         class: 'tiptap focus:outline-none min-h-[450px] p-8 md:p-12 prose prose-slate prose-lg max-w-none prose-headings:font-bold prose-headings:text-slate-900 prose-p:text-slate-600 prose-a:text-primary prose-img:rounded-3xl',
       },
     },

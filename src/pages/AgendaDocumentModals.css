@@ -1,0 +1,64 @@
+/* Batch 3 opts into Phase 2 sizing, grids, scrolling, stacking and focus. */
+.batch-three-modal :is(form, .tiptap-wrapper) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.batch-three-modal .tiptap-wrapper .tiptap {
+  min-height: 7.5rem;
+  padding: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.batch-three-modal :is(p, h3, a, span) {
+  overflow-wrap: anywhere;
+}
+
+.batch-three-modal :is(input, select):focus-visible {
+  outline: 2px solid var(--archi-accent);
+  outline-offset: 2px;
+}
+
+.batch-three-modal .batch-three-actions,
+.batch-three-modal .batch-three-action-row {
+  width: 100%;
+  min-width: 0;
+}
+
+.batch-three-modal .batch-three-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.batch-three-modal .batch-three-action-row > button {
+  flex: 1 1 9rem;
+  justify-content: center;
+}
+
+.batch-three-modal .batch-three-empty {
+  margin: 0;
+  padding: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--archi-secondary);
+}
+
+.batch-three-modal .documents-dropzone {
+  margin-bottom: 0;
+  padding: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.batch-three-modal .documents-dropzone:focus-visible {
+  outline: 2px solid var(--archi-accent);
+  outline-offset: 2px;
+}
+
+.agenda-detail-drawer .agenda-detail-tabs {
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.document-preview-drawer .batch-three-file-information {
+  padding: 0.75rem;
+}

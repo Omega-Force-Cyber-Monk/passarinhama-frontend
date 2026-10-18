@@ -169,16 +169,39 @@ export const normalizeAttachments = (
     .map((source, index) => normalizeAttachment(source, `${fallbackPrefix} ${index + 1}`))
     .filter((item): item is NormalizedAttachment => item !== null);
 
-const getAuthHeaders = () => {
+// Match the browser's existing relative-URL resolution; never invent a storage path.
+export const resolveAttachmentUrl = (url: string) => {
+  if (!url.trim() || ["undefined", "null"].includes(url.trim()) || url.trim().startsWith("#")) return null;
+  try {
+    const resolved = new URL(url, document.baseURI);
+    if (resolved.username || resolved.password) return null;
+    if (["http:", "https:"].includes(resolved.protocol)) return resolved.href;
+    if (resolved.protocol === "blob:" && resolved.origin === window.location.origin) return resolved.href;
+  } catch { /* Invalid references have no actionable link. */ }
+  return null;
+};
+
+export const usesAuthenticatedFileRequest = (url: string) => {
+  const resolved = resolveAttachmentUrl(url);
+  if (!resolved || resolved.startsWith("blob:")) return false;
+  const origin = new URL(resolved).origin;
+  if (origin === window.location.origin) return true;
+  const apiBase = import.meta.env.VITE_API_BASE_URL;
+  return Boolean(apiBase && origin === new URL(apiBase, document.baseURI).origin);
+};
+
+const getAuthHeaders = (url: string) => {
   const token =
     typeof window !== "undefined" ? window.localStorage.getItem("token") : null;
 
-  return token ? { Authorization: `Bearer ${token}` } : undefined;
+  return token && usesAuthenticatedFileRequest(url) ? { Authorization: `Bearer ${token}` } : undefined;
 };
 
 export const fetchUrlAsObjectUrl = async (url: string, fallbackType?: string | null) => {
-  const response = await fetch(url, {
-    headers: getAuthHeaders(),
+  const resolved = resolveAttachmentUrl(url);
+  if (!resolved) throw new Error("Invalid file URL");
+  const response = await fetch(resolved, {
+    headers: getAuthHeaders(resolved),
   });
 
   if (!response.ok) {
@@ -193,9 +216,24 @@ export const fetchUrlAsObjectUrl = async (url: string, fallbackType?: string | n
 };
 
 export const openUrlAsBlob = async (url: string, fallbackType?: string | null) => {
-  const objectUrl = await fetchUrlAsObjectUrl(url, fallbackType);
-  window.open(objectUrl, "_blank", "noopener,noreferrer");
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  // Reserve the tab before awaiting a request so the user's click grants it.
+  const tab = window.open("about:blank", "_blank");
+  if (!tab) throw new Error("File tab was blocked by the browser");
+  tab.opener = null;
+  let objectUrl: string | undefined;
+  try {
+    objectUrl = await fetchUrlAsObjectUrl(url, fallbackType);
+    if (tab.closed) {
+      URL.revokeObjectURL(objectUrl);
+      return;
+    }
+    tab.location.replace(objectUrl);
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl!), 60_000);
+  } catch (error) {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    tab.close();
+    throw error;
+  }
 };
 
 export const downloadUrlAsFile = async (

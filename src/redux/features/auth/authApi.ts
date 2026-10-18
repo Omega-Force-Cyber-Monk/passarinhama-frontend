@@ -42,7 +42,7 @@ const normalizeVerifyOtpResponse = (
   sessionKey: response.sessionKey ?? response.session_key,
 });
 
-const normalizeUserProfile = (user: UserProfileApiResponse): UserProfile => ({
+export const normalizeUserProfile = (user: UserProfileApiResponse): UserProfile => ({
   ...user,
   role: normalizeRole(user.role),
   is_superuser: user.is_superuser ?? false,

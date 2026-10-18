@@ -1,3 +1,5 @@
+import { ModalFieldGrid, ModalFullWidth, ModalSubmitButton } from "../components/ui/ModalLayout";
+import "./ArticleForumModals.css";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Paperclip,
@@ -10,13 +12,11 @@ import {
   Star,
   Plus,
   Trash2,
-  CheckCircle2,
   ArrowLeft,
   Send,
   User as UserIcon,
   ChevronLeft,
   ChevronRight,
-  Shield,
   Edit2,
   FileText,
   Image as ImageIcon,
@@ -46,9 +46,6 @@ import { useSelector } from "react-redux";
 import { RootState } from "../redux/store";
 import { ROLE_SLUGS } from "../redux/features/auth/authTypes";
 import {
-  useGetUserRolesQuery,
-} from "../redux/features/members/membersApi";
-import {
   useCreateForumMutation,
   useCreateForumTopicMutation,
   useCreateTopicPostMutation,
@@ -59,8 +56,6 @@ import {
   useGetForumTopicsQuery,
   useGetTopicPostsQuery,
   usePinTopicMutation,
-  useSetForumPermissionMutation,
-  useGetForumPermissionsQuery,
   useUpdateForumMutation,
   useUpdatePostMutation,
   useUpdateTopicMutation,
@@ -70,7 +65,7 @@ import { useUploadFileMutation } from "../redux/features/articles/articlesApi";
 import { usePermissions } from "../hooks/usePermissions";
 import { getApiErrorDisplayMessage } from "../utils/apiErrorMessages";
 
-// Enhanced Mock Data Types
+// Forum view models
 type ForumWithMeta = Forum & {
   author_name: string | null;
   posts: number;
@@ -103,14 +98,21 @@ const FORUM_COLORS = [
 const TOPICS_PAGE_SIZE = 20;
 const POSTS_PAGE_SIZE = 20;
 
-const getDefaultForumFormData = (): ForumFormState => ({
-  name: "",
-  author_name: "",
-  description: "",
-  forum_type: "general",
-  thumbnail: null,
-  thumbnail_url: null,
+const DEFAULT_FORUM_TYPE: ForumType = "general";
+type NewForumFormState = Omit<ForumFormState, "id" | "forum_type">;
+const getDefaultNewForumFormData = (): NewForumFormState => ({
+  name: "", author_name: "", description: "", thumbnail: null, thumbnail_url: null,
 });
+const getDefaultForumFormData = (): ForumFormState => ({
+  ...getDefaultNewForumFormData(), forum_type: DEFAULT_FORUM_TYPE,
+});
+
+const ForumThumbnail = ({ src, frameClassName = "forum-thumbnail" }: { src?: string | null; frameClassName?: string }) => {
+  const [failed, setFailed] = useState<string | null>(null);
+  return <div className={frameClassName}>
+    {src && failed !== src ? <img src={src} alt="" loading="lazy" onError={() => setFailed(src)} className="h-full w-full object-cover" /> : <MessageSquare aria-hidden="true" className="h-6 w-6 text-slate-400" />}
+  </div>;
+};
 
 const SkeletonBar = ({ className }: { className: string }) => (
   <div className={`animate-pulse rounded-full bg-slate-100 ${className}`} />
@@ -123,7 +125,7 @@ const ForumsListSkeleton = () => (
         key={index}
         className="bg-white p-6 rounded-2xl border-l-[6px] border-slate-200 shadow-sm flex items-center justify-between gap-4 animate-pulse"
       >
-        <div className="flex-1 space-y-3">
+        <div className="min-w-0 flex-1 space-y-3">
           <SkeletonBar className="h-6 w-1/3" />
           <SkeletonBar className="h-4 w-4/5" />
           <SkeletonBar className="h-3 w-2/5" />
@@ -167,7 +169,7 @@ const PostsListSkeleton = () => (
         className={`flex gap-4 animate-pulse ${index === 0 ? "" : "pt-6 border-t border-slate-100"}`}
       >
         <div className="shrink-0">
-          <div className="w-12 h-12 bg-slate-100 rounded-2xl" />
+          <div className="forum-avatar bg-slate-100 rounded-2xl" />
         </div>
         <div className="flex-1 space-y-3">
           <div className="flex items-center justify-between gap-4">
@@ -189,7 +191,7 @@ const LatestActivitySkeleton = () => (
   <div className="space-y-6">
     {Array.from({ length: 4 }).map((_, index) => (
       <div key={index} className="space-y-3 animate-pulse">
-        <div className="flex justify-between items-start gap-2">
+        <div className="flex min-w-0 flex-wrap justify-between items-start gap-2">
           <SkeletonBar className="h-5 w-24 rounded" />
           <SkeletonBar className="h-3 w-20" />
         </div>
@@ -198,23 +200,6 @@ const LatestActivitySkeleton = () => (
           <SkeletonBar className="h-3 w-16" />
           <SkeletonBar className="h-3 w-14" />
         </div>
-      </div>
-    ))}
-  </div>
-);
-
-const PermissionsTableSkeleton = () => (
-  <div className="p-4 space-y-3 animate-pulse">
-    <div className="grid grid-cols-[2fr,1fr,1fr] gap-3">
-      <div className="h-4 rounded bg-slate-100" />
-      <div className="h-4 rounded bg-slate-100" />
-      <div className="h-4 rounded bg-slate-100" />
-    </div>
-    {Array.from({ length: 4 }).map((_, index) => (
-      <div key={index} className="grid grid-cols-[2fr,1fr,1fr] gap-3 items-center">
-        <div className="h-4 rounded bg-slate-100" />
-        <div className="mx-auto h-5 w-5 rounded-full bg-slate-100" />
-        <div className="mx-auto h-5 w-5 rounded-full bg-slate-100" />
       </div>
     ))}
   </div>
@@ -237,7 +222,7 @@ const PinnedDiscussionsSkeleton = () => (
 );
 
 const ForumsPageSkeleton = () => (
-  <div className="space-y-8 p-4 text-slate-900 sm:p-6 lg:p-8">
+  <div className="forums-page">
     <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div className="space-y-3">
         <SkeletonBar className="h-10 w-72" />
@@ -255,13 +240,13 @@ const ForumsPageSkeleton = () => (
       </div>
     </header>
 
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 text-left">
-      <div className="lg:col-span-2">
+    <div className="forums-layout">
+      <div className="forums-main">
         <ForumsListSkeleton />
       </div>
 
       <div className="space-y-6">
-        <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-xl relative overflow-hidden">
+        <div className="forum-side-panel bg-slate-900 text-white rounded-2xl shadow-xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -mr-16 -mt-16" />
           <div className="relative space-y-4">
             <SkeletonBar className="h-6 w-44 bg-slate-700" />
@@ -269,7 +254,7 @@ const ForumsPageSkeleton = () => (
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="forum-side-panel bg-white rounded-2xl border border-slate-200 shadow-sm">
           <div className="space-y-6">
             <SkeletonBar className="h-6 w-36" />
             <LatestActivitySkeleton />
@@ -383,7 +368,7 @@ const AttachmentGallery = ({
   attachments: string[];
   translate: (key: string, params?: Record<string, string | number>) => string;
 }) => (
-  <div className="grid gap-3 sm:grid-cols-2">
+  <div className="forum-attachments">
     {attachments.map((attachment, attachmentIndex) => {
       const info = getAttachmentInfo(attachment);
 
@@ -396,11 +381,7 @@ const AttachmentGallery = ({
             rel="noreferrer"
             className="group overflow-hidden rounded-2xl border border-slate-200 bg-white transition-all hover:shadow-md"
           >
-            <img
-              src={attachment}
-              alt={info.filename}
-              className="h-48 w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-            />
+            <ForumThumbnail src={attachment} frameClassName="forum-attachment-image" />
             <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
               <div className="flex min-w-0 items-center gap-2 text-slate-600">
                 <ImageIcon className="h-4 w-4 shrink-0 text-primary" />
@@ -480,7 +461,7 @@ const PendingAttachmentGallery = ({
   files: File[];
   onRemove: (index: number) => void;
 }) => (
-  <div className="grid gap-3 sm:grid-cols-2">
+  <div className="forum-attachments">
     {files.map((file, index) => (
       <FilePreviewCard
         key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
@@ -500,7 +481,7 @@ const EditableAttachmentGallery = ({
   onRemove: (url: string) => void;
   translate: (key: string, params?: Record<string, string | number>) => string;
 }) => (
-  <div className="grid gap-3 sm:grid-cols-2">
+  <div className="forum-attachments">
     {attachments.map((attachment, attachmentIndex) => {
       const info = getAttachmentInfo(attachment);
 
@@ -547,12 +528,13 @@ export default function Forums() {
     forumId?: string;
     topicId?: string;
   }>();
-  const { data: forumData, isLoading: isForumsLoading } = useGetForumsQuery({
+  const { data: forumData, isLoading: isForumsLoading, isError: isForumsError } = useGetForumsQuery({
     pageSize: 100,
   });
   const {
     data: pinnedTopics = [],
     isLoading: isPinnedTopicsLoading,
+    isError: isPinnedTopicsError,
     refetch: refetchPinnedTopics,
   } = useGetPinnedTopicsQuery();
   const [createForum, { isLoading: isCreatingForum }] =
@@ -572,8 +554,6 @@ export default function Forums() {
   const [deletePost, { isLoading: isDeletingPost }] = useDeletePostMutation();
   const [updatePost, { isLoading: isUpdatingPost }] = useUpdatePostMutation();
   const [pinTopic, { isLoading: isPinningTopic }] = usePinTopicMutation();
-  const [setForumPermission, { isLoading: isSettingPermission }] =
-    useSetForumPermissionMutation();
   const [uploadFile] = useUploadFileMutation();
 
   const handleImageUpload = async (file: File): Promise<string> => {
@@ -590,7 +570,6 @@ export default function Forums() {
 
   const { user } = useSelector((state: RootState) => state.auth);
   const { hasPermission } = usePermissions();
-  const { data: userRolesData = [] } = useGetUserRolesQuery();
   const isSuperuser = Boolean(user?.is_superuser);
   const currentUserId = user?.id || "";
   const view: ListView = topicId ? "posts" : forumId ? "topics" : "forums";
@@ -606,7 +585,6 @@ export default function Forums() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewForumModalOpen, setIsNewForumModalOpen] = useState(false);
   const [isEditForumModalOpen, setIsEditForumModalOpen] = useState(false);
-  const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false);
   const [isEditTopicModalOpen, setIsEditTopicModalOpen] = useState(false);
   const [isEditPostModalOpen, setIsEditPostModalOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -617,23 +595,12 @@ export default function Forums() {
     forumId: "",
   });
   const [topicFiles, setTopicFiles] = useState<File[]>([]);
-  const [newForumData, setNewForumData] = useState<ForumFormState>(
-    getDefaultForumFormData(),
+  const [newForumData, setNewForumData] = useState<NewForumFormState>(
+    getDefaultNewForumFormData(),
   );
   const [editForumData, setEditForumData] = useState<ForumFormState>({
     ...getDefaultForumFormData(),
     id: "",
-  });
-  const [permissionData, setPermissionData] = useState<{
-    forumIds: string[];
-    roleIds: string[];
-    canRead: boolean;
-    canPost: boolean;
-  }>({
-    forumIds: [],
-    roleIds: [],
-    canRead: true,
-    canPost: true,
   });
   const [editTopicData, setEditTopicData] = useState<EditTopicFormData>({
     id: "",
@@ -658,7 +625,6 @@ export default function Forums() {
   });
   const [editPostFiles, setEditPostFiles] = useState<File[]>([]);
   const [pinningTopicId, setPinningTopicId] = useState<string | null>(null);
-  const [permissionTab, setPermissionTab] = useState<"view" | "edit">("view");
 
   const showRequiredFieldError = (fieldLabel: string) => {
     toast.error(
@@ -667,69 +633,6 @@ export default function Forums() {
       }),
     );
   };
-
-  const showSelectAtLeastOneError = (fieldLabel: string) => {
-    toast.error(
-      translate("common.selectAtLeastOne", {
-        field: fieldLabel,
-      }),
-    );
-  };
-
-  const translatePermissionRole = (role: string) => {
-    const normalizedRole = role.trim().toLowerCase().replace(/\s+/g, "_");
-
-    if (normalizedRole === "admin" || normalizedRole === "administrator") {
-      return translate("forumsPage.roleAdmin");
-    }
-
-    if (normalizedRole === "moderator") {
-      return translate("forumsPage.roleModerator");
-    }
-
-    if (
-      normalizedRole === "membre" ||
-      normalizedRole === "member" ||
-      normalizedRole === "editor" ||
-      normalizedRole === "manager"
-    ) {
-      return role;
-    }
-
-    if (normalizedRole === "auditeur") {
-      return translate("forumsPage.roleAuditeur");
-    }
-
-    if (normalizedRole === "comite_coproprietaire") {
-      return translate("forumsPage.roleComite");
-    }
-
-    if (normalizedRole === "partenaires_technicopro") {
-      return translate("forumsPage.rolePartenaires");
-    }
-
-    return role;
-  };
-
-  const permissionRoleOptions = useMemo(
-    () =>
-      userRolesData.map((role) => ({
-        id: role.id,
-        label: translatePermissionRole(role.slug || role.name),
-      })),
-    [userRolesData, translate],
-  );
-
-  const permissionRoleLabelsById = useMemo(
-    () =>
-      Object.fromEntries(
-        userRolesData.map((role) => [
-          role.id,
-          translatePermissionRole(role.slug || role.name),
-        ]),
-      ),
-    [userRolesData, translate],
-  );
 
   const forums = useMemo<ForumWithMeta[]>(() => {
     const apiForums = (forumData?.results || []).map((forum, index) => ({
@@ -755,6 +658,7 @@ export default function Forums() {
     currentData: forumTopicsData,
     isLoading: isTopicsLoading,
     isFetching: isTopicsFetching,
+    isError: isTopicsError,
   } = useGetForumTopicsQuery(
     {
       forumId: activeForumId,
@@ -769,6 +673,7 @@ export default function Forums() {
     currentData: topicPostsData,
     isLoading: isPostsLoading,
     isFetching: isPostsFetching,
+    isError: isPostsError,
   } = useGetTopicPostsQuery(
     {
       topicId: selectedTopicId || "",
@@ -779,13 +684,6 @@ export default function Forums() {
       skip: !selectedTopicId,
     },
   );
-
-  const singleSelectedForumId =
-    permissionData.forumIds.length === 1 ? permissionData.forumIds[0] : null;
-  const { data: currentPermissions, isLoading: isLoadingCurrentPermissions } =
-    useGetForumPermissionsQuery(singleSelectedForumId!, {
-      skip: !singleSelectedForumId || !isPermissionModalOpen,
-    });
 
   useEffect(() => {
     if (!forums.length) {
@@ -799,32 +697,7 @@ export default function Forums() {
       }));
     }
 
-    if (permissionData.forumIds.length === 0 && forums.length) {
-      setPermissionData((prev) => ({
-        ...prev,
-        forumIds: selectedForumId ? [selectedForumId] : [forums[0].id],
-      }));
-    }
-  }, [forums, formData.forumId, permissionData.forumIds, selectedForumId]);
-
-  useEffect(() => {
-    if (permissionData.roleIds.length > 0 || !userRolesData.length) {
-      return;
-    }
-
-    const defaultRoleId =
-      userRolesData.find((role) => role.slug === ROLE_SLUGS.MEMBER)?.id ||
-      userRolesData[0]?.id;
-
-    if (!defaultRoleId) {
-      return;
-    }
-
-    setPermissionData((prev) => ({
-      ...prev,
-      roleIds: [defaultRoleId],
-    }));
-  }, [permissionData.roleIds.length, userRolesData]);
+  }, [forums, formData.forumId, selectedForumId]);
 
   useEffect(() => {
     setTopicPage(1);
@@ -1008,11 +881,11 @@ export default function Forums() {
         name: newForumData.name.trim(),
         author_name: trimOrUndefined(newForumData.author_name),
         description: normalizeRichText(newForumData.description),
-        forum_type: newForumData.forum_type,
+        forum_type: DEFAULT_FORUM_TYPE,
         thumbnail: newForumData.thumbnail,
       }).unwrap();
 
-      setNewForumData(getDefaultForumFormData());
+      setNewForumData(getDefaultNewForumFormData());
       setIsNewForumModalOpen(false);
       toast.success(translate("forumsPage.success"));
     } catch (error) {
@@ -1059,35 +932,6 @@ export default function Forums() {
 
       setIsEditForumModalOpen(false);
       setEditForumData(getDefaultForumFormData());
-      toast.success(translate("forumsPage.success"));
-    } catch (error) {
-      toast.error(getApiErrorDisplayMessage(error, translate, "apiErrors.default"));
-    }
-  };
-
-  const handleSetPermission = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canManageForumPermissions) return;
-
-    if (!permissionData.forumIds.length) {
-      showSelectAtLeastOneError(translate("forumsPage.forums"));
-      return;
-    }
-
-    if (!permissionData.roleIds.length) {
-      showSelectAtLeastOneError(translate("forumsPage.role"));
-      return;
-    }
-
-    try {
-      await setForumPermission({
-        forum_id: permissionData.forumIds,
-        role_id: permissionData.roleIds,
-        can_read: permissionData.canRead,
-        can_post: permissionData.canPost,
-      }).unwrap();
-
-      setIsPermissionModalOpen(false);
       toast.success(translate("forumsPage.success"));
     } catch (error) {
       toast.error(getApiErrorDisplayMessage(error, translate, "apiErrors.default"));
@@ -1494,8 +1338,6 @@ export default function Forums() {
   const canPostMessage = canViewForum;
   const canEditForum = hasPermission("forum", "edit");
   const canDeleteForum = hasPermission("forum", "delete");
-  const canManageForumPermissions = canEditForum;
-  const canSeeForumPermissionsButton = isSuperuser;
   const canPinTopic = isSuperuser;
   const canEditTopic = (topic: Topic) =>
     isSuperuser || Boolean(topic.authorUserId && topic.authorUserId === currentUserId);
@@ -1515,125 +1357,35 @@ export default function Forums() {
   }
 
   return (
-    <div className="space-y-8 p-4 text-slate-900 sm:p-6 lg:p-8">
-      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div className="flex items-start gap-3 sm:items-center sm:gap-4">
-          {view !== "forums" && (
-            <button
-              onClick={handleBack}
-              className="rounded-full p-2 transition-colors hover:bg-slate-100 cursor-pointer"
-            >
-              <ArrowLeft className="w-6 h-6 text-slate-600" />
-            </button>
-          )}
-          <div className="min-w-0">
-            <div className="mb-1 flex items-center gap-3">
-              {view === "forums" && (
-                <h2 className="text-2xl font-bold tracking-tight text-slate-900 underline decoration-primary decoration-4 underline-offset-8 sm:text-3xl">
-                  {translate("forumsPage.discussionForums")}
-                </h2>
-              )}
-              {view === "topics" && (
-                <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-                  {selectedForum?.name} {translate("forumsPage.forum")}
-                </h2>
-              )}
-              {view === "posts" && (
-                <h2 className="text-xl font-bold leading-tight tracking-tight text-slate-900 sm:text-2xl">
-                  {selectedTopic?.title}
-                </h2>
-              )}
-            </div>
-            <nav className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400">
-              <span
-                className={
-                  view === "forums"
-                    ? "text-primary cursor-pointer mt-1"
-                    : "hover:text-slate-600 cursor-pointer"
-                }
-                onClick={() => {
-                  navigate("/forums");
-                }}
-              >
-                {translate("forumsPage.forums")}
-              </span>
-              {selectedForum && (
-                <>
-                  <ChevronRight className="w-3 h-3" />
-                  <span
-                    className={
-                      view === "topics"
-                        ? "text-primary"
-                        : "hover:text-slate-600 cursor-pointer"
-                    }
-                    onClick={() => {
-                      navigate(
-                        selectedForumId
-                          ? `/forums/${selectedForumId}`
-                          : "/forums",
-                      );
-                    }}
-                  >
-                    {selectedForum.name}
-                  </span>
-                </>
-              )}
-              {selectedTopic && (
-                <>
-                  <ChevronRight className="w-3 h-3" />
-                  <span className="text-slate-900">
-                    {translate("forumsPage.discussion")}
-                  </span>
-                </>
-              )}
+    <div className="forums-page">
+      <header className="forums-header">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          {view !== "forums" ? <button type="button" onClick={handleBack} aria-label={translate("forumUi.back")} className="forum-icon-button shrink-0"><ArrowLeft className="h-5 w-5" /></button> : null}
+          <div className="min-w-0 flex-1">
+            <h2 className="content-page-title">
+              {view === "forums" ? translate("forumsPage.discussionForums") : view === "topics" ? selectedForum?.name : selectedTopic?.title}
+            </h2>
+            <nav aria-label={translate("forumUi.breadcrumbs")} className="forum-breadcrumbs">
+              <button type="button" onClick={() => navigate("/forums")} aria-current={view === "forums" ? "page" : undefined}>{translate("forumsPage.forums")}</button>
+              {selectedForum ? <><ChevronRight aria-hidden="true" className="h-3 w-3 shrink-0" /><button type="button" onClick={() => navigate(selectedForumId ? '/forums/' + selectedForumId : '/forums')} aria-current={view === "topics" ? "page" : undefined}>{selectedForum.name}</button></> : null}
+              {selectedTopic ? <><ChevronRight aria-hidden="true" className="h-3 w-3 shrink-0" /><span aria-current="page">{translate("forumsPage.discussion")}</span></> : null}
             </nav>
           </div>
         </div>
-
-        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-          {view === "forums" && (canCreateForum || canManageForumPermissions) && (
-            <>
-              {canCreateForum && (
-                <button
-                  onClick={() => setIsNewForumModalOpen(true)}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-900 shadow-sm transition-all active:scale-95 hover:bg-slate-50 cursor-pointer sm:w-auto"
-                >
-                  <MessageSquare className="w-5 h-5 text-primary" />
-                  {translate("forumsPage.newForum")}
-                </button>
-              )}
-              {canSeeForumPermissionsButton && (
-                <button
-                  onClick={() => setIsPermissionModalOpen(true)}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-900 shadow-sm transition-all active:scale-95 hover:bg-slate-50 cursor-pointer sm:w-auto"
-                >
-                  <Shield className="w-5 h-5 text-primary" />
-                  {translate("forumsPage.permission")}
-                </button>
-              )}
-            </>
-          )}
-
-          {view !== "posts" && canCreateTopic && (
-            <button
-              onClick={() => {
-                setFormData((prev) => ({
-                  ...prev,
-                  forumId: selectedForumId || forums[0]?.id || "",
-                }));
-                setIsModalOpen(true);
-              }}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-bold text-white shadow-lg transition-all active:scale-95 hover:bg-slate-800 cursor-pointer sm:w-auto"
-            >
-              <Plus className="w-5 h-5" />
-              {translate("forumsPage.newTopic")}
-            </button>
-          )}
+        <div className="content-page-actions forums-header-actions">
+          {view === "forums" && canCreateForum ? <button type="button" onClick={() => setIsNewForumModalOpen(true)} className="content-page-button content-page-button-secondary"><MessageSquare className="h-4 w-4 shrink-0" />{translate("forumsPage.newForum")}</button> : null}
+          {view !== "posts" && canCreateTopic ? <button type="button" onClick={() => {
+            setFormData((previous) => ({ ...previous, forumId: selectedForumId || forums[0]?.id || "" }));
+            setIsModalOpen(true);
+          }} className="content-page-button content-page-button-primary"><Plus className="h-4 w-4 shrink-0" />{translate("forumsPage.newTopic")}</button> : null}
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 text-left">
-        <div className="lg:col-span-2">
+      <div className="forums-layout">
+        <div className="forums-main">
+          {view === "posts" && !selectedTopic ? (
+            isTopicsLoading || isTopicsFetching ? <PostsListSkeleton /> : <p role="status" className="forum-empty-state">{translate(isTopicsError ? "forumUi.loadError" : "forumUi.topicUnavailable")}</p>
+          ) : null}
           <AnimatePresence mode="wait">
             {/* VIEW: FORUMS LIST */}
             {view === "forums" && canViewForum && (
@@ -1646,32 +1398,26 @@ export default function Forums() {
               >
                 {isForumsLoading && !forums.length ? (
                   <ForumsListSkeleton />
-                ) : (
+                ) : isForumsError ? (<p role="alert" className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">{translate("forumUi.loadError")}</p>) : !forums.length ? (<p className="forum-empty-state">{translate("forumUi.noForums")}</p>) : (
                   forums.map((forum) => (
                     <motion.div
                       key={forum.id}
-                      whileHover={{ x: 5 }}
                       onClick={() => handleNavigateToForum(forum.id)}
-                      className={`group flex flex-col gap-4 rounded-2xl border-l-[6px] bg-white p-5 shadow-sm transition-all hover:shadow-md cursor-pointer sm:flex-row sm:items-center sm:justify-between sm:p-6 ${forum.color}`}
+                      role="link"
+                      tabIndex={0}
+                      onKeyDown={(event) => { if (event.key === "Enter" && event.target === event.currentTarget) { event.preventDefault(); handleNavigateToForum(forum.id); } }}
+                      className={`forum-list-card group border-l-[6px] ${forum.color}`}
                     >
-                      <div className="flex flex-1 gap-4">
-                        {forum.thumbnail_url ? (
-                          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
-                            <img
-                              src={forum.thumbnail_url}
-                              alt={forum.name}
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-                        ) : null}
-                        <div className="flex-1">
+                      <div className="forum-summary">
+                        <ForumThumbnail src={forum.thumbnail_url} />
+                        <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-bold group-hover:text-primary-dark transition-colors text-slate-900">
+                            <h3 className="forum-list-title font-bold group-hover:text-primary-dark transition-colors text-slate-900">
                               {forum.name}
                             </h3>
                           </div>
                           <div
-                            className="mt-1 text-sm text-slate-500 prose prose-sm prose-slate max-w-none prose-p:my-0 prose-p:text-slate-500 prose-strong:text-slate-700 prose-a:text-primary prose-ul:my-1 prose-ol:my-1 line-clamp-3"
+                            className="forum-summary-description mt-1 text-sm text-slate-500 prose prose-sm prose-slate max-w-none prose-p:my-0 prose-p:text-slate-500 prose-strong:text-slate-700 prose-a:text-primary prose-ul:my-1 prose-ol:my-1 line-clamp-3"
                             dangerouslySetInnerHTML={{
                               __html:
                                 forum.description ||
@@ -1685,7 +1431,7 @@ export default function Forums() {
                               })}
                             </p>
                           )}
-                          <div className="mt-4 flex flex-wrap items-center gap-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 sm:gap-6">
+                          <div className="forum-metadata mt-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">
                             <span className="flex items-center gap-1.5">
                               <MessageCircle className="w-3.5 h-3.5" />{" "}
                               {forum.topics} {translate("forumsPage.topics")}
@@ -1697,7 +1443,7 @@ export default function Forums() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
+                      <div className="forum-row-actions">
                         {(canEditForum || canDeleteForum) && (
                           <div className="flex items-center gap-2">
                             {canEditForum && (
@@ -1706,6 +1452,7 @@ export default function Forums() {
                                 onClick={(event) =>
                                   handleOpenEditForum(event, forum)
                                 }
+                                aria-label={translate("forumsPage.editForum")}
                                 className="p-2 rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
                               >
                                 <Edit2 className="w-4 h-4" />
@@ -1717,6 +1464,7 @@ export default function Forums() {
                                 onClick={(event) =>
                                   confirmDeleteForum(event, forum.id)
                                 }
+                                aria-label={translate("forumsPage.deleteForum")}
                                 className="p-2 rounded-full bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -1746,19 +1494,22 @@ export default function Forums() {
                 {(isTopicsLoading || isTopicsFetching) &&
                 !filteredTopics.length ? (
                   <TopicsListSkeleton />
-                ) : filteredTopics.length > 0 ? (
+                ) : isTopicsError ? (<p role="alert" className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">{translate("forumUi.loadError")}</p>) : filteredTopics.length > 0 ? (
                   <>
                     {filteredTopics.map((topic) => (
                       <motion.div
                         key={topic.id}
                         onClick={() => handleNavigateToTopic(topic.id)}
-                        className="group flex flex-col gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:shadow-md cursor-pointer sm:flex-row sm:items-center sm:justify-between sm:p-6"
+                      role="link"
+                      tabIndex={0}
+                      onKeyDown={(event) => { if (event.key === "Enter" && event.target === event.currentTarget) { event.preventDefault(); handleNavigateToTopic(topic.id); } }}
+                        className="forum-topic-card group"
                       >
                         <div className="flex-1">
-                          <h3 className="text-lg font-bold group-hover:text-primary-dark transition-colors text-slate-900 leading-tight">
+                          <h3 className="forum-list-title font-bold group-hover:text-primary-dark transition-colors text-slate-900">
                             {topic.title}
                           </h3>
-                          <div className="mt-3 flex flex-wrap items-center gap-3 text-left text-[10px] font-bold uppercase tracking-tight text-slate-400 sm:gap-4">
+                          <div className="forum-metadata mt-3 text-left text-[10px] font-bold uppercase tracking-tight text-slate-400">
                             <span className="flex items-center gap-1">
                               <UserIcon className="w-3 h-3" /> {topic.authorId}
                             </span>
@@ -1836,7 +1587,7 @@ export default function Forums() {
                         </div>
                       </motion.div>
                     ))}
-                    <div className="flex flex-col gap-4 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="forum-pagination border-t border-slate-100 pt-4">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                         {translate("forumsPage.showingTopics", {
                           count: filteredTopics.length,
@@ -1846,7 +1597,7 @@ export default function Forums() {
                           ? translate("forumsPage.refreshing")
                           : ""}
                       </p>
-                      <div className="flex items-center gap-3 self-end sm:self-auto">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                           {translate("forumsPage.pageOf", {
                             current: topicPage,
@@ -1863,7 +1614,7 @@ export default function Forums() {
                           className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
                           disabled={topicPage <= 1 || isTopicsFetching}
                         >
-                          <ChevronLeft className="w-4 h-4" />
+                          <ChevronLeft aria-hidden="true" className="w-4 h-4" /><span className="sr-only">{translate("contentListing.previous")}</span>
                         </button>
                         <button
                           type="button"
@@ -1877,7 +1628,7 @@ export default function Forums() {
                             topicPage >= totalTopicPages || isTopicsFetching
                           }
                         >
-                          <ChevronRight className="w-4 h-4" />
+                          <ChevronRight aria-hidden="true" className="w-4 h-4" /><span className="sr-only">{translate("contentListing.next")}</span>
                         </button>
                       </div>
                     </div>
@@ -1911,14 +1662,14 @@ export default function Forums() {
               >
                 {/* Topic Original Content */}
                 {selectedTopic && (
-                  <div className="flex flex-col gap-4 border-b-2 border-slate-100 pb-6 sm:flex-row">
+                  <div className="forum-thread-item border-b border-slate-100 pb-5">
                     <div className="shrink-0">
-                      <div className="w-12 h-12 bg-primary/20 rounded-2xl flex items-center justify-center font-bold text-primary-dark text-lg">
+                      <div className="forum-avatar bg-primary/20 rounded-2xl flex items-center justify-center font-bold text-primary-dark text-lg">
                         {selectedTopic.authorId.substring(0, 2).toUpperCase()}
                       </div>
                     </div>
-                    <div className="flex-1 space-y-4">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0 flex-1 space-y-3">
+                      <div className="forum-thread-header">
                         <h4 className="font-bold text-slate-900">
                           {selectedTopic.authorId}
                           <span className="ml-2 px-2 py-0.5 bg-primary/10 text-primary-dark text-[8px] uppercase font-black rounded-md">
@@ -1941,6 +1692,7 @@ export default function Forums() {
                                   onClick={(event) =>
                                     handleOpenEditTopic(event, selectedTopic)
                                   }
+                                  aria-label={translate("forumsPage.editTopic")}
                                   className="text-slate-300 hover:text-slate-600 transition-colors cursor-pointer"
                                 >
                                   <Edit2 className="w-3.5 h-3.5" />
@@ -1956,6 +1708,7 @@ export default function Forums() {
                                       selectedTopic.forumId,
                                     )
                                   }
+                                  aria-label={translate("forumsPage.deleteDiscussion")}
                                   className="text-slate-300 hover:text-red-500 transition-colors cursor-pointer"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -1966,7 +1719,7 @@ export default function Forums() {
                         </div>
                       </div>
                       <div
-                        className="text-slate-800 leading-relaxed font-medium bg-white p-6 rounded-2xl border-2 border-primary/20 shadow-sm shadow-primary/5 prose prose-slate max-w-none prose-p:text-slate-700 prose-headings:text-slate-900 prose-strong:text-slate-900 prose-a:text-primary prose-img:rounded-2xl"
+                        className="forum-rich-content forum-post-content text-slate-800 leading-relaxed font-medium bg-white rounded-2xl border-2 border-primary/20 shadow-sm shadow-primary/5 prose prose-slate max-w-none prose-p:text-slate-700 prose-headings:text-slate-900 prose-strong:text-slate-900 prose-a:text-primary prose-img:rounded-2xl"
                         dangerouslySetInnerHTML={{
                           __html: selectedTopic.content,
                         }}
@@ -1982,20 +1735,20 @@ export default function Forums() {
                 )}
                 {(isPostsLoading || isPostsFetching) && !topicPosts.length ? (
                   <PostsListSkeleton />
-                ) : (
+                ) : isPostsError ? (<p role="alert" className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">{translate("forumUi.loadError")}</p>) : (
                   <>
                     {topicPosts.map((post, index) => (
                       <div
                         key={post.id}
-                        className={`flex flex-col gap-4 sm:flex-row ${index === 0 ? "" : "pt-6 border-t border-slate-100"}`}
+                        className={`forum-thread-item ${index === 0 ? "" : "pt-5 border-t border-slate-100"}`}
                       >
                         <div className="shrink-0">
-                          <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center font-bold text-slate-600 text-lg">
+                          <div className="forum-avatar bg-slate-100 rounded-2xl flex items-center justify-center font-bold text-slate-600 text-lg">
                             {post.authorId.substring(0, 2).toUpperCase()}
                           </div>
                         </div>
-                        <div className="flex-1 space-y-2">
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <div className="forum-thread-header">
                             <h4 className="font-bold text-slate-900">
                               {post.authorId}
                             </h4>
@@ -2012,6 +1765,7 @@ export default function Forums() {
                                       onClick={(event) =>
                                         handleOpenEditPost(event, post)
                                       }
+                                      aria-label={translate("forumsPage.editReply")}
                                       className="text-slate-300 hover:text-slate-600 transition-colors cursor-pointer"
                                     >
                                       <Edit2 className="w-3.5 h-3.5" />
@@ -2028,6 +1782,7 @@ export default function Forums() {
                                           selectedForumId || undefined,
                                         )
                                       }
+                                      aria-label={translate("forumsPage.deleteReply")}
                                       className="text-slate-300 hover:text-red-500 transition-colors cursor-pointer"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
@@ -2038,7 +1793,7 @@ export default function Forums() {
                             </div>
                           </div>
                           <div
-                            className="text-slate-600 leading-relaxed bg-slate-50 p-6 rounded-2xl border border-slate-100 prose prose-slate max-w-none prose-p:text-slate-600 prose-headings:text-slate-900 prose-strong:text-slate-900 prose-a:text-primary prose-img:rounded-2xl"
+                            className="forum-rich-content forum-post-content text-slate-600 leading-relaxed bg-slate-50 rounded-2xl border border-slate-100 prose prose-slate max-w-none prose-p:text-slate-600 prose-headings:text-slate-900 prose-strong:text-slate-900 prose-a:text-primary prose-img:rounded-2xl"
                             dangerouslySetInnerHTML={{ __html: post.content }}
                           />
                           {!!post.attachments?.length && (
@@ -2050,7 +1805,7 @@ export default function Forums() {
                         </div>
                       </div>
                     ))}
-                    <div className="flex flex-col gap-4 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="forum-pagination border-t border-slate-100 pt-4">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                         {translate("forumsPage.showingReplies", {
                           count: topicPosts.length,
@@ -2060,7 +1815,7 @@ export default function Forums() {
                           ? translate("forumsPage.refreshing")
                           : ""}
                       </p>
-                      <div className="flex items-center gap-3 self-end sm:self-auto">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                           {translate("forumsPage.pageOf", {
                             current: postPage,
@@ -2077,7 +1832,7 @@ export default function Forums() {
                           className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
                           disabled={postPage <= 1 || isPostsFetching}
                         >
-                          <ChevronLeft className="w-4 h-4" />
+                          <ChevronLeft aria-hidden="true" className="w-4 h-4" /><span className="sr-only">{translate("contentListing.previous")}</span>
                         </button>
                         <button
                           type="button"
@@ -2089,7 +1844,7 @@ export default function Forums() {
                           className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
                           disabled={postPage >= totalPostPages || isPostsFetching}
                         >
-                          <ChevronRight className="w-4 h-4" />
+                          <ChevronRight aria-hidden="true" className="w-4 h-4" /><span className="sr-only">{translate("contentListing.next")}</span>
                         </button>
                       </div>
                     </div>
@@ -2098,22 +1853,22 @@ export default function Forums() {
 
                 {/* Reply area */}
                 {canPostMessage && (
-                  <div className="mt-12 space-y-4">
-                  <div className="flex flex-col gap-4 sm:flex-row">
+                  <div className="mt-6 space-y-4">
+                  <div className="forum-thread-item">
                     <div className="shrink-0 mt-2">
                       <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center font-bold text-primary-dark">
                         {user?.avatarInitials}
                       </div>
                     </div>
-                    <form noValidate onSubmit={handleReply} className="flex-1 space-y-3">
+                    <form noValidate onSubmit={handleReply} className="min-w-0 flex-1 space-y-3">
                       <TiptapEditor
+                        variant="compact"
                         content={replyText}
                         onChange={(content) => setReplyText(content)}
                         placeholder={translate("forumsPage.replyPlaceholder")}
                         onImageUpload={handleImageUpload}
-                        variant="compact"
                       />
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="forum-thread-header">
                         <label className="inline-flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50 cursor-pointer">
                           <Paperclip className="w-4 h-4 text-primary" />
                           {translate("forumsPage.addFiles")}
@@ -2161,8 +1916,8 @@ export default function Forums() {
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
-          <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-xl relative overflow-hidden">
+        <aside className="forum-side-panels">
+          <div className="forum-side-panel bg-slate-900 text-white rounded-2xl shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -mr-16 -mt-16" />
             <h3 className="text-lg font-bold mb-4 flex items-center gap-2 relative">
               <Pin className="w-5 h-5 text-primary" />
@@ -2171,7 +1926,7 @@ export default function Forums() {
             <div className="space-y-4 relative">
               {isPinnedTopicsLoading ? (
                 <PinnedDiscussionsSkeleton />
-              ) : pinnedTopics.length > 0 ? (
+              ) : isPinnedTopicsError ? (<p role="alert" className="text-sm text-red-300">{translate("forumUi.loadError")}</p>) : pinnedTopics.length > 0 ? (
                 pinnedTopics.map((topic) => (
                   <div
                     key={topic.id}
@@ -2179,6 +1934,9 @@ export default function Forums() {
                       navigate(`/forums/${topic.forum.id}/topics/${topic.id}`);
                       window.scrollTo(0, 0);
                     }}
+                    role="link"
+                    tabIndex={0}
+                    onKeyDown={(event) => { if (event.key === "Enter" && event.target === event.currentTarget) { event.preventDefault(); navigate(`/forums/${topic.forum.id}/topics/${topic.id}`); window.scrollTo(0, 0); } }}
                     className="group cursor-pointer"
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -2238,26 +1996,29 @@ export default function Forums() {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="forum-side-panel bg-white rounded-2xl border border-slate-200 shadow-sm">
             <h3 className="text-lg font-bold mb-4 text-slate-900">
               {translate("forumsPage.latestActivity")}
             </h3>
             <div className="space-y-6">
               {(isTopicsLoading || isTopicsFetching) && !topics.length ? (
                 <LatestActivitySkeleton />
-              ) : (
+              ) : isTopicsError ? (<p role="alert" className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">{translate("forumUi.loadError")}</p>) : !topics.length ? (<p className="text-sm text-slate-500">{translate("forumUi.noActivity")}</p>) : (
                 <AnimatePresence mode="popLayout">
                   {topics.slice(0, 5).map((topic) => (
                     <motion.div
                       layout
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
                       key={topic.id}
                       onClick={() => handleNavigateToTopic(topic.id)}
+                      role="link"
+                      tabIndex={0}
+                      onKeyDown={(event) => { if (event.key === "Enter" && event.target === event.currentTarget) { event.preventDefault(); handleNavigateToTopic(topic.id); } }}
                       className="space-y-2 group relative group cursor-pointer"
                     >
-                      <div className="flex justify-between items-start gap-2">
+                      <div className="flex min-w-0 flex-wrap justify-between items-start gap-2">
                         <span className="px-2 py-0.5 bg-slate-50 border border-slate-100 rounded text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
                           {forums.find((f) => f.id === topic.forumId)?.name ||
                             translate("forumsPage.general")}
@@ -2267,10 +2028,11 @@ export default function Forums() {
                             <Clock className="w-3 h-3" /> {topic.lastActivity}
                           </span>
                           {(canEditTopic(topic) || canDeleteTopic(topic)) && (
-                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                            <div className="flex items-center gap-2 transition-all">
                               {canEditTopic(topic) && (
                                 <button
                                   onClick={(e) => handleOpenEditTopic(e, topic)}
+                                  aria-label={translate("forumsPage.editTopic")}
                                   className="text-slate-300 hover:text-slate-600 transition-all cursor-pointer"
                                 >
                                   <Edit2 className="w-3 h-3" />
@@ -2281,6 +2043,7 @@ export default function Forums() {
                                   onClick={(e) =>
                                     confirmDeleteTopic(e, topic.id, topic.forumId)
                                   }
+                                  aria-label={translate("forumsPage.deleteDiscussion")}
                                   className="text-slate-300 hover:text-red-500 transition-all cursor-pointer"
                                 >
                                   <Trash2 className="w-3 h-3" />
@@ -2293,7 +2056,7 @@ export default function Forums() {
                       <h4 className="text-sm font-bold group-hover:text-primary-dark transition-colors leading-snug text-slate-900">
                         {topic.title}
                       </h4>
-                      <div className="flex items-center gap-4 text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                      <div className="forum-metadata text-[10px] text-slate-400 font-bold uppercase tracking-tight">
                         <span className="flex items-center gap-1">
                           <MessageCircle className="w-3.5 h-3.5" />{" "}
                           {topic.replyCount}
@@ -2311,55 +2074,66 @@ export default function Forums() {
               )}
             </div>
           </div>
-        </div>
+        </aside>
       </div>
 
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={translate("forumsPage.newDiscussionTopic")}
-        maxWidth="max-w-5xl"
+        layout="compact"
+        className="article-forum-modal"
+        footer={(<ModalSubmitButton formId="forum-new-discussion-form"
+          disabled={isCreatingTopic}
+          className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all cursor-pointer"
+        >
+          {isCreatingTopic
+            ? translate("forumsPage.publishing")
+            : translate("forumsPage.publishTopic")}
+        </ModalSubmitButton>)}
       >
-        <form noValidate onSubmit={handleAddTopic} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              {translate("forumsPage.discussionTitle")}
-            </label>
-            <input
-              required
-              autoFocus
-              type="text"
-              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-              value={formData.title}
-              onChange={(e) =>
-                setFormData({ ...formData, title: e.target.value })
-              }
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              {translate("forumsPage.forum")}
-            </label>
-            <select
-              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-              value={formData.forumId}
-              onChange={(e) =>
-                setFormData({ ...formData, forumId: e.target.value })
-              }
-            >
-              {forums.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+        <form id="forum-new-discussion-form" noValidate onSubmit={handleAddTopic} className="article-forum-modal-form">
+          <ModalFieldGrid>
+            <div className="space-y-2">
+              <label htmlFor="forum-new-discussion-form-field-1" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                {translate("forumsPage.discussionTitle")}
+              </label>
+              <input id="forum-new-discussion-form-field-1"
+                required
+                autoFocus
+                type="text"
+                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                value={formData.title}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="forum-new-discussion-form-field-2" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                {translate("forumsPage.forum")}
+              </label>
+              <select id="forum-new-discussion-form-field-2"
+                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                value={formData.forumId}
+                onChange={(e) =>
+                  setFormData({ ...formData, forumId: e.target.value })
+                }
+              >
+                {forums.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </ModalFieldGrid>
+          <div role="group" aria-labelledby="forum-new-discussion-form-field-3-label" className="space-y-2">
+            <label id="forum-new-discussion-form-field-3-label" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
               {translate("forumsPage.content")}
             </label>
             <TiptapEditor
+              variant="compact"
               content={formData.content}
               onChange={(content) =>
                 setFormData({ ...formData, content: content })
@@ -2368,120 +2142,96 @@ export default function Forums() {
               onImageUpload={handleImageUpload}
             />
           </div>
-
           <div className="space-y-3">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
               {translate("forumsPage.attachments")}
             </label>
             <FileUploadDropzone
+              presentation="compact"
               inputId="forum-topic-files"
               title={translate("forumsPage.addFile")}
               hint="Images, videos, PDFs"
               selectedLabel={
                 topicFiles.length
                   ? translate("forumsPage.filesSelected", {
-                      count: topicFiles.length,
-                    })
+                    count: topicFiles.length,
+                  })
                   : undefined
               }
               onFilesSelected={handleTopicFilesChange}
               preview={
                 topicFiles.length ? (
                   <SelectedFilesPreview
+                    presentation="compact"
                     files={topicFiles}
                     onRemove={handleRemoveTopicFile}
                   />
                 ) : undefined
               }
-              emptyPreview={
-                <div className="flex h-full min-h-[220px] w-full items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 lg:min-h-[260px]">
-                  {translate("forumsPage.attachments")}
-                </div>
-              }
             />
           </div>
-          <button
-            type="submit"
-            disabled={isCreatingTopic}
-            className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all mt-4 cursor-pointer"
-          >
-            {isCreatingTopic
-              ? translate("forumsPage.publishing")
-              : translate("forumsPage.publishTopic")}
-          </button>
         </form>
       </Modal>
-
       <Modal
         isOpen={isNewForumModalOpen}
         onClose={() => setIsNewForumModalOpen(false)}
         title={translate("forumsPage.createNewForum")}
-        maxWidth="max-w-4xl"
+        layout="compact"
+        className="article-forum-modal"
+        footer={(<div className="article-forum-modal-actions">
+          <button type="button" onClick={() => setIsNewForumModalOpen(false)} className="content-page-button content-page-button-secondary">{translate("common.cancel")}</button>
+          <ModalSubmitButton formId="forum-create-form"
+            disabled={isCreatingForum}
+            className="content-page-button content-page-button-primary disabled:opacity-50"
+          >
+            {isCreatingForum
+              ? translate("forumsPage.creating")
+              : translate("forumsPage.createForum")}
+          </ModalSubmitButton>
+        </div>)}
       >
-        <form noValidate onSubmit={handleAddForum} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              {translate("forumsPage.forumName")}
-            </label>
-            <input
-              required
-              autoFocus
-              type="text"
-              placeholder={translate("forumsPage.forumNamePlaceholder")}
-              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-              value={newForumData.name}
-              onChange={(e) =>
-                setNewForumData({ ...newForumData, name: e.target.value })
-              }
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              {translate("forumsPage.type")}
-            </label>
-            <select
-              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-              value={newForumData.forum_type}
-              onChange={(e) =>
-                setNewForumData({
-                  ...newForumData,
-                  forum_type: e.target.value,
-                })
-              }
-            >
-              <option value="general">
-                {translate("forumsPage.typeGeneral")}
-              </option>
-              <option value="professionnel">
-                {translate("forumsPage.typeProfessional")}
-              </option>
-              <option value="commission">
-                {translate("forumsPage.typeCommission")}
-              </option>
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              {translate("forumsPage.responsibleAuthor")}
-            </label>
-            <input
-              type="text"
-              placeholder={translate("forumsPage.authorPlaceholder")}
-              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-              value={newForumData.author_name}
-              onChange={(e) =>
-                setNewForumData({
-                  ...newForumData,
-                  author_name: e.target.value,
-                })
-              }
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+        <form id="forum-create-form" noValidate onSubmit={handleAddForum} className="article-forum-modal-form">
+          <ModalFieldGrid>
+            <div className="space-y-2">
+              <label htmlFor="forum-create-form-field-1" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                {translate("forumsPage.forumName")}
+              </label>
+              <input id="forum-create-form-field-1"
+                required
+                autoFocus
+                type="text"
+                placeholder={translate("forumsPage.forumNamePlaceholder")}
+                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                value={newForumData.name}
+                onChange={(e) =>
+                  setNewForumData({ ...newForumData, name: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="forum-create-form-field-2" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                {translate("forumsPage.responsibleAuthor")}
+              </label>
+              <input id="forum-create-form-field-2"
+                type="text"
+                placeholder={translate("forumsPage.authorPlaceholder")}
+                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                value={newForumData.author_name}
+                onChange={(e) =>
+                  setNewForumData({
+                    ...newForumData,
+                    author_name: e.target.value,
+                  })
+                }
+              />
+            </div>
+          </ModalFieldGrid>
+          <div role="group" aria-labelledby="forum-create-form-field-3-label" className="space-y-2">
+            <label id="forum-create-form-field-3-label" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
               {translate("forumsPage.description")}
             </label>
             <TiptapEditor
+              variant="compact"
               content={newForumData.description}
               onChange={(content) =>
                 setNewForumData({
@@ -2497,64 +2247,53 @@ export default function Forums() {
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
               {translate("forumsPage.thumbnailLabel")}
             </label>
-            <FileUploadDropzone
-              inputId="forum-thumbnail-create"
-              title={translate("forumsPage.uploadThumbnail")}
-              hint={translate("articlesPage.thumbnailHelp")}
-              accept="image/*"
-              multiple={false}
-              selectedLabel={
-                newForumData.thumbnail
-                  ? newForumData.thumbnail.name
-                  : newForumData.thumbnail_url
-                    ? translate("forumsPage.replaceThumbnail")
-                    : undefined
-              }
-              onFilesSelected={(files) =>
-                setNewForumData((prev) => ({
-                  ...prev,
-                  thumbnail: files[0] || null,
-                  thumbnail_url: prev.thumbnail_url,
-                }))
-              }
-              preview={
-                newForumData.thumbnail || newForumData.thumbnail_url ? (
-                  <FilePreviewCard
-                    file={newForumData.thumbnail}
-                    url={newForumData.thumbnail_url || undefined}
-                    name={
-                      newForumData.thumbnail?.name ||
-                      translate("forumsPage.forumThumbnail")
-                    }
-                    onRemove={() =>
-                      setNewForumData((prev) => ({
-                        ...prev,
-                        thumbnail: null,
-                        thumbnail_url: null,
-                      }))
-                    }
-                  />
-                ) : undefined
-              }
-              emptyPreview={
-                <div className="flex h-full w-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 text-center text-xs font-bold uppercase tracking-widest text-slate-400">
-                  {translate("forumsPage.thumbnailPreview")}
-                </div>
-              }
-            />
+            <div className="min-w-0">
+              <FileUploadDropzone
+                presentation="compact"
+                inputId="forum-thumbnail-create"
+                title={translate("forumsPage.uploadThumbnail")}
+                hint={translate("articlesPage.thumbnailHelp")}
+                accept="image/*"
+                multiple={false}
+                selectedLabel={
+                  newForumData.thumbnail
+                    ? newForumData.thumbnail.name
+                    : newForumData.thumbnail_url
+                      ? translate("forumsPage.replaceThumbnail")
+                      : undefined
+                }
+                onFilesSelected={(files) =>
+                  setNewForumData((prev) => ({
+                    ...prev,
+                    thumbnail: files[0] || null,
+                    thumbnail_url: prev.thumbnail_url,
+                  }))
+                }
+                preview={
+                  newForumData.thumbnail || newForumData.thumbnail_url ? (
+                    <FilePreviewCard
+                      presentation="compact"
+                      file={newForumData.thumbnail}
+                      url={newForumData.thumbnail_url || undefined}
+                      name={
+                        newForumData.thumbnail?.name ||
+                        translate("forumsPage.forumThumbnail")
+                      }
+                      onRemove={() =>
+                        setNewForumData((prev) => ({
+                          ...prev,
+                          thumbnail: null,
+                          thumbnail_url: null,
+                        }))
+                      }
+                    />
+                  ) : undefined
+                }
+              />
+            </div>
           </div>
-          <button
-            type="submit"
-            disabled={isCreatingForum}
-            className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all mt-4 font-bold uppercase tracking-widest cursor-pointer"
-          >
-            {isCreatingForum
-              ? translate("forumsPage.creating")
-              : translate("forumsPage.createForum")}
-          </button>
         </form>
       </Modal>
-
       <Modal
         isOpen={isEditForumModalOpen}
         onClose={() => {
@@ -2562,70 +2301,85 @@ export default function Forums() {
           setEditForumData(getDefaultForumFormData());
         }}
         title={translate("forumsPage.editForum")}
-        maxWidth="max-w-4xl"
+        layout="compact"
+        className="article-forum-modal"
+        footer={(<ModalSubmitButton formId="forum-edit-form"
+          disabled={isUpdatingForum}
+          className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all uppercase tracking-widest cursor-pointer"
+        >
+          {isUpdatingForum
+            ? translate("forumsPage.saving")
+            : translate("forumsPage.saveForum")}
+        </ModalSubmitButton>)}
       >
-        <form noValidate onSubmit={handleUpdateForum} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              {translate("forumsPage.forumName")}
-            </label>
-            <input
-              required
-              autoFocus
-              type="text"
-              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-              value={editForumData.name}
-              onChange={(e) =>
-                setEditForumData({ ...editForumData, name: e.target.value })
-              }
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              {translate("forumsPage.type")}
-            </label>
-            <select
-              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-              value={editForumData.forum_type}
-              onChange={(e) =>
-                setEditForumData({
-                  ...editForumData,
-                  forum_type: e.target.value,
-                })
-              }
-            >
-              <option value="general">
-                {translate("forumsPage.typeGeneral")}
-              </option>
-              <option value="professionnel">
-                {translate("forumsPage.typeProfessional")}
-              </option>
-              <option value="commission">
-                {translate("forumsPage.typeCommission")}
-              </option>
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              {translate("forumsPage.responsibleAuthor")}
-            </label>
-            <input
-              type="text"
-              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-              value={editForumData.author_name}
-              onChange={(e) =>
-                setEditForumData({
-                  ...editForumData,
-                  author_name: e.target.value,
-                })
-              }
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+        <form id="forum-edit-form" noValidate onSubmit={handleUpdateForum} className="article-forum-modal-form">
+          <ModalFieldGrid>
+            <ModalFullWidth>
+              <div className="space-y-2">
+                <label htmlFor="forum-edit-form-field-1" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  {translate("forumsPage.forumName")}
+                </label>
+                <input id="forum-edit-form-field-1"
+                  required
+                  autoFocus
+                  type="text"
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                  value={editForumData.name}
+                  onChange={(e) =>
+                    setEditForumData({ ...editForumData, name: e.target.value })
+                  }
+                />
+              </div>
+            </ModalFullWidth>
+            <div className="space-y-2">
+              <label htmlFor="forum-edit-form-field-2" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                {translate("forumsPage.type")}
+              </label>
+              <select id="forum-edit-form-field-2"
+                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                value={editForumData.forum_type}
+                onChange={(e) =>
+                  setEditForumData({
+                    ...editForumData,
+                    forum_type: e.target.value,
+                  })
+                }
+              >
+                {!["general", "professionnel", "commission"].includes(editForumData.forum_type) ? <option value={editForumData.forum_type}>{editForumData.forum_type}</option> : null}
+                <option value="general">
+                  {translate("forumsPage.typeGeneral")}
+                </option>
+                <option value="professionnel">
+                  {translate("forumsPage.typeProfessional")}
+                </option>
+                <option value="commission">
+                  {translate("forumsPage.typeCommission")}
+                </option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="forum-edit-form-field-3" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                {translate("forumsPage.responsibleAuthor")}
+              </label>
+              <input id="forum-edit-form-field-3"
+                type="text"
+                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                value={editForumData.author_name}
+                onChange={(e) =>
+                  setEditForumData({
+                    ...editForumData,
+                    author_name: e.target.value,
+                  })
+                }
+              />
+            </div>
+          </ModalFieldGrid>
+          <div role="group" aria-labelledby="forum-edit-form-field-4-label" className="space-y-2">
+            <label id="forum-edit-form-field-4-label" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
               {translate("forumsPage.description")}
             </label>
             <TiptapEditor
+              variant="compact"
               content={editForumData.description}
               onChange={(content) =>
                 setEditForumData({
@@ -2640,340 +2394,55 @@ export default function Forums() {
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
               {translate("forumsPage.thumbnailLabel")}
             </label>
-            <FileUploadDropzone
-              inputId="forum-thumbnail-edit"
-              title={translate("forumsPage.uploadThumbnail")}
-              hint={translate("articlesPage.thumbnailHelp")}
-              accept="image/*"
-              multiple={false}
-              selectedLabel={
-                editForumData.thumbnail
-                  ? editForumData.thumbnail.name
-                  : editForumData.thumbnail_url
-                    ? translate("forumsPage.replaceThumbnail")
-                    : undefined
-              }
-              onFilesSelected={(files) =>
-                setEditForumData((prev) => ({
-                  ...prev,
-                  thumbnail: files[0] || null,
-                  thumbnail_url: files[0] ? null : prev.thumbnail_url,
-                }))
-              }
-              preview={
-                editForumData.thumbnail || editForumData.thumbnail_url ? (
-                  <FilePreviewCard
-                    file={editForumData.thumbnail}
-                    url={editForumData.thumbnail_url || undefined}
-                    name={
-                      editForumData.thumbnail?.name ||
-                      translate("forumsPage.forumThumbnail")
-                    }
-                    onRemove={
-                      editForumData.thumbnail
-                        ? () =>
+            <div className="min-w-0">
+              <FileUploadDropzone
+                presentation="compact"
+                inputId="forum-thumbnail-edit"
+                title={translate("forumsPage.uploadThumbnail")}
+                hint={translate("articlesPage.thumbnailHelp")}
+                accept="image/*"
+                multiple={false}
+                selectedLabel={
+                  editForumData.thumbnail
+                    ? editForumData.thumbnail.name
+                    : editForumData.thumbnail_url
+                      ? translate("forumsPage.replaceThumbnail")
+                      : undefined
+                }
+                onFilesSelected={(files) =>
+                  setEditForumData((prev) => ({
+                    ...prev,
+                    thumbnail: files[0] || null,
+                    thumbnail_url: files[0] ? null : prev.thumbnail_url,
+                  }))
+                }
+                preview={
+                  editForumData.thumbnail || editForumData.thumbnail_url ? (
+                    <FilePreviewCard
+                      presentation="compact"
+                      file={editForumData.thumbnail}
+                      url={editForumData.thumbnail_url || undefined}
+                      name={
+                        editForumData.thumbnail?.name ||
+                        translate("forumsPage.forumThumbnail")
+                      }
+                      onRemove={
+                        editForumData.thumbnail
+                          ? () =>
                             setEditForumData((prev) => ({
                               ...prev,
                               thumbnail: null,
                             }))
-                        : undefined
-                    }
-                  />
-                ) : undefined
-              }
-              emptyPreview={
-                <div className="flex h-full w-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 text-center text-xs font-bold uppercase tracking-widest text-slate-400">
-                  {translate("forumsPage.thumbnailPreview")}
-                </div>
-              }
-            />
+                          : undefined
+                      }
+                    />
+                  ) : undefined
+                }
+              />
+            </div>
           </div>
-          <button
-            type="submit"
-            disabled={isUpdatingForum}
-            className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all mt-4 uppercase tracking-widest cursor-pointer"
-          >
-            {isUpdatingForum
-              ? translate("forumsPage.saving")
-              : translate("forumsPage.saveForum")}
-          </button>
         </form>
       </Modal>
-
-      <Modal
-        isOpen={isPermissionModalOpen}
-        onClose={() => setIsPermissionModalOpen(false)}
-        title={translate("forumsPage.setForumPermission")}
-        maxWidth="max-w-5xl"
-      >
-        <div className="mb-6 flex flex-wrap gap-4 border-b border-slate-100 sm:gap-6">
-          <button
-            onClick={() => setPermissionTab("view")}
-            className={`pb-2 text-xs font-black uppercase tracking-widest transition-all relative cursor-pointer ${
-              permissionTab === "view"
-                ? "text-primary"
-                : "text-slate-400 hover:text-slate-600"
-            }`}
-          >
-            {translate("forumsPage.currentPermissions")}
-            {permissionTab === "view" && (
-              <motion.div
-                layoutId="permissionTab"
-                className="absolute -bottom-[1px] left-0 right-0 h-0.5 bg-primary"
-              />
-            )}
-          </button>
-          <button
-            onClick={() => setPermissionTab("edit")}
-            className={`pb-2 text-xs font-black uppercase tracking-widest transition-all relative cursor-pointer ${
-              permissionTab === "edit"
-                ? "text-primary"
-                : "text-slate-400 hover:text-slate-600"
-            }`}
-          >
-            {translate("forumsPage.managePermissions")}
-            {permissionTab === "edit" && (
-              <motion.div
-                layoutId="permissionTab"
-                className="absolute -bottom-[1px] left-0 right-0 h-0.5 bg-primary"
-              />
-            )}
-          </button>
-        </div>
-
-        {permissionTab === "view" ? (
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                {translate("forumsPage.selectForumToView")}
-              </label>
-              <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto p-2 bg-slate-50 border border-slate-200 rounded-lg text-left">
-                {forums.map((forum) => (
-                  <label
-                    key={forum.id}
-                    className="flex items-center gap-2 p-2 hover:bg-white rounded-md cursor-pointer transition-colors"
-                  >
-                    <input
-                      type="radio"
-                      name="view-forum-permission"
-                      checked={permissionData.forumIds.includes(forum.id)}
-                      onChange={() => {
-                        setPermissionData({
-                          ...permissionData,
-                          forumIds: [forum.id],
-                        });
-                      }}
-                      className="h-4 w-4 border-slate-300 text-primary focus:ring-primary"
-                    />
-                    <span className="text-sm font-medium text-slate-700">
-                      {forum.name}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {singleSelectedForumId ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    {translate("forumsPage.permissionsFor", {
-                      forum:
-                        currentPermissions?.[0]?.forum_name ||
-                        forums.find((f) => f.id === singleSelectedForumId)
-                          ?.name ||
-                        "",
-                    })}
-                  </label>
-                  <button
-                    onClick={() => setPermissionTab("edit")}
-                    className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline cursor-pointer"
-                  >
-                    {translate("forumsPage.editThese")}
-                  </button>
-                </div>
-                <div className="overflow-x-auto rounded-xl border border-slate-200 bg-slate-50">
-                  {isLoadingCurrentPermissions ? (
-                    <PermissionsTableSkeleton />
-                  ) : (
-                      <table className="min-w-[420px] w-full text-xs">
-                      <thead>
-                        <tr className="bg-slate-100/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
-                          <th className="px-4 py-3 text-left">
-                            {translate("forumsPage.role")}
-                          </th>
-                          <th className="px-4 py-3 text-center">
-                            {translate("forumsPage.read")}
-                          </th>
-                          <th className="px-4 py-3 text-center">
-                            {translate("forumsPage.post")}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {(currentPermissions || []).map((p) => (
-                          <tr
-                            key={p.id}
-                            className="hover:bg-white transition-colors"
-                          >
-                            <td className="px-4 py-3">
-                              <p className="font-bold text-slate-700 capitalize">
-                                {p.role_name
-                                  ? translatePermissionRole(p.role_name)
-                                  : permissionRoleLabelsById[p.role_id] || ""}
-                              </p>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              {p.can_read ? (
-                                <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
-                              ) : (
-                                <div className="w-2 h-2 rounded-full bg-slate-300 mx-auto" />
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              {p.can_post ? (
-                                <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
-                              ) : (
-                                <div className="w-2 h-2 rounded-full bg-slate-300 mx-auto" />
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="p-8 bg-slate-50 border border-slate-200 border-dashed rounded-2xl text-center">
-                <Shield className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                  {translate("forumsPage.selectForumPrompt")}
-                </p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <form onSubmit={handleSetPermission} className="space-y-4">
-            <div className="space-y-2 text-left">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                {translate("forumsPage.selectForumsToUpdate")}
-              </label>
-              <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto p-2 bg-slate-50 border border-slate-200 rounded-lg">
-                {forums.map((forum) => (
-                  <label
-                    key={forum.id}
-                    className="flex items-center gap-2 p-2 hover:bg-white rounded-md cursor-pointer transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={permissionData.forumIds.includes(forum.id)}
-                      onChange={(e) => {
-                        const nextIds = e.target.checked
-                          ? [...permissionData.forumIds, forum.id]
-                          : permissionData.forumIds.filter(
-                              (id) => id !== forum.id,
-                            );
-                        setPermissionData({
-                          ...permissionData,
-                          forumIds: nextIds,
-                        });
-                      }}
-                      className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                    />
-                    <span className="text-sm font-medium text-slate-700">
-                      {forum.name}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2 text-left">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                {translate("forumsPage.rolesToUpdate")}
-              </label>
-              <div className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 sm:grid-cols-2">
-                {permissionRoleOptions.map((role) => (
-                  <label
-                    key={role.id}
-                    className="flex items-center gap-2 p-2 hover:bg-white rounded-md cursor-pointer transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={permissionData.roleIds.includes(role.id)}
-                      onChange={(e) => {
-                        const nextRoleIds = e.target.checked
-                          ? [...permissionData.roleIds, role.id]
-                          : permissionData.roleIds.filter((id) => id !== role.id);
-                        setPermissionData({
-                          ...permissionData,
-                          roleIds: nextRoleIds,
-                        });
-                      }}
-                      className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                    />
-                    <span className="text-sm font-medium text-slate-700">
-                      {role.label}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-3 text-left">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                {translate("forumsPage.accessSettings")}
-              </label>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <label className="flex items-center justify-between gap-4 px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer hover:bg-white transition-colors">
-                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    {translate("forumsPage.canRead")}
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={permissionData.canRead}
-                    onChange={(e) =>
-                      setPermissionData({
-                        ...permissionData,
-                        canRead: e.target.checked,
-                      })
-                    }
-                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-4 px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer hover:bg-white transition-colors">
-                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    {translate("forumsPage.canPost")}
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={permissionData.canPost}
-                    onChange={(e) =>
-                      setPermissionData({
-                        ...permissionData,
-                        canPost: e.target.checked,
-                      })
-                    }
-                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                  />
-                </label>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSettingPermission}
-              className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold text-xs hover:bg-slate-800 transition-all mt-4 uppercase tracking-[0.2em] shadow-xl cursor-pointer"
-            >
-              {isSettingPermission
-                ? translate("forumsPage.saving")
-                : translate("forumsPage.applyBulkPermissions")}
-            </button>
-          </form>
-        )}
-      </Modal>
-
       {/* EDIT TOPIC MODAL */}
       <Modal
         isOpen={isEditTopicModalOpen}
@@ -2991,14 +2460,23 @@ export default function Forums() {
           });
         }}
         title={translate("forumsPage.editTopic")}
-        maxWidth="max-w-5xl"
+        layout="compact"
+        className="article-forum-modal"
+        footer={(<ModalSubmitButton formId="forum-edit-discussion-form"
+          disabled={isUpdatingTopic}
+          className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all uppercase tracking-widest cursor-pointer"
+        >
+          {isUpdatingTopic
+            ? translate("forumsPage.saving")
+            : translate("forumsPage.saveTopic")}
+        </ModalSubmitButton>)}
       >
-        <form noValidate onSubmit={handleUpdateTopic} className="space-y-4">
+        <form id="forum-edit-discussion-form" noValidate onSubmit={handleUpdateTopic} className="article-forum-modal-form">
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            <label htmlFor="forum-edit-discussion-form-field-1" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
               {translate("forumsPage.discussionTitle")}
             </label>
-            <input
+            <input id="forum-edit-discussion-form-field-1"
               required
               type="text"
               className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
@@ -3008,12 +2486,12 @@ export default function Forums() {
               }
             />
           </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+          <div role="group" aria-labelledby="forum-edit-discussion-form-field-2-label" className="space-y-2">
+            <label id="forum-edit-discussion-form-field-2-label" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
               {translate("forumsPage.content")}
             </label>
             <TiptapEditor
+              variant="compact"
               content={editTopicData.content}
               onChange={(content) =>
                 setEditTopicData({ ...editTopicData, content: content })
@@ -3021,78 +2499,70 @@ export default function Forums() {
               onImageUpload={handleImageUpload}
             />
           </div>
-
           <div className="space-y-3">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
               {translate("forumsPage.attachments")}
             </label>
             {!!editTopicData.attachments.length && (
-              <EditableAttachmentGallery
-                attachments={editTopicData.attachments}
-                onRemove={handleRemoveExistingAttachment}
-                translate={translate}
-              />
+              <ModalFieldGrid>
+                {editTopicData.attachments.map((url, index) => (
+                  <FilePreviewCard
+                    presentation="compact"
+                    key={`${url}-${index}`}
+                    url={url}
+                    href={url}
+                    name={getAttachmentInfo(url).filename || translate("forumsPage.existingFile", { count: index + 1 })}
+                    subtitle={translate("forumsPage.openFile")}
+                    onRemove={() => handleRemoveExistingAttachment(url)}
+                  />
+                ))}
+              </ModalFieldGrid>
             )}
             <FileUploadDropzone
+              presentation="compact"
               inputId="forum-edit-topic-files"
               title={translate("forumsPage.addFile")}
               hint="Images, videos, PDFs"
               selectedLabel={
                 editTopicFiles.length
                   ? translate("forumsPage.filesSelected", {
-                      count: editTopicFiles.length,
-                    })
+                    count: editTopicFiles.length,
+                  })
                   : undefined
               }
               onFilesSelected={handleEditTopicFilesChange}
-              preview={
-                editTopicFiles.length ? (
-                  <SelectedFilesPreview
-                    files={editTopicFiles}
-                    onRemove={handleRemoveEditTopicFile}
-                  />
-                ) : editTopicData.attachments[0] ? (
-                  <FilePreviewCard
-                    url={editTopicData.attachments[0]}
-                    href={editTopicData.attachments[0]}
-                    name={getAttachmentInfo(editTopicData.attachments[0]).filename}
-                    onRemove={() => handleRemoveExistingAttachment(editTopicData.attachments[0])}
-                    aspectClassName="h-full"
-                  />
-                ) : undefined
-              }
-              emptyPreview={
-                <div className="flex h-full min-h-[220px] items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 lg:min-h-[260px]">
-                  {translate("forumsPage.attachments")}
-                </div>
-              }
+              preview={editTopicFiles.length ? (<SelectedFilesPreview
+                presentation="compact"
+                files={editTopicFiles}
+                onRemove={handleRemoveEditTopicFile}
+              />) : undefined}
             />
           </div>
-          <button
-            type="submit"
-            disabled={isUpdatingTopic}
-            className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all mt-4 uppercase tracking-widest cursor-pointer"
-          >
-            {isUpdatingTopic
-              ? translate("forumsPage.saving")
-              : translate("forumsPage.saveTopic")}
-          </button>
         </form>
       </Modal>
-
       {/* EDIT REPLY MODAL */}
       <Modal
         isOpen={isEditPostModalOpen}
         onClose={() => setIsEditPostModalOpen(false)}
         title={translate("forumsPage.editReply")}
-        maxWidth="max-w-5xl"
+        layout="compact"
+        className="article-forum-modal"
+        footer={(<ModalSubmitButton formId="forum-edit-reply-form"
+          disabled={isUpdatingPost}
+          className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all uppercase tracking-widest disabled:opacity-50 cursor-pointer"
+        >
+          {isUpdatingPost
+            ? translate("forumsPage.saving")
+            : translate("forumsPage.saveReply")}
+        </ModalSubmitButton>)}
       >
-        <form noValidate onSubmit={handleUpdatePost} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+        <form id="forum-edit-reply-form" noValidate onSubmit={handleUpdatePost} className="article-forum-modal-form">
+          <div role="group" aria-labelledby="forum-edit-reply-form-field-1-label" className="space-y-2">
+            <label id="forum-edit-reply-form-field-1-label" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
               {translate("forumsPage.content")}
             </label>
             <TiptapEditor
+              variant="compact"
               content={editPostData.content}
               onChange={(content) =>
                 setEditPostData({ ...editPostData, content: content })
@@ -3105,14 +2575,22 @@ export default function Forums() {
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                 {translate("forumsPage.existingAttachments")}
               </label>
-              <AttachmentGallery
-                attachments={editPostData.attachments}
-                translate={translate}
-              />
+              <ModalFieldGrid>
+                {editPostData.attachments.map((url, index) => (
+                  <FilePreviewCard
+                    presentation="compact"
+                    key={`${url}-${index}`}
+                    url={url}
+                    href={url}
+                    name={getAttachmentInfo(url).filename}
+                  />
+                ))}
+              </ModalFieldGrid>
             </div>
           )}
           <div className="space-y-3">
             <FileUploadDropzone
+              presentation="compact"
               inputId="forum-edit-post-files"
               title={translate("forumsPage.addFiles")}
               hint="Images, videos, PDFs"
@@ -3120,46 +2598,23 @@ export default function Forums() {
               selectedLabel={
                 editPostFiles.length
                   ? translate("forumsPage.filesSelected", {
-                      count: editPostFiles.length,
-                    })
+                    count: editPostFiles.length,
+                  })
                   : undefined
               }
               onFilesSelected={handleEditPostFilesChange}
-              preview={
-                editPostFiles.length ? (
-                  <SelectedFilesPreview
-                    files={editPostFiles}
-                    onRemove={handleRemoveEditPostFile}
-                  />
-                ) : editPostData.attachments[0] ? (
-                  <FilePreviewCard
-                    url={editPostData.attachments[0]}
-                    href={editPostData.attachments[0]}
-                    name={getAttachmentInfo(editPostData.attachments[0]).filename}
-                    aspectClassName="h-full"
-                  />
-                ) : undefined
-              }
-              emptyPreview={
-                <div className="flex h-full min-h-[220px] items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 lg:min-h-[260px]">
-                  {translate("forumsPage.attachments")}
-                </div>
-              }
+              preview={editPostFiles.length ? (<SelectedFilesPreview
+                presentation="compact"
+                files={editPostFiles}
+                onRemove={handleRemoveEditPostFile}
+              />) : undefined}
             />
           </div>
-          <button
-            type="submit"
-            disabled={isUpdatingPost}
-            className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all mt-4 uppercase tracking-widest disabled:opacity-50 cursor-pointer"
-          >
-            {isUpdatingPost
-              ? translate("forumsPage.saving")
-              : translate("forumsPage.saveReply")}
-          </button>
         </form>
       </Modal>
 
       <ConfirmModal
+        presentation="compact"
         isOpen={isConfirmOpen}
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleDeleteItem}

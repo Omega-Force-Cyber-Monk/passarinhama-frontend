@@ -1,0 +1,41 @@
+/* Only opt-in presentations/helpers use these rules. Legacy classes remain intact. */
+.shared-modal { padding: 0.75rem; }
+.shared-modal > .relative { max-height: calc(100vh - 1.5rem); max-height: calc(100dvh - 1.5rem); min-width: 0; width: 100%; border-radius: 1rem; border: 1px solid var(--archi-border); box-shadow: var(--archi-shadow-lg); }
+.shared-modal--compact:not([data-modal-custom-width="true"]) > .relative { max-width: 46rem; }
+.shared-modal--sectioned:not([data-modal-custom-width="true"]) > .relative { max-width: 56rem; }
+.shared-modal .shared-modal-header { flex-shrink: 0; gap: 0.75rem; padding: 0.875rem 1rem; }
+.shared-modal-header > div { min-width: 0; flex: 1; }
+.shared-modal-header h3, .shared-modal-header p { overflow-wrap: anywhere; }
+.shared-modal-header button { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-width: 2.75rem; min-height: 2.75rem; }
+.shared-modal .shared-modal-body { container: shared-modal-body / inline-size; min-width: 0; min-height: 0; padding: 1rem; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
+.shared-modal-body :is(form, fieldset, input, select, textarea) { min-width: 0; max-width: 100%; }
+.shared-modal-body :is(input:not([type="checkbox"]):not([type="color"]):not([type="file"]), select) { min-height: 2.75rem; }
+.shared-modal-body .tiptap { font-family: var(--font-sans); }
+.shared-modal-body .tiptap-wrapper:focus-within { border-color: var(--archi-accent); box-shadow: 0 0 0 3px var(--archi-accent-soft), var(--archi-shadow-sm); }
+.shared-modal-body :is(img, video, iframe, audio) { max-width: 100%; }
+.shared-modal-body :is(label, p) { overflow-wrap: anywhere; }
+.shared-modal-footer { display: flex; flex-shrink: 0; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.5rem; padding: 0.875rem 1rem; border-top: 1px solid var(--archi-border); background: var(--archi-surface); }
+.shared-modal-footer button { min-width: 0; min-height: 2.75rem; overflow-wrap: anywhere; }
+.shared-modal--drawer { justify-content: flex-end; align-items: stretch; padding: 0; }
+.shared-modal--drawer > .relative { height: 100vh; height: 100dvh; max-height: 100vh; max-height: 100dvh; border-radius: 1rem 0 0 1rem; }
+.shared-modal--drawer:not([data-modal-custom-width="true"]) > .relative { max-width: 48rem; }
+.shared-modal-field-grid, .shared-modal-media-split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.875rem; min-width: 0; }
+.shared-modal-field-grid > *, .shared-modal-media-split > *, .shared-modal-full-width { min-width: 0; max-width: 100%; }
+.shared-modal-full-width { grid-column: 1 / -1; }
+.shared-modal-section { display: flex; flex-direction: column; min-width: 0; gap: 0.875rem; }
+.shared-modal-section + .shared-modal-section { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--archi-border); }
+.shared-modal-section > h4 { margin: 0; color: var(--archi-text); font-size: 0.875rem; font-weight: 700; }
+.shared-modal-section > p { margin: 0; color: var(--archi-secondary); font-size: 0.8125rem; }
+@container shared-modal-body (min-width: 32rem) { .shared-modal-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container shared-modal-body (min-width: 38rem) { .shared-modal-media-split { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: start; } }
+.shared-confirm > .relative { width: 100%; max-width: 26rem; min-width: 0; max-height: calc(100vh - 2rem); max-height: calc(100dvh - 2rem); overflow-y: auto; border-radius: 1rem; }
+.shared-confirm > .relative > :first-child { padding: 1.25rem; }
+.shared-confirm > .relative > :first-child > div { width: 3rem; height: 3rem; margin-bottom: 0.75rem; }
+.shared-confirm > .relative > :last-child { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 1rem; }
+.shared-confirm :is(h3, p, button) { overflow-wrap: anywhere; }
+.shared-confirm button { flex: 1 1 8rem; min-height: 2.75rem; min-width: 0; }
+.shared-modal button:focus-visible, .shared-confirm button:focus-visible { outline: 2px solid var(--archi-accent); outline-offset: 2px; }
+@media (max-width: 30rem) { .shared-modal-footer button { flex: 1 1 9rem; } .shared-modal--drawer > .relative { border-radius: 0; } }
+/* Narrow custom drawers (including the day list) fill the full mobile viewport. */
+@media (max-width: 767px) { .shared-modal--drawer > .relative { max-width: 100%; border-radius: 0; } }
+@media (prefers-reduced-motion: reduce) { .shared-modal *, .shared-confirm * { scroll-behavior: auto; } }

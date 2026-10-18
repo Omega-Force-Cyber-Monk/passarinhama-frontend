@@ -1,0 +1,47 @@
+/* Batch 1 presentation only; shared modal sizing, focus and scrolling remain authoritative. */
+.article-forum-modal .article-forum-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.article-forum-modal .article-forum-modal-form > *,
+.article-forum-modal .tiptap-wrapper {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.article-forum-modal .article-forum-modal-form > .shared-modal-section + .shared-modal-section {
+  margin-top: 0;
+}
+
+.article-forum-modal .tiptap-wrapper .tiptap {
+  min-height: 7.5rem;
+  padding: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.article-forum-modal .article-forum-modal-empty {
+  padding: 1rem;
+  border: 1px dashed var(--archi-border);
+  border-radius: 1rem;
+  background: var(--archi-surface);
+  color: var(--archi-secondary);
+  font-size: 0.75rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.article-forum-modal .article-forum-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.article-forum-modal .article-forum-modal-actions > button {
+  flex: 1 1 9rem;
+}

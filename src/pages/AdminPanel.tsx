@@ -1,3 +1,9 @@
+import { ModalFieldGrid, ModalFullWidth, ModalSection, ModalMediaSplit, ModalSubmitButton } from "../components/ui/ModalLayout";
+import "./MemberAdminModals.css";
+import { AdminPasswordField } from "./admin/AdminPasswordField";
+import { buildAdminForumCreatePayload, isUndisplayedAdminStatus } from "./admin/adminPresentation";
+import "./AdminPanel.css";
+import { useArticleAuthorization } from "../hooks/useArticleAuthorization";
 import React, { useState } from "react";
 import {
   Users,
@@ -67,18 +73,13 @@ import {
   useCreateUserMutation,
   useUpdateUserMutation,
   useGetUserByIdQuery,
-  useValidateUserMutation,
+
   useExportUsersCsvMutation,
   useGetUserRolesQuery,
   useCreateUserRoleMutation,
   useUpdateUserRoleMutation,
   useDeleteUserRoleMutation,
-  useGetUserPermissionsQuery,
-  useCreateUserPermissionMutation,
-  useUpdateUserPermissionMutation,
-  useGetMemberPermissionsQuery,
-  useCreateMemberPermissionMutation,
-  useUpdateMemberPermissionMutation,
+
 } from "../redux/features/members/membersApi";
 import {
   useGetModerationQueueQuery,
@@ -91,8 +92,7 @@ import {
   useDeleteForumMutation,
   useUpdateForumMutation,
   useGetForumQuery,
-  useSetForumPermissionMutation,
-  useGetForumPermissionsQuery,
+
 } from "../redux/features/forum/forumApi";
 import {
   useGetArticlesQuery,
@@ -128,8 +128,7 @@ import {
   useCreateTrainingMutation,
   useUpdateTrainingMutation,
   useGetTrainingByIdQuery,
-  useGetTrainingPermissionsQuery,
-  useSetTrainingPermissionMutation,
+
   useGetTrainingCategoriesQuery,
   buildTrainingFormData,
 } from "../redux/features/trainings/trainingsApi";
@@ -152,7 +151,7 @@ import {
   useGetAdminBackupsQuery,
   useUpdateAdminBackupConfigurationMutation,
   useRunAdminBackupMutation,
-  useTestAdminBackupPermissionsMutation,
+
   useDeleteAdminBackupMutation,
   useDownloadAdminBackupMutation,
 } from "../redux/features/admin/adminApi";
@@ -166,10 +165,10 @@ import { ROLE_SLUGS } from "../redux/features/auth/authTypes";
 import { getApiErrorDisplayMessage } from "../utils/apiErrorMessages";
 import type {
   CreateUserRequest,
-  MemberPermission,
+
   User as MemberUser,
   UpdateUserRequest,
-  UserPermission,
+
   UserRoleDetails,
 } from "../redux/features/members/membersTypes";
 
@@ -185,11 +184,6 @@ interface Member {
   is_payment_validated: boolean;
   joinedDate: string;
 }
-
-type MemberPermissionTarget = Pick<
-  MemberUser,
-  "id" | "first_name" | "last_name" | "email"
->;
 
 interface ForumEntity {
   id: string;
@@ -239,33 +233,6 @@ type AdminTab =
   | "rolesPermissions"
   | "settingsBackups";
 
-const ROLE_PERMISSION_FEATURES = [
-  "article",
-  "document",
-  "event",
-  "forum",
-  "technicopro",
-  "training",
-  "user",
-] as const;
-
-type RolePermissionFeature = (typeof ROLE_PERMISSION_FEATURES)[number];
-type PermissionToggleField =
-  | "can_view"
-  | "can_create"
-  | "can_edit"
-  | "can_delete";
-
-const PERMISSION_ACTION_FIELDS: Array<[PermissionToggleField, string]> = [
-  ["can_view", "view"],
-  ["can_create", "create"],
-  ["can_edit", "edit"],
-  ["can_delete", "delete"],
-];
-
-const isSameSerializedState = (current: unknown, next: unknown) =>
-  JSON.stringify(current) === JSON.stringify(next);
-
 const downloadFile = (file: Blob, filename: string) => {
   const url = URL.createObjectURL(file);
   const link = document.createElement("a");
@@ -299,7 +266,7 @@ const adminTableCellClass =
   "overflow-hidden text-ellipsis whitespace-nowrap p-4 align-middle";
 const adminTableRowClass = "hover:bg-slate-50/70 transition-colors group";
 const adminPaginationClass =
-  "col-span-full flex w-full max-w-full min-w-0 flex-col gap-3 border-t border-slate-100 bg-slate-50/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between";
+  "admin-pagination col-span-full w-full max-w-full min-w-0 border-t border-slate-100 bg-slate-50/70";
 const adminPaginationButtonClass =
   "flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer";
 const adminPaginationTextClass =
@@ -344,28 +311,6 @@ const AdminTableSkeleton = ({
       </tr>
     ))}
   </>
-);
-
-const ForumPermissionsSkeleton = () => (
-  <div className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden">
-    <div className="p-4 space-y-4">
-      <div className="grid grid-cols-[2fr,1fr,1fr] gap-3">
-        <SkeletonBar className="h-3 w-20" />
-        <SkeletonBar className="h-3 w-12 mx-auto" />
-        <SkeletonBar className="h-3 w-12 mx-auto" />
-      </div>
-      {Array.from({ length: 5 }).map((_, index) => (
-        <div
-          key={index}
-          className="grid grid-cols-[2fr,1fr,1fr] gap-3 items-center animate-pulse"
-        >
-          <SkeletonBar className="h-4 w-28" />
-          <div className="mx-auto h-4 w-4 rounded bg-slate-100" />
-          <div className="mx-auto h-4 w-4 rounded bg-slate-100" />
-        </div>
-      ))}
-    </div>
-  </div>
 );
 
 const getLastPathSegment = (value: string) => {
@@ -416,6 +361,7 @@ const RichTextPreview = ({
 };
 
 export default function AdminPanel() {
+  const adminFieldId = React.useId();
   const navigate = useNavigate();
   const toast = useAppToast();
   const MEMBERS_PAGE_SIZE = 10;
@@ -428,6 +374,7 @@ export default function AdminPanel() {
   const { hasPermission, canAccessAdminPanel, canAccessModeration } =
     usePermissions();
 
+  const canModify = useArticleAuthorization();
   const canViewMembers = hasPermission("user", "view");
   const canCreateMembers = hasPermission("user", "create");
   const canEditMembers = hasPermission("user", "edit");
@@ -469,8 +416,7 @@ export default function AdminPanel() {
   const [moderationQueuePage, setModerationQueuePage] = useState(1);
   const [moderationLogsPage, setModerationLogsPage] = useState(1);
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
-  const [selectedMemberForPermissions, setSelectedMemberForPermissions] =
-    useState<MemberPermissionTarget | null>(null);
+
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [isRoleDeleteConfirmOpen, setIsRoleDeleteConfirmOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<UserRoleDetails | null>(
@@ -481,12 +427,7 @@ export default function AdminPanel() {
     name: "",
     description: "",
   });
-  const [permissionDrafts, setPermissionDrafts] = useState<
-    Record<string, UserPermission>
-  >({});
-  const [memberPermissionDrafts, setMemberPermissionDrafts] = useState<
-    Record<string, MemberPermission>
-  >({});
+
   const [smtpForm, setSmtpForm] = useState<UpdateAdminSmtpSettingsRequest>({
     host: "",
     port: 587,
@@ -514,7 +455,7 @@ export default function AdminPanel() {
   );
 
   const getTabLabel = (tab: AdminTab) =>
-    translate(`adminPanelPage.tabs.${tab}`);
+    translate(tab === "rolesPermissions" ? "adminUi.roles" : `adminPanelPage.tabs.${tab}`);
 
   const getRoleLabel = (role?: string | null) => {
     if (!role) return translate("adminPanelPage.fallbacks.member");
@@ -532,11 +473,10 @@ export default function AdminPanel() {
   };
 
   const getMemberStatusLabel = (status?: string | null) => {
+    if (isUndisplayedAdminStatus(status)) return translate("adminUi.neutralStatus");
     switch (status) {
       case "active":
         return translate("adminPanelPage.memberStatuses.active");
-      case "pending":
-        return translate("adminPanelPage.memberStatuses.pending");
       case "suspended":
         return translate("adminPanelPage.memberStatuses.suspended");
       default:
@@ -559,6 +499,7 @@ export default function AdminPanel() {
   };
 
   const getArticleStatusLabel = (status?: string | null) => {
+    if (isUndisplayedAdminStatus(status)) return translate("adminUi.neutralStatus");
     switch (status) {
       case "published":
         return translate("adminPanelPage.articleStatuses.published");
@@ -598,11 +539,10 @@ export default function AdminPanel() {
   };
 
   const getTrainingStatusLabel = (status?: string | null) => {
+    if (isUndisplayedAdminStatus(status)) return translate("adminUi.neutralStatus");
     switch (status) {
       case "published":
         return translate("adminPanelPage.articleStatuses.published");
-      case "pending":
-        return translate("adminPanelPage.articleStatuses.pending");
       case "draft":
         return translate("adminPanelPage.articleStatuses.draft");
       default:
@@ -611,11 +551,10 @@ export default function AdminPanel() {
   };
 
   const getModerationStatusLabel = (status?: string | null) => {
+    if (isUndisplayedAdminStatus(status)) return translate("adminUi.neutralStatus");
     switch (status) {
       case "flagged":
         return translate("adminPanelPage.moderationStatuses.flagged");
-      case "pending":
-        return translate("adminPanelPage.moderationStatuses.pending");
       default:
         return status || translate("adminPanelPage.fallbacks.notAvailable");
     }
@@ -655,27 +594,6 @@ export default function AdminPanel() {
       return new Date(value).toLocaleDateString(localeCode);
     } catch {
       return value;
-    }
-  };
-
-  const getRolePermissionFeatureLabel = (feature: string) => {
-    switch (feature) {
-      case "article":
-        return translate("adminPanelPage.rolePermissions.features.article");
-      case "document":
-        return translate("adminPanelPage.rolePermissions.features.document");
-      case "event":
-        return translate("adminPanelPage.rolePermissions.features.event");
-      case "forum":
-        return translate("adminPanelPage.rolePermissions.features.forum");
-      case "technicopro":
-        return translate("adminPanelPage.rolePermissions.features.technicopro");
-      case "training":
-        return translate("adminPanelPage.rolePermissions.features.training");
-      case "user":
-        return translate("adminPanelPage.rolePermissions.features.user");
-      default:
-        return feature;
     }
   };
 
@@ -720,24 +638,7 @@ export default function AdminPanel() {
   const eventCategories = eventCategoriesResponse?.results ?? [];
   const { data: trainingsData } = useGetAllTrainingsQuery();
   const { data: userRolesData = [] } = useGetUserRolesQuery();
-  const forumPermissionRoleOptions = React.useMemo(
-    () =>
-      userRolesData.map((role) => ({
-        id: role.id,
-        label: getRoleLabel(role.slug || role.name),
-      })),
-    [userRolesData, translate],
-  );
-  const forumPermissionRoleLabelsById = React.useMemo(
-    () =>
-      Object.fromEntries(
-        userRolesData.map((role) => [
-          role.id,
-          getRoleLabel(role.slug || role.name),
-        ]),
-      ),
-    [userRolesData, translate],
-  );
+
   const {
     data: moderationQueueData,
     isLoading: isLoadingModeration,
@@ -769,8 +670,7 @@ export default function AdminPanel() {
     useSoftDeleteUserMutation();
   const [restoreUser, { isLoading: isRestoringUser }] =
     useRestoreUserMutation();
-  const [validateUser, { isLoading: isValidatingUser }] =
-    useValidateUserMutation();
+
   const [exportUsersCsv, { isLoading: isExportingUsers }] =
     useExportUsersCsvMutation();
 
@@ -799,14 +699,6 @@ export default function AdminPanel() {
     }
   };
 
-  const handleValidateUser = async (id: string) => {
-    try {
-      await validateUser(id).unwrap();
-      notifySuccess();
-    } catch (err) {
-      notifyError(err);
-    }
-  };
   const [createUser, { isLoading: isCreatingMember }] = useCreateUserMutation();
   const [updateUser, { isLoading: isUpdatingMember }] = useUpdateUserMutation();
   const [createUserRole, { isLoading: isCreatingUserRole }] =
@@ -815,14 +707,6 @@ export default function AdminPanel() {
     useUpdateUserRoleMutation();
   const [deleteUserRole, { isLoading: isDeletingUserRole }] =
     useDeleteUserRoleMutation();
-  const [createUserPermission, { isLoading: isCreatingUserPermission }] =
-    useCreateUserPermissionMutation();
-  const [updateUserPermission, { isLoading: isUpdatingUserPermission }] =
-    useUpdateUserPermissionMutation();
-  const [createMemberPermission, { isLoading: isCreatingMemberPermission }] =
-    useCreateMemberPermissionMutation();
-  const [updateMemberPermission, { isLoading: isUpdatingMemberPermission }] =
-    useUpdateMemberPermissionMutation();
 
   const [deleteArticle, { isLoading: isDeletingArticle }] =
     useDeleteArticleMutation();
@@ -856,8 +740,6 @@ export default function AdminPanel() {
     useCreateTrainingMutation();
   const [updateTraining, { isLoading: isUpdatingTraining }] =
     useUpdateTrainingMutation();
-  const [setTrainingPermission, { isLoading: isSettingTrainingPermission }] =
-    useSetTrainingPermissionMutation();
 
   const [createForum, { isLoading: isCreatingForum }] =
     useCreateForumMutation();
@@ -865,36 +747,11 @@ export default function AdminPanel() {
     useUpdateForumMutation();
   const [deleteForum, { isLoading: isDeletingForum }] =
     useDeleteForumMutation();
-  const [setForumPermission, { isLoading: isSettingPermission }] =
-    useSetForumPermissionMutation();
-  const {
-    data: rolePermissionsData = [],
-    isLoading: isLoadingRolePermissions,
-    isFetching: isFetchingRolePermissions,
-    refetch: refetchRolePermissions,
-  } = useGetUserPermissionsQuery(
-    { role_id: selectedRoleId || "" },
-    { skip: activeTab !== "rolesPermissions" || !selectedRoleId },
-  );
-  const {
-    data: memberPermissionsData = [],
-    isLoading: isLoadingMemberPermissions,
-    isFetching: isFetchingMemberPermissions,
-    refetch: refetchMemberPermissions,
-  } = useGetMemberPermissionsQuery(
-    { user_id: selectedMemberForPermissions?.id || "" },
-    {
-      skip: !selectedMemberForPermissions,
-    },
-  );
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false);
-  const [isTrainingPermissionModalOpen, setIsTrainingPermissionModalOpen] =
-    useState(false);
-  const [isMemberPermissionsModalOpen, setIsMemberPermissionsModalOpen] =
-    useState(false);
+  const [showMemberPassword, setShowMemberPassword] = useState(false);
+
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any | null>(null);
@@ -905,10 +762,6 @@ export default function AdminPanel() {
   const [memberDeleteMode, setMemberDeleteMode] = useState<
     "archive" | "restore" | "hard"
   >("archive");
-  const [permissionTab, setPermissionTab] = useState<"view" | "edit">("view");
-  const [trainingPermissionTab, setTrainingPermissionTab] = useState<
-    "view" | "edit"
-  >("view");
 
   // Generic Form State
   const [formData, setFormData] = useState<any>({});
@@ -938,45 +791,6 @@ export default function AdminPanel() {
       notifyError(error);
     }
   };
-  const [permissionData, setPermissionData] = useState<{
-    forumIds: string[];
-    roleIds: string[];
-    canRead: boolean;
-    canPost: boolean;
-  }>({
-    forumIds: [],
-    roleIds: [],
-    canRead: true,
-    canPost: true,
-  });
-  const [trainingPermissionData, setTrainingPermissionData] = useState<{
-    trainingIds: string[];
-    roleIds: string[];
-    canRead: boolean;
-    canWrite: boolean;
-  }>({
-    trainingIds: [],
-    roleIds: [],
-    canRead: true,
-    canWrite: true,
-  });
-
-  const singleSelectedForumId =
-    permissionData.forumIds.length === 1 ? permissionData.forumIds[0] : null;
-  const { data: currentPermissions, isLoading: isLoadingCurrentPermissions } =
-    useGetForumPermissionsQuery(singleSelectedForumId!, {
-      skip: !singleSelectedForumId || !isPermissionModalOpen,
-    });
-  const singleSelectedTrainingId =
-    trainingPermissionData.trainingIds.length === 1
-      ? trainingPermissionData.trainingIds[0]
-      : null;
-  const {
-    data: currentTrainingPermissions,
-    isLoading: isLoadingCurrentTrainingPermissions,
-  } = useGetTrainingPermissionsQuery(singleSelectedTrainingId || "", {
-    skip: !singleSelectedTrainingId || !isTrainingPermissionModalOpen,
-  });
 
   const { data: articleCategoriesResponse } = useGetArticleCategoriesQuery({
     pageSize: 100,
@@ -1014,7 +828,8 @@ export default function AdminPanel() {
       (!editingItem && !viewingId),
   });
   const {
-    data: articleDetail,
+    currentData: articleDetail,
+    isFetching: isFetchingArticle,
     isLoading: isLoadingArticle,
     isError: isErrorArticle,
     refetch: refetchArticle,
@@ -1126,10 +941,7 @@ export default function AdminPanel() {
   ] = useUpdateAdminBackupConfigurationMutation();
   const [runAdminBackup, { isLoading: isRunningBackup }] =
     useRunAdminBackupMutation();
-  const [
-    testAdminBackupPermissions,
-    { isLoading: isTestingBackupPermissions },
-  ] = useTestAdminBackupPermissionsMutation();
+
   const [deleteAdminBackup, { isLoading: isDeletingBackup }] =
     useDeleteAdminBackupMutation();
   const [downloadAdminBackup, { isLoading: isDownloadingBackup }] =
@@ -1351,14 +1163,6 @@ export default function AdminPanel() {
     );
   };
 
-  const notifySelectAtLeastOne = (fieldLabel: string) => {
-    toast.error(
-      translate("common.selectAtLeastOne", {
-        field: fieldLabel,
-      }),
-    );
-  };
-
   const hasRichTextValue = (value: string | null | undefined) =>
     Boolean(
       (value || "")
@@ -1376,63 +1180,6 @@ export default function AdminPanel() {
       .trim();
 
   React.useEffect(() => {
-    if (!forumsData?.length) return;
-
-    if (permissionData.forumIds.length === 0) {
-      setPermissionData((prev) => ({
-        ...prev,
-        forumIds: [forumsData[0].id],
-      }));
-    }
-  }, [forumsData, permissionData.forumIds.length]);
-
-  React.useEffect(() => {
-    if (permissionData.roleIds.length > 0 || !userRolesData.length) return;
-
-    const defaultRoleId =
-      userRolesData.find((role) => role.slug === ROLE_SLUGS.MEMBER)?.id ||
-      userRolesData[0]?.id;
-
-    if (!defaultRoleId) return;
-
-    setPermissionData((prev) => ({
-      ...prev,
-      roleIds: [defaultRoleId],
-    }));
-  }, [permissionData.roleIds.length, userRolesData]);
-
-  React.useEffect(() => {
-    if (
-      trainingPermissionData.trainingIds.length > 0 ||
-      !trainingsData?.length
-    ) {
-      return;
-    }
-
-    setTrainingPermissionData((prev) => ({
-      ...prev,
-      trainingIds: [trainingsData[0].id],
-    }));
-  }, [trainingPermissionData.trainingIds.length, trainingsData]);
-
-  React.useEffect(() => {
-    if (trainingPermissionData.roleIds.length > 0 || !userRolesData.length) {
-      return;
-    }
-
-    const defaultRoleId =
-      userRolesData.find((role) => role.slug === ROLE_SLUGS.MEMBER)?.id ||
-      userRolesData[0]?.id;
-
-    if (!defaultRoleId) return;
-
-    setTrainingPermissionData((prev) => ({
-      ...prev,
-      roleIds: [defaultRoleId],
-    }));
-  }, [trainingPermissionData.roleIds.length, userRolesData]);
-
-  React.useEffect(() => {
     if (!userRolesData.length) {
       setSelectedRoleId(null);
       return;
@@ -1445,70 +1192,6 @@ export default function AdminPanel() {
       setSelectedRoleId(userRolesData[0].id);
     }
   }, [selectedRoleId, userRolesData]);
-
-  React.useEffect(() => {
-    if (activeTab !== "rolesPermissions" || !selectedRoleId) {
-      return;
-    }
-
-    const permissionMap = Object.fromEntries(
-      ROLE_PERMISSION_FEATURES.map((feature) => {
-        const existingPermission = rolePermissionsData.find(
-          (permission) => permission.feature === feature,
-        );
-
-        return [
-          feature,
-          existingPermission || {
-            role_id: selectedRoleId,
-            feature,
-            can_view: false,
-            can_create: false,
-            can_edit: false,
-            can_delete: false,
-          },
-        ];
-      }),
-    );
-
-    setPermissionDrafts((current) =>
-      isSameSerializedState(current, permissionMap) ? current : permissionMap,
-    );
-  }, [activeTab, rolePermissionsData, selectedRoleId]);
-
-  React.useEffect(() => {
-    if (!selectedMemberForPermissions) {
-      setMemberPermissionDrafts((current) =>
-        Object.keys(current).length === 0 ? current : {},
-      );
-      return;
-    }
-
-    const permissionMap = Object.fromEntries(
-      ROLE_PERMISSION_FEATURES.map((feature) => {
-        const existingPermission = memberPermissionsData.find(
-          (permission) => permission.feature === feature,
-        );
-
-        return [
-          feature,
-          existingPermission || {
-            id: "",
-            user_id: selectedMemberForPermissions.id,
-            feature,
-            can_view: false,
-            can_create: false,
-            can_edit: false,
-            can_delete: false,
-          },
-        ];
-      }),
-    );
-
-    setMemberPermissionDrafts((current) =>
-      isSameSerializedState(current, permissionMap) ? current : permissionMap,
-    );
-  }, [memberPermissionsData, selectedMemberForPermissions]);
 
   const handleOpenModal = (item?: any) => {
     const canCreateForTab =
@@ -1531,7 +1214,7 @@ export default function AdminPanel() {
         : activeTab === "forums"
           ? canEditForums
         : activeTab === "articles"
-          ? canEditArticles
+          ? canModify(item, "edit")
           : activeTab === "technicopro"
             ? canEditTechnicoPro
             : activeTab === "events"
@@ -1577,7 +1260,6 @@ export default function AdminPanel() {
           name: "",
           author_name: "",
           description: "",
-          forum_type: "general",
           thumbnail: null,
           thumbnail_url: null,
         },
@@ -1630,6 +1312,7 @@ export default function AdminPanel() {
       };
       setFormData(defaults[activeTab]);
     }
+    setShowMemberPassword(false);
     setIsModalOpen(true);
   };
 
@@ -1668,40 +1351,6 @@ export default function AdminPanel() {
     handleOpenDetails(item);
   };
 
-  const handleOpenPermissionModal = () => {
-    if (!canEditForums || !forumsData?.length) return;
-
-    setPermissionTab("view");
-    setPermissionData((prev) => ({
-      ...prev,
-      forumIds: prev.forumIds.length > 0 ? prev.forumIds : [forumsData[0].id],
-    }));
-    setIsPermissionModalOpen(true);
-  };
-
-  const handleOpenTrainingPermissionModal = () => {
-    if (!canEditTrainings || !trainingsData?.length) return;
-
-    setTrainingPermissionTab("view");
-    setTrainingPermissionData((prev) => ({
-      ...prev,
-      trainingIds:
-        prev.trainingIds.length > 0 ? prev.trainingIds : [trainingsData[0].id],
-    }));
-    setIsTrainingPermissionModalOpen(true);
-  };
-
-  const handleOpenMemberPermissionsModal = (member: MemberPermissionTarget) => {
-    setSelectedMemberForPermissions(member);
-    setIsMemberPermissionsModalOpen(true);
-  };
-
-  const handleCloseMemberPermissionsModal = () => {
-    setIsMemberPermissionsModalOpen(false);
-    setSelectedMemberForPermissions(null);
-    setMemberPermissionDrafts({});
-  };
-
   const confirmDelete = (
     id: string,
     member?: MemberUser,
@@ -1713,7 +1362,7 @@ export default function AdminPanel() {
         : activeTab === "forums"
           ? canDeleteForums
         : activeTab === "articles"
-          ? canDeleteArticles
+          ? canModify(articlesData?.results.find((article) => article.id === id), "delete")
           : activeTab === "technicopro"
             ? canDeleteTechnicoPro
             : activeTab === "events"
@@ -1734,6 +1383,7 @@ export default function AdminPanel() {
 
   const handleDelete = async () => {
     if (!deletingId) return;
+    if (activeTab === "articles" && !canModify(articlesData?.results.find((article) => article.id === deletingId), "delete")) return;
 
     try {
       if (activeTab === "forums") {
@@ -1864,15 +1514,6 @@ export default function AdminPanel() {
     }
   };
 
-  const handleTestBackupPermissions = async () => {
-    try {
-      await testAdminBackupPermissions().unwrap();
-      notifySuccess();
-    } catch (err) {
-      notifyError(err);
-    }
-  };
-
   const handleDownloadBackup = async (backupId: string) => {
     try {
       const response = await downloadAdminBackup(backupId).unwrap();
@@ -1900,6 +1541,9 @@ export default function AdminPanel() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const id = editingItem ? editingItem.id : null;
+    if (activeTab === "articles" && (editingItem
+      ? isFetchingArticle || isErrorArticle || articleDetail?.id !== id || !canModify(articleDetail, "edit")
+      : !canCreateArticles)) return;
 
     if (activeTab === "members") {
       if (!formData.first_name?.trim()) {
@@ -2101,7 +1745,6 @@ export default function AdminPanel() {
             "name",
             "author_name",
             "description",
-            "forum_type",
           ];
           forumFields.forEach((key) => {
             if (formData[key] !== editingItem[key]) {
@@ -2120,16 +1763,15 @@ export default function AdminPanel() {
             }).unwrap();
           }
         } else {
-          await createForum({
+          await createForum(buildAdminForumCreatePayload({
             name: formData.name,
             author_name: formData.author_name,
             description: formData.description,
-            forum_type: formData.forum_type,
             thumbnail:
               formData.thumbnail instanceof File
                 ? formData.thumbnail
                 : undefined,
-          }).unwrap();
+          })).unwrap();
         }
       } else if (activeTab === "articles") {
         const articlePayload: Partial<CreateArticleRequest> = {};
@@ -2302,65 +1944,10 @@ export default function AdminPanel() {
       }
 
       setIsModalOpen(false);
+      setShowMemberPassword(false);
       setFormData({});
       setSelectedFiles([]);
       setRemovedFileUrls([]);
-      notifySuccess();
-    } catch (err) {
-      notifyError(err);
-    }
-  };
-
-  const handleSetForumPermission = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!permissionData.forumIds.length) {
-      notifySelectAtLeastOne(translate("common.forums"));
-      return;
-    }
-
-    if (!permissionData.roleIds.length) {
-      notifySelectAtLeastOne(translate("adminPanelPage.rolesLabel"));
-      return;
-    }
-
-    try {
-      await setForumPermission({
-        forum_id: permissionData.forumIds,
-        role_id: permissionData.roleIds,
-        can_read: permissionData.canRead,
-        can_post: permissionData.canPost,
-      }).unwrap();
-
-      setIsPermissionModalOpen(false);
-      notifySuccess();
-    } catch (err) {
-      notifyError(err);
-    }
-  };
-
-  const handleSetTrainingPermission = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!trainingPermissionData.trainingIds.length) {
-      notifySelectAtLeastOne(translate("common.training"));
-      return;
-    }
-
-    if (!trainingPermissionData.roleIds.length) {
-      notifySelectAtLeastOne(translate("adminPanelPage.rolesLabel"));
-      return;
-    }
-
-    try {
-      await setTrainingPermission({
-        training_id: trainingPermissionData.trainingIds,
-        role_id: trainingPermissionData.roleIds,
-        can_read: trainingPermissionData.canRead,
-        can_write: trainingPermissionData.canWrite,
-      }).unwrap();
-
-      setIsTrainingPermissionModalOpen(false);
       notifySuccess();
     } catch (err) {
       notifyError(err);
@@ -2422,7 +2009,6 @@ export default function AdminPanel() {
 
       if (selectedRoleId === roleToDelete.id) {
         setSelectedRoleId(null);
-        setPermissionDrafts({});
       }
 
       setRoleToDelete(null);
@@ -2430,102 +2016,6 @@ export default function AdminPanel() {
       setEditingRole((current) =>
         current?.id === roleToDelete.id ? null : current,
       );
-      notifySuccess();
-    } catch (err) {
-      notifyError(err);
-    }
-  };
-
-  const handlePermissionToggle = (
-    feature: string,
-    field: PermissionToggleField,
-    value: boolean,
-  ) => {
-    setPermissionDrafts((prev) => ({
-      ...prev,
-      [feature]: {
-        ...prev[feature],
-        [field]: value,
-      },
-    }));
-  };
-
-  const handleMemberPermissionToggle = (
-    feature: string,
-    field: PermissionToggleField,
-    value: boolean,
-  ) => {
-    setMemberPermissionDrafts((prev) => ({
-      ...prev,
-      [feature]: {
-        ...prev[feature],
-        [field]: value,
-      },
-    }));
-  };
-
-  const handleSaveRolePermission = async (feature: RolePermissionFeature) => {
-    const permission = permissionDrafts[feature];
-    if (!permission || !selectedRoleId) {
-      return;
-    }
-
-    try {
-      if (permission.id) {
-        await updateUserPermission({
-          id: permission.id,
-          role_id: selectedRoleId,
-          can_view: permission.can_view,
-          can_create: permission.can_create,
-          can_edit: permission.can_edit,
-          can_delete: permission.can_delete,
-        }).unwrap();
-      } else {
-        await createUserPermission({
-          role_id: selectedRoleId,
-          feature: permission.feature,
-          can_view: permission.can_view,
-          can_create: permission.can_create,
-          can_edit: permission.can_edit,
-          can_delete: permission.can_delete,
-        }).unwrap();
-      }
-
-      await refetchRolePermissions();
-      notifySuccess();
-    } catch (err) {
-      notifyError(err);
-    }
-  };
-
-  const handleSaveMemberPermission = async (feature: RolePermissionFeature) => {
-    const permission = memberPermissionDrafts[feature];
-    if (!permission || !selectedMemberForPermissions) {
-      return;
-    }
-
-    try {
-      if (permission.id) {
-        await updateMemberPermission({
-          id: permission.id,
-          user_id: selectedMemberForPermissions.id,
-          can_view: Boolean(permission.can_view),
-          can_create: Boolean(permission.can_create),
-          can_edit: Boolean(permission.can_edit),
-          can_delete: Boolean(permission.can_delete),
-        }).unwrap();
-      } else {
-        await createMemberPermission({
-          user_id: selectedMemberForPermissions.id,
-          feature: permission.feature,
-          can_view: Boolean(permission.can_view),
-          can_create: Boolean(permission.can_create),
-          can_edit: Boolean(permission.can_edit),
-          can_delete: Boolean(permission.can_delete),
-        }).unwrap();
-      }
-
-      await refetchMemberPermissions();
       notifySuccess();
     } catch (err) {
       notifyError(err);
@@ -2615,14 +2105,15 @@ export default function AdminPanel() {
   }, [activeTab, tabs]);
 
   return (
-    <div className="w-full max-w-full min-w-0 space-y-8 overflow-x-hidden p-4 sm:p-6 lg:p-8">
-      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+    <div className="admin-page">
+      <div className="admin-content">
+      <header className="admin-page-header">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 underline decoration-primary decoration-4 underline-offset-8 uppercase">
+          <h2 className="admin-page-title text-3xl font-bold tracking-tight text-slate-900 underline decoration-primary decoration-4 underline-offset-8 uppercase">
             {translate("adminPanelPage.title")}
           </h2>
         </div>
-        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap">
+        <div className="admin-header-actions">
           {activeTab === "members" && canViewMembers && (
             <button
               onClick={handleExportUsers}
@@ -2633,24 +2124,6 @@ export default function AdminPanel() {
               {isExportingUsers
                 ? translate("adminPanelPage.submitting")
                 : translate("adminPanelPage.exportCsv")}
-            </button>
-          )}
-          {activeTab === "forums" && canEditForums && (
-            <button
-              onClick={handleOpenPermissionModal}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-900 shadow-sm transition-all active:scale-95 hover:bg-slate-50 cursor-pointer sm:w-auto"
-            >
-              <Shield className="w-4 h-4 text-primary" />
-              {translate("adminPanelPage.permission")}
-            </button>
-          )}
-          {activeTab === "trainings" && canEditTrainings && (
-            <button
-              onClick={handleOpenTrainingPermissionModal}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-900 shadow-sm transition-all active:scale-95 hover:bg-slate-50 cursor-pointer sm:w-auto"
-            >
-              <Shield className="w-4 h-4 text-primary" />
-              {translate("adminPanelPage.permission")}
             </button>
           )}
           {activeTab === "rolesPermissions" && canManageRolesPermissions && (
@@ -2685,14 +2158,15 @@ export default function AdminPanel() {
       </header>
 
       {/* Stats Quick Cards */}
-      <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+      <div className="admin-stats-grid">
         {tabs.map((tab) => (
           <button
             key={tab.id}
+            aria-pressed={activeTab === tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`p-6 rounded-2xl border transition-all flex flex-col items-center gap-3 text-center cursor-pointer ${
               activeTab === tab.id
-                ? "bg-slate-900 text-white border-slate-900 shadow-xl scale-105"
+                ? "bg-slate-900 text-white border-slate-900 shadow-xl"
                 : "bg-white text-slate-400 border-slate-200 hover:border-primary/50 grayscale hover:grayscale-0"
             }`}
           >
@@ -2714,8 +2188,8 @@ export default function AdminPanel() {
       </div>
 
       {/* Main Admin Section */}
-      <div className="w-full max-w-full min-w-0 bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden text-slate-900 min-h-[500px]">
-        <div className="flex flex-col justify-between gap-4 border-b border-slate-100 p-4 sm:p-6 lg:flex-row lg:items-center lg:p-8">
+      <div className="admin-main-panel w-full max-w-full min-w-0 bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden text-slate-900">
+        <div className="admin-section-header border-b border-slate-100">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-primary/10 text-primary-dark rounded-2xl">
               {tabs.find((t) => t.id === activeTab)?.icon &&
@@ -2763,10 +2237,11 @@ export default function AdminPanel() {
           )}
 
           {activeTab !== "settingsBackups" && (
-            <div className="relative w-full lg:w-80">
+            <div className="admin-search relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
+                aria-label={translate("adminUi.search")}
                 placeholder={translate("adminPanelPage.searchPlaceholder", {
                   entity: getTabLabel(activeTab).toLowerCase(),
                 })}
@@ -2780,8 +2255,8 @@ export default function AdminPanel() {
 
         {activeTab === "settingsBackups" ? (
           <div className="space-y-8 p-8">
-            <div className="rounded-[32px] border border-slate-200 bg-white p-8 shadow-sm">
-              <div className="mb-6 flex items-start justify-between gap-4">
+            <div className="admin-settings-panel rounded-[32px] border border-slate-200 bg-white shadow-sm">
+              <div className="admin-panel-heading">
                 <div>
                   <h3 className="flex items-center gap-2 text-xl font-black uppercase text-slate-900">
                     <Globe className="h-5 w-5 text-primary-dark" />
@@ -2798,7 +2273,7 @@ export default function AdminPanel() {
               </div>
 
               <form onSubmit={handleSaveSmtpSettings} className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="admin-fluid-grid gap-4">
                   <FormField
                     label={translate("adminPanelPage.smtpHost")}
                     value={smtpForm.host}
@@ -2847,7 +2322,7 @@ export default function AdminPanel() {
                   />
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="admin-fluid-grid gap-4">
                   <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                     <span className="text-sm font-bold text-slate-700">
                       {translate("adminPanelPage.smtpUseTls")}
@@ -2906,13 +2381,13 @@ export default function AdminPanel() {
 
               <form
                 onSubmit={handleSendSmtpTest}
-                className="mt-6 flex flex-col gap-3 rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-end"
+                className="admin-smtp-test mt-6 rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-4"
               >
                 <div className="flex-1">
-                  <label className="ml-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <label htmlFor={`${adminFieldId}-smtp-recipient`} className="ml-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
                     {translate("adminPanelPage.smtpTestRecipient")}
                   </label>
-                  <input
+                  <input id={`${adminFieldId}-smtp-recipient`}
                     type="email"
                     required
                     value={smtpTestEmail}
@@ -2957,7 +2432,7 @@ export default function AdminPanel() {
                 onSubmit={handleSaveBackupConfiguration}
                 className="space-y-4"
               >
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="admin-fluid-grid gap-4">
                   <SelectField
                     label={translate("adminPanelPage.backupFrequency")}
                     options={[
@@ -3051,7 +2526,7 @@ export default function AdminPanel() {
                   />
                 </label>
 
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="admin-fluid-grid admin-fluid-grid-three gap-3">
                   <button
                     type="submit"
                     disabled={isSavingBackupConfiguration || isLoadingBackups}
@@ -3071,16 +2546,7 @@ export default function AdminPanel() {
                       ? translate("adminPanelPage.running")
                       : translate("adminPanelPage.runBackupNow")}
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleTestBackupPermissions}
-                    disabled={isTestingBackupPermissions}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-900 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isTestingBackupPermissions
-                      ? translate("adminPanelPage.testing")
-                      : translate("adminPanelPage.testBackupPermissions")}
-                  </button>
+
                 </div>
               </form>
 
@@ -3119,7 +2585,7 @@ export default function AdminPanel() {
                     backupsData.backups.map((backup) => (
                       <div
                         key={backup.id}
-                        className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
+                        className="admin-backup-row rounded-2xl border border-slate-200 bg-white p-4"
                       >
                         <div>
                           <p className="text-sm font-bold text-slate-900">
@@ -3161,14 +2627,14 @@ export default function AdminPanel() {
             </div>
           </div>
         ) : activeTab === "rolesPermissions" ? (
-          <div className="grid gap-8 p-8 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="admin-role-directory">
             <div className="space-y-4">
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
                 <h4 className="text-sm font-black uppercase tracking-widest text-slate-900">
                   {translate("adminPanelPage.rolePermissions.rolesDirectory")}
                 </h4>
                 <p className="mt-2 text-xs font-medium text-slate-500">
-                  {translate("adminPanelPage.rolePermissions.description")}
+                  {translate("adminUi.rolesDescription")}
                 </p>
               </div>
 
@@ -3258,140 +2724,14 @@ export default function AdminPanel() {
               </div>
             </div>
 
-            <div className="space-y-6">
-              {selectedRoleId ? (
-                <>
-                  <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                          {translate(
-                            "adminPanelPage.rolePermissions.permissionsFor",
-                          )}
-                        </p>
-                        <h4 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
-                          {userRolesData.find(
-                            (role) => role.id === selectedRoleId,
-                          )?.name || ""}
-                        </h4>
-                      </div>
-                      <p className="text-xs font-medium text-slate-500">
-                        {isFetchingRolePermissions
-                          ? translate("adminPanelPage.pagination.refreshing")
-                          : translate(
-                              "adminPanelPage.rolePermissions.permissionsHint",
-                            )}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4">
-                    {ROLE_PERMISSION_FEATURES.map((feature) => {
-                      const permission = permissionDrafts[feature];
-                      const originalPermission = rolePermissionsData.find(
-                        (item) => item.feature === feature,
-                      );
-                      const isDirty =
-                        permission &&
-                        (!originalPermission ||
-                          permission.can_view !== originalPermission.can_view ||
-                          permission.can_create !==
-                            originalPermission.can_create ||
-                          permission.can_edit !== originalPermission.can_edit ||
-                          permission.can_delete !==
-                            originalPermission.can_delete);
-
-                      return (
-                        <div
-                          key={feature}
-                          className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm"
-                        >
-                          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                            <div>
-                              <h5 className="text-lg font-black uppercase tracking-tight text-slate-900">
-                                {getRolePermissionFeatureLabel(feature)}
-                              </h5>
-                              <p className="mt-1 text-xs font-medium text-slate-500">
-                                {translate(
-                                  "adminPanelPage.rolePermissions.permissionRowHint",
-                                )}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleSaveRolePermission(feature)}
-                              disabled={
-                                !permission ||
-                                !isDirty ||
-                                isCreatingUserPermission ||
-                                isUpdatingUserPermission
-                              }
-                              className="inline-flex items-center cursor-pointer justify-center rounded-2xl bg-slate-900 px-5 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white transition-all hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                            >
-                              {translate(
-                                "adminPanelPage.rolePermissions.savePermission",
-                              )}
-                            </button>
-                          </div>
-
-                          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                            {PERMISSION_ACTION_FIELDS.map(
-                              ([field, actionKey]) => (
-                                <label
-                                  key={field}
-                                  className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
-                                >
-                                  <span className="text-xs font-black uppercase tracking-wider text-slate-700">
-                                    {translate(
-                                      `adminPanelPage.rolePermissions.actions.${actionKey}`,
-                                    )}
-                                  </span>
-                                  <input
-                                    type="checkbox"
-                                    checked={Boolean(permission?.[field])}
-                                    onChange={(e) =>
-                                      handlePermissionToggle(
-                                        feature,
-                                        field,
-                                        e.target.checked,
-                                      )
-                                    }
-                                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                                  />
-                                </label>
-                              ),
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              ) : (
-                <div className="flex min-h-[320px] flex-col items-center justify-center rounded-[32px] border-2 border-dashed border-slate-200 bg-slate-50 px-6 text-center">
-                  <Shield className="mb-4 h-10 w-10 text-slate-300" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    {translate(
-                      "adminPanelPage.rolePermissions.selectRolePrompt",
-                    )}
-                  </p>
-                </div>
-              )}
-
-              {isLoadingRolePermissions && (
-                <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                  <ForumPermissionsSkeleton />
-                </div>
-              )}
-            </div>
           </div>
         ) : (
           <div className="grid min-w-0 grid-cols-1 lg:grid-cols-1 xl:grid-cols-4">
             <div className="h-full w-full min-w-0 xl:col-span-4">
               <div className="h-full w-full max-w-full min-w-0 overflow-hidden border-y border-slate-100 bg-white [contain:layout_paint]">
-                <div className="archi-scrollbar w-full max-w-full min-w-0 overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
+                <div className="admin-table-scroll archi-scrollbar w-full max-w-full min-w-0 overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]" tabIndex={0} role="region" aria-label={translate("adminUi.tableScroll")}>
                   <div className="min-w-[900px]">
-                    <table className="w-full table-fixed text-left">
+                    <table className="admin-management-table w-full table-fixed text-left">
                   <thead className="border-b border-slate-100 bg-slate-50/80">
                     <tr>
                       {/* DYNAMIC HEADERS */}
@@ -3411,6 +2751,7 @@ export default function AdminPanel() {
                                 </span>
                               </div>
                               <select
+                                aria-label={translate("adminPanelPage.table.role")}
                                 value={memberRoleFilter}
                                 onChange={(e) =>
                                   setMemberRoleFilter(e.target.value)
@@ -3439,6 +2780,7 @@ export default function AdminPanel() {
                                 </span>
                               </div>
                               <select
+                                aria-label={translate("adminPanelPage.table.status")}
                                 value={memberStatusFilter}
                                 onChange={(e) =>
                                   setMemberStatusFilter(e.target.value)
@@ -3458,14 +2800,6 @@ export default function AdminPanel() {
                                     "adminPanelPage.filters.activeCount",
                                     {
                                       count: usersData?.counts.active || 0,
-                                    },
-                                  )}
-                                </option>
-                                <option value="pending">
-                                  {translate(
-                                    "adminPanelPage.filters.pendingCount",
-                                    {
-                                      count: usersData?.counts.pending || 0,
                                     },
                                   )}
                                 </option>
@@ -3657,25 +2991,13 @@ export default function AdminPanel() {
                                 className={
                                   member.status === "active"
                                     ? "text-emerald-600"
-                                    : member.status === "pending"
-                                      ? "text-amber-500"
-                                      : "text-red-500"
+                                    : member.status === "suspended"
+                                      ? "text-red-500"
+                                      : "text-slate-400"
                                 }
                               >
                                 {getMemberStatusLabel(member.status)}
                               </span>
-                              {member.status === "pending" && (
-                                <button
-                                  onClick={() => handleValidateUser(member.id)}
-                                  disabled={isValidatingUser}
-                                  className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all cursor-pointer duration-300 disabled:opacity-50 group/approve"
-                                  title={translate(
-                                    "adminPanelPage.approveMember",
-                                  )}
-                                >
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
                             </span>
                           </td>
                           <td className={`${adminTableCellClass} text-right`}>
@@ -3708,9 +3030,6 @@ export default function AdminPanel() {
                                 member.status === "suspended"
                                   ? "restore"
                                   : "archive"
-                              }
-                              onManagePermissions={() =>
-                                handleOpenMemberPermissionsModal(member)
                               }
                             />
                           </td>
@@ -3817,8 +3136,8 @@ export default function AdminPanel() {
                             <td className={`${adminTableCellClass} text-right`}>
                               <Actions
                                 onView={() => handleViewItem(article)}
-                                onEdit={() => handleOpenModal(article)}
-                                onDelete={() => confirmDelete(article.id)}
+                                onEdit={canModify(article, "edit") ? () => handleOpenModal(article) : undefined}
+                                onDelete={canModify(article, "delete") ? () => confirmDelete(article.id) : undefined}
                                 onPublish={
                                   article.status !== "published"
                                     ? () => handlePublishArticle(article.id)
@@ -4372,6 +3691,8 @@ export default function AdminPanel() {
         )}
       </div>
 
+      </div>
+
       <Modal
         isOpen={isRoleModalOpen}
         onClose={() => {
@@ -4384,9 +3705,22 @@ export default function AdminPanel() {
             ? translate("adminPanelPage.rolePermissions.updateRole")
             : translate("adminPanelPage.rolePermissions.createRole")
         }
-        maxWidth="max-w-4xl"
-      >
+        className="batch-four-modal"
+        layout={"compact"}
+        maxWidth="max-w-md"
+        footer={(<ModalSubmitButton
+          formId="admin-role-form"
+          disabled={isCreatingUserRole || isUpdatingUserRole}
+          className="w-full py-3 bg-slate-900 text-white rounded-2xl font-black text-xs hover:bg-slate-800 disabled:bg-slate-400 disabled:cursor-not-allowed transition-all shadow-xl uppercase tracking-[0.2em] flex items-center justify-center gap-3 cursor-pointer"
+        >
+          {isCreatingUserRole || isUpdatingUserRole
+            ? translate("adminPanelPage.submitting")
+            : editingRole
+              ? translate("adminPanelPage.rolePermissions.updateRole")
+              : translate("adminPanelPage.rolePermissions.createRole")}
+        </ModalSubmitButton>)}>
         <form
+          id="admin-role-form"
           noValidate
           onSubmit={handleSaveRole}
           className="space-y-5 text-left"
@@ -4399,10 +3733,10 @@ export default function AdminPanel() {
             }
           />
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+            <label htmlFor={`${adminFieldId}-role-description`} className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
               {translate("adminPanelPage.rolePermissions.roleDescription")}
             </label>
-            <textarea
+            <textarea id={`${adminFieldId}-role-description`}
               value={newRoleData.description}
               onChange={(e) =>
                 setNewRoleData((prev) => ({
@@ -4414,22 +3748,11 @@ export default function AdminPanel() {
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition-all focus:ring-4 focus:ring-primary/10"
             />
           </div>
-          <button
-            type="submit"
-            disabled={isCreatingUserRole || isUpdatingUserRole}
-            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs hover:bg-slate-800 disabled:bg-slate-400 disabled:cursor-not-allowed transition-all mt-6 shadow-xl uppercase tracking-[0.2em] flex items-center justify-center gap-3 cursor-pointer"
-          >
-            {isCreatingUserRole || isUpdatingUserRole
-              ? translate("adminPanelPage.submitting")
-              : editingRole
-                ? translate("adminPanelPage.rolePermissions.updateRole")
-                : translate("adminPanelPage.rolePermissions.createRole")}
-          </button>
         </form>
       </Modal>
 
-      <div className="rounded-[32px] border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="admin-log-panel rounded-[32px] border border-slate-200 bg-white shadow-sm">
+        <div className="admin-log-heading">
           <div>
             <h3 className="flex items-center gap-2 text-xl font-black uppercase text-slate-900">
               <FileIcon className="h-5 w-5 text-primary-dark" />
@@ -4442,11 +3765,12 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="admin-log-toolbar">
           <input
             type="text"
             value={systemLogSearchTerm}
             onChange={(e) => setSystemLogSearchTerm(e.target.value)}
+            aria-label={translate("adminPanelPage.filterLogs")}
             placeholder={translate("adminPanelPage.filterLogs")}
             className="h-10 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-700 outline-none transition-all focus:ring-4 focus:ring-primary/10 sm:min-w-0 sm:flex-1"
           />
@@ -4472,7 +3796,7 @@ export default function AdminPanel() {
           </button>
         </div>
 
-        <div className="min-h-[260px] rounded-[28px] bg-slate-950 p-5 font-mono text-[11px] text-slate-200 shadow-inner">
+        <div className="admin-log-output min-h-[260px] rounded-[28px] bg-slate-950 p-5 font-mono text-[11px] text-slate-200 shadow-inner" tabIndex={0} role="region" aria-label={translate("adminPanelPage.systemLogs")}>
           {isInitialSystemLogsLoading ? (
             <div className="space-y-3">
               {[1, 2, 3, 4, 5].map((item) => (
@@ -4487,7 +3811,7 @@ export default function AdminPanel() {
               {systemLogLines.map((line, index) => (
                 <p
                   key={`${line}-${index}`}
-                  className="break-all text-slate-300"
+                  className="admin-log-line text-slate-300"
                 >
                   {line}
                 </p>
@@ -4519,9 +3843,11 @@ export default function AdminPanel() {
 
       {/* COMPREHENSIVE MODAL FOR ALL ENTITIES */}
       <Modal
-        isOpen={isModalOpen}
+        isOpen={isModalOpen && (activeTab !== "articles" || (editingItem ? canModify(articleDetail ?? editingItem, "edit") && !isErrorArticle : canCreateArticles))}
         onClose={() => {
           setIsModalOpen(false);
+          setShowMemberPassword(false);
+          setFormData((current: any) => ({ ...current, password: "" }));
           setEditingItem(null);
           setSelectedFiles([]);
           setRemovedFileUrls([]);
@@ -4529,15 +3855,73 @@ export default function AdminPanel() {
         title={
           editingItem
             ? translate("adminPanelPage.modal.editTitle", {
-                entity: getTabLabel(activeTab),
-              })
+              entity: getTabLabel(activeTab),
+            })
             : translate("adminPanelPage.modal.createTitle", {
-                entity: getTabLabel(activeTab),
-              })
+              entity: getTabLabel(activeTab),
+            })
         }
-        maxWidth="max-w-4xl"
-      >
+        className="batch-four-modal"
+        layout={["articles", "technicopro", "trainings"].includes(activeTab) ? "sectioned" : "compact"}
+        footer={(<ModalSubmitButton
+          formId="admin-entity-form"
+          disabled={
+            isCreatingMember ||
+            isUpdatingMember ||
+            isCreatingForum ||
+            isUpdatingForum ||
+            isCreatingArticle ||
+            isUpdatingArticle ||
+            isCreatingTechnicoPro ||
+            isUpdatingTechnicoPro ||
+            isCreatingEvent ||
+            isUpdatingEvent ||
+            isCreatingTraining ||
+            isUpdatingTraining
+          }
+          className="w-full py-3 bg-slate-900 text-white rounded-2xl font-black text-xs hover:bg-slate-800 disabled:bg-slate-400 disabled:cursor-not-allowed transition-all shadow-xl uppercase tracking-[0.2em] flex items-center justify-center gap-3 group cursor-pointer"
+        >
+          {isCreatingMember ||
+            isUpdatingMember ||
+            isCreatingForum ||
+            isUpdatingForum ||
+            isCreatingArticle ||
+            isUpdatingArticle ||
+            isCreatingTechnicoPro ||
+            isUpdatingTechnicoPro ||
+            isCreatingEvent ||
+            isUpdatingEvent ||
+            isCreatingTraining ||
+            isUpdatingTraining ? (
+            editingItem ? (
+              <Edit2 className="w-4 h-4 text-primary" />
+            ) : (
+              <Plus className="w-4 h-4 text-primary" />
+            )
+          ) : editingItem ? (
+            <Edit2 className="w-4 h-4 text-primary" />
+          ) : (
+            <Plus className="w-4 h-4 text-primary" />
+          )}
+          {isCreatingMember ||
+            isUpdatingMember ||
+            isCreatingForum ||
+            isUpdatingForum ||
+            isCreatingArticle ||
+            isUpdatingArticle ||
+            isCreatingTechnicoPro ||
+            isUpdatingTechnicoPro ||
+            isCreatingEvent ||
+            isUpdatingEvent ||
+            isCreatingTraining ||
+            isUpdatingTraining
+            ? translate("adminPanelPage.submitting")
+            : editingItem
+              ? translate("adminPanelPage.submitEdit")
+              : translate("adminPanelPage.submitCreate")}
+        </ModalSubmitButton>)}>
         <form
+          id="admin-entity-form"
           noValidate
           onSubmit={handleSubmit}
           className="space-y-5 text-left"
@@ -4545,112 +3929,168 @@ export default function AdminPanel() {
           {/* MEMBER FORM */}
           {activeTab === "members" && (
             <>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label={translate("adminPanelPage.form.firstName")}
-                  value={formData.first_name || ""}
-                  onChange={(val) =>
-                    setFormData({ ...formData, first_name: val })
-                  }
-                />
-                <FormField
-                  label={translate("adminPanelPage.form.lastName")}
-                  value={formData.last_name || ""}
-                  onChange={(val) =>
-                    setFormData({ ...formData, last_name: val })
-                  }
-                />
-              </div>
-              <FormField
-                label={translate("adminPanelPage.form.email")}
-                type="email"
-                autoComplete="off"
-                value={formData.email || ""}
-                onChange={(val) => setFormData({ ...formData, email: val })}
-              />
-              {!editingItem && (
-                <FormField
-                  label={translate("adminPanelPage.form.password")}
-                  type="password"
-                  autoComplete="new-password"
-                  value={formData.password || ""}
-                  onChange={(val) =>
-                    setFormData({ ...formData, password: val })
-                  }
-                  minLength={8}
-                />
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label={translate("adminPanelPage.form.phoneOptional")}
-                  value={formData.phone || ""}
-                  onChange={(val) => setFormData({ ...formData, phone: val })}
-                  required={false}
-                />
-                <FormField
-                  label={translate("adminPanelPage.form.mobileOptional")}
-                  value={formData.mobile || ""}
-                  onChange={(val) => setFormData({ ...formData, mobile: val })}
-                  required={false}
-                />
-              </div>
-              <FormField
-                label={translate("adminPanelPage.form.city")}
-                value={formData.city || ""}
-                onChange={(val) => setFormData({ ...formData, city: val })}
-                required={false}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label={translate("adminPanelPage.form.society")}
-                  value={formData.society || ""}
-                  onChange={(val) => setFormData({ ...formData, society: val })}
-                  required={false}
-                />
-                <FormField
-                  label={translate("adminPanelPage.form.department")}
-                  value={formData.department || ""}
-                  onChange={(val) =>
-                    setFormData({ ...formData, department: val })
-                  }
-                  required={false}
-                />
-              </div>
-              <FormField
-                label={translate("adminPanelPage.form.address")}
-                value={formData.address || ""}
-                onChange={(val) => setFormData({ ...formData, address: val })}
-                required={false}
-              />
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                  {translate("adminPanelPage.form.profilePhoto")}
-                </label>
-                <div className="grid items-stretch gap-4 md:grid-cols-[minmax(0,1.35fr)_280px]">
-                  <FileUploadDropzone
-                    inputId="admin-member-avatar"
-                    accept="image/*"
-                    multiple={false}
-                    title={translate("adminPanelPage.form.profilePhoto")}
-                    className="h-full md:min-h-[336px]"
-                    selectedLabel={
-                      formData.avatar
-                        ? formData.avatar.name
-                        : formData.avatar_url
-                          ? translate("memberDirectory.replaceProfilePhoto")
-                          : undefined
-                    }
-                    hint="PNG, JPG, WEBP"
-                    onFilesSelected={(files) =>
-                      setFormData({
-                        ...formData,
-                        avatar: files[0] || null,
-                      })
+              <ModalSection title={translate("modalBatchFour.personalInformation")}>
+                <ModalFieldGrid>
+                  <FormField
+                    label={translate("adminPanelPage.form.firstName")}
+                    value={formData.first_name || ""}
+                    onChange={(val) =>
+                      setFormData({ ...formData, first_name: val })
                     }
                   />
-                  <div className="flex h-full w-full max-w-[280px] justify-self-center md:max-w-none md:justify-self-auto">
+                  <FormField
+                    label={translate("adminPanelPage.form.lastName")}
+                    value={formData.last_name || ""}
+                    onChange={(val) =>
+                      setFormData({ ...formData, last_name: val })
+                    }
+                  />
+                  <FormField
+                    label={translate("adminPanelPage.form.email")}
+                    type="email"
+                    autoComplete="off"
+                    value={formData.email || ""}
+                    onChange={(val) => setFormData({ ...formData, email: val })}
+                  />
+                  {!editingItem && (
+                    <AdminPasswordField
+                    id={`${adminFieldId}-member-password`}
+                      label={translate("adminPanelPage.form.password")}
+                      value={formData.password || ""}
+                      onChange={(val) =>
+                        setFormData({ ...formData, password: val })
+                      }
+                      visible={showMemberPassword}
+                      onToggle={() => setShowMemberPassword((visible) => !visible)}
+                      showLabel={translate("memberDirectory.showPassword")}
+                      hideLabel={translate("memberDirectory.hidePassword")}
+                    />
+                  )}
+                  <FormField
+                    label={translate("adminPanelPage.form.phoneOptional")}
+                    value={formData.phone || ""}
+                    onChange={(val) => setFormData({ ...formData, phone: val })}
+                    required={false}
+                  />
+                  <FormField
+                    label={translate("adminPanelPage.form.mobileOptional")}
+                    value={formData.mobile || ""}
+                    onChange={(val) => setFormData({ ...formData, mobile: val })}
+                    required={false}
+                  />
+                </ModalFieldGrid>
+              </ModalSection>
+              <ModalSection title={translate("modalBatchFour.organizationLocation")}>
+                <ModalFieldGrid>
+                  <FormField
+                    label={translate("adminPanelPage.form.city")}
+                    value={formData.city || ""}
+                    onChange={(val) => setFormData({ ...formData, city: val })}
+                    required={false}
+                  />
+                  <FormField
+                    label={translate("adminPanelPage.form.society")}
+                    value={formData.society || ""}
+                    onChange={(val) => setFormData({ ...formData, society: val })}
+                    required={false}
+                  />
+                  <FormField
+                    label={translate("adminPanelPage.form.department")}
+                    value={formData.department || ""}
+                    onChange={(val) =>
+                      setFormData({ ...formData, department: val })
+                    }
+                    required={false}
+                  />
+                  <ModalFullWidth>
+                    <FormField
+                      label={translate("adminPanelPage.form.address")}
+                      value={formData.address || ""}
+                      onChange={(val) => setFormData({ ...formData, address: val })}
+                      required={false}
+                    />
+                  </ModalFullWidth>
+                </ModalFieldGrid>
+              </ModalSection>
+              <ModalSection title={translate("modalBatchFour.accountInformation")}>
+                <ModalFieldGrid>
+                  <SelectField
+                    label={translate("adminPanelPage.form.role")}
+                    options={userRolesData.map((role) => ({
+                      label: role.name,
+                      value: role.id,
+                    }))}
+                    value={formData.role_id || ""}
+                    onChange={(val) => setFormData({ ...formData, role_id: val })}
+                  />
+                  <SelectField
+                    label={translate("adminPanelPage.form.status")}
+                    options={[
+                      {
+                        label: translate("adminPanelPage.memberStatuses.active"),
+                        value: "active",
+                      },
+                      {
+                        label: translate(
+                          "adminPanelPage.memberStatuses.suspended",
+                        ),
+                        value: "suspended",
+                      },
+                    ]}
+                    value={formData.status}
+                    onChange={(val) => setFormData({ ...formData, status: val })}
+                  />
+                  <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <input
+                      type="checkbox"
+                      id={`${adminFieldId}-is_payment_validated`}
+                      className="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
+                      checked={formData.is_payment_validated || false}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          is_payment_validated: e.target.checked,
+                        })
+                      }
+                    />
+                    <label
+                      htmlFor={`${adminFieldId}-is_payment_validated`}
+                      className="text-xs font-bold text-slate-700 uppercase tracking-widest cursor-pointer"
+                    >
+                      {translate("adminPanelPage.form.paymentValidated")}
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <input
+                      type="checkbox"
+                      id={`${adminFieldId}-is_superuser`}
+                      className="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
+                      checked={formData.is_superuser || false}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          is_superuser: e.target.checked,
+                        })
+                      }
+                    />
+                    <label
+                      htmlFor={`${adminFieldId}-is_superuser`}
+                      className="text-xs font-bold text-slate-700 uppercase tracking-widest cursor-pointer"
+                    >
+                      {translate("adminPanelPage.memberDetails.superuser")}
+                    </label>
+                  </div>
+                </ModalFieldGrid>
+              </ModalSection>
+              <ModalSection title={translate("memberDirectory.profilePhoto")}>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                    {translate("adminPanelPage.form.profilePhoto")}
+                  </label>
+                  <ModalMediaSplit preview={<>
                     {formData.avatar_url || formData.avatar ? (
                       <FilePreviewCard
+                        presentation="compact"
                         file={formData.avatar}
                         url={formData.avatar_url}
                         name={
@@ -4658,18 +4098,16 @@ export default function AdminPanel() {
                           translate("adminPanelPage.form.profilePhoto")
                         }
                         subtitle={translate("adminPanelPage.form.profilePhoto")}
-                        className="h-full w-full"
                         onRemove={
                           formData.avatar
                             ? () => setFormData({ ...formData, avatar: null })
                             : undefined
                         }
-                        aspectClassName="aspect-square"
-                        mediaShapeClassName="rounded-full"
+
                       />
                     ) : (
-                      <div className="flex h-full min-h-[336px] w-full items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-6">
-                        <div className="flex h-28 w-28 items-center justify-center rounded-full bg-white text-3xl font-bold text-slate-400 shadow-sm">
+                      <div className="batch-four-empty">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-sm font-bold text-slate-400 shadow-sm">
                           {(
                             formData.first_name?.[0] ||
                             formData.email?.[0] ||
@@ -4678,277 +4116,194 @@ export default function AdminPanel() {
                         </div>
                       </div>
                     )}
-                  </div>
+                  </>}>
+                    <FileUploadDropzone
+                      presentation="compact"
+                      inputId="admin-member-avatar"
+                      accept="image/*"
+                      multiple={false}
+                      title={translate("adminPanelPage.form.profilePhoto")}
+                      selectedLabel={
+                        formData.avatar
+                          ? formData.avatar.name
+                          : formData.avatar_url
+                            ? translate("memberDirectory.replaceProfilePhoto")
+                            : undefined
+                      }
+                      hint="PNG, JPG, WEBP"
+                      onFilesSelected={(files) =>
+                        setFormData({
+                          ...formData,
+                          avatar: files[0] || null,
+                        })
+                      }
+                    />
+                  </ModalMediaSplit>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <SelectField
-                  label={translate("adminPanelPage.form.role")}
-                  options={userRolesData.map((role) => ({
-                    label: role.name,
-                    value: role.id,
-                  }))}
-                  value={formData.role_id || ""}
-                  onChange={(val) => setFormData({ ...formData, role_id: val })}
-                />
-                <SelectField
-                  label={translate("adminPanelPage.form.status")}
-                  options={[
-                    {
-                      label: translate("adminPanelPage.memberStatuses.active"),
-                      value: "active",
-                    },
-                    {
-                      label: translate("adminPanelPage.memberStatuses.pending"),
-                      value: "pending",
-                    },
-                    {
-                      label: translate(
-                        "adminPanelPage.memberStatuses.suspended",
-                      ),
-                      value: "suspended",
-                    },
-                  ]}
-                  value={formData.status}
-                  onChange={(val) => setFormData({ ...formData, status: val })}
-                />
-              </div>
-              <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <input
-                  type="checkbox"
-                  id="is_payment_validated"
-                  className="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
-                  checked={formData.is_payment_validated || false}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      is_payment_validated: e.target.checked,
-                    })
-                  }
-                />
-                <label
-                  htmlFor="is_payment_validated"
-                  className="text-xs font-bold text-slate-700 uppercase tracking-widest cursor-pointer"
-                >
-                  {translate("adminPanelPage.form.paymentValidated")}
-                </label>
-              </div>
-              <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <input
-                  type="checkbox"
-                  id="is_superuser"
-                  className="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
-                  checked={formData.is_superuser || false}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      is_superuser: e.target.checked,
-                    })
-                  }
-                />
-                <label
-                  htmlFor="is_superuser"
-                  className="text-xs font-bold text-slate-700 uppercase tracking-widest cursor-pointer"
-                >
-                  {translate("adminPanelPage.memberDetails.superuser")}
-                </label>
-              </div>
+              </ModalSection>
             </>
           )}
-
           {/* FORUM FORM */}
           {activeTab === "forums" && (
             <>
-              <FormField
-                label={translate("adminPanelPage.form.forumName")}
-                value={formData.name || ""}
-                onChange={(val) => setFormData({ ...formData, name: val })}
-              />
-              <FormField
-                label={translate("adminPanelPage.form.responsibleAuthor")}
-                value={formData.author_name || ""}
-                onChange={(val) =>
-                  setFormData({ ...formData, author_name: val })
-                }
-                required={false}
-              />
-              <SelectField
-                label={translate("adminPanelPage.form.forumType")}
-                options={[
-                  {
-                    label: translate("adminPanelPage.forumTypes.general"),
-                    value: "general",
-                  },
-                  {
-                    label: translate("adminPanelPage.forumTypes.professional"),
-                    value: "professional",
-                  },
-                  {
-                    label: translate("adminPanelPage.forumTypes.commission"),
-                    value: "commission",
-                  },
-                ]}
-                value={formData.forum_type}
-                onChange={(val) =>
-                  setFormData({ ...formData, forum_type: val })
-                }
-              />
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                  {translate("adminPanelPage.form.descriptionOptional")}
-                </label>
-                <TiptapEditor
-                  content={formData.description || ""}
-                  onChange={(content) =>
-                    setFormData({ ...formData, description: content })
-                  }
-                  placeholder={translate(
-                    "adminPanelPage.placeholders.forumDescription",
-                  )}
-                  onImageUpload={handleImageUpload}
+              <ModalFieldGrid>
+                <FormField
+                  label={translate("adminPanelPage.form.forumName")}
+                  value={formData.name || ""}
+                  onChange={(val) => setFormData({ ...formData, name: val })}
                 />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                  {translate("articlesPage.thumbnailLabel")}
-                </label>
-                <div className="grid items-stretch gap-4 md:grid-cols-[minmax(0,1.35fr)_280px]">
-                  <FileUploadDropzone
-                    inputId="admin-forum-thumbnail"
-                    accept="image/*"
-                    multiple={false}
-                    title={translate("forumsPage.uploadThumbnail")}
-                    className="h-full md:min-h-[336px]"
-                    selectedLabel={
-                      formData.thumbnail
-                        ? formData.thumbnail.name
-                        : formData.thumbnail_url
-                          ? translate("forumsPage.replaceThumbnail")
-                          : undefined
-                    }
-                    hint={translate("articlesPage.thumbnailHelp")}
-                    onFilesSelected={(files) =>
-                      setFormData({
-                        ...formData,
-                        thumbnail: files[0] || null,
-                      })
-                    }
-                  />
-                  <div className="flex h-full w-full max-w-[280px] justify-self-center md:max-w-none md:justify-self-auto">
-                    {formData.thumbnail_url || formData.thumbnail ? (
-                      <FilePreviewCard
-                        file={formData.thumbnail}
-                        url={formData.thumbnail_url}
-                        name={
-                          formData.thumbnail?.name ||
-                          getLastPathSegment(formData.thumbnail_url || "") ||
-                          translate("forumsPage.forumThumbnail")
-                        }
-                        subtitle={
-                          formData.thumbnail
-                            ? null
-                            : translate("forumsPage.openFile")
-                        }
-                        className="h-full w-full"
-                        onRemove={
-                          formData.thumbnail
-                            ? () =>
+                <FormField
+                  label={translate("adminPanelPage.form.responsibleAuthor")}
+                  value={formData.author_name || ""}
+                  onChange={(val) =>
+                    setFormData({ ...formData, author_name: val })
+                  }
+                  required={false}
+                />
+                <ModalFullWidth>
+                  <div className="space-y-2">
+                    <label id={`${adminFieldId}-forum-content`} className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      {translate("adminPanelPage.form.descriptionOptional")}
+                    </label>
+                    <TiptapEditor
+                      ariaLabelledBy={`${adminFieldId}-forum-content`}
+                      content={formData.description || ""}
+                      onChange={(content) =>
+                        setFormData({ ...formData, description: content })
+                      }
+                      placeholder={translate(
+                        "adminPanelPage.placeholders.forumDescription",
+                      )}
+                      onImageUpload={handleImageUpload}
+                    />
+                  </div>
+                </ModalFullWidth>
+                <ModalFullWidth>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      {translate("articlesPage.thumbnailLabel")}
+                    </label>
+                    <ModalMediaSplit preview={<>
+                      {formData.thumbnail_url || formData.thumbnail ? (
+                        <FilePreviewCard
+                          presentation="compact"
+                          file={formData.thumbnail}
+                          url={formData.thumbnail_url}
+                          name={
+                            formData.thumbnail?.name ||
+                            getLastPathSegment(formData.thumbnail_url || "") ||
+                            translate("forumsPage.forumThumbnail")
+                          }
+                          subtitle={
+                            formData.thumbnail
+                              ? null
+                              : translate("forumsPage.openFile")
+                          }
+                          onRemove={
+                            formData.thumbnail
+                              ? () =>
                                 setFormData({
                                   ...formData,
                                   thumbnail: null,
                                 })
-                            : undefined
-                        }
-                        aspectClassName="aspect-square"
-                      />
-                    ) : (
-                      <div className="flex h-full min-h-[336px] w-full items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-6">
-                        <div className="flex h-28 w-28 items-center justify-center rounded-full bg-white text-center text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 shadow-sm">
-                          {translate("articlesPage.thumbnailLabel")}
+                              : undefined
+                          }
+                        />
+                      ) : (
+                        <div className="batch-four-empty">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-center text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 shadow-sm">
+                            {translate("articlesPage.thumbnailLabel")}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </>}>
+                      <FileUploadDropzone
+                        presentation="compact"
+                        inputId="admin-forum-thumbnail"
+                        accept="image/*"
+                        multiple={false}
+                        title={translate("forumsPage.uploadThumbnail")}
+                        selectedLabel={
+                          formData.thumbnail
+                            ? formData.thumbnail.name
+                            : formData.thumbnail_url
+                              ? translate("forumsPage.replaceThumbnail")
+                              : undefined
+                        }
+                        hint={translate("articlesPage.thumbnailHelp")}
+                        onFilesSelected={(files) =>
+                          setFormData({
+                            ...formData,
+                            thumbnail: files[0] || null,
+                          })
+                        }
+                      />
+                    </ModalMediaSplit>
                   </div>
-                </div>
-              </div>
+                </ModalFullWidth>
+              </ModalFieldGrid>
             </>
           )}
-
           {/* ARTICLE / TECHNICOPRO FORM */}
           {(activeTab === "articles" || activeTab === "technicopro") && (
             <>
-              <FormField
-                label={translate("adminPanelPage.form.articleTitle")}
-                value={formData.title || ""}
-                onChange={(val) => setFormData({ ...formData, title: val })}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <SelectField
-                  label={translate("adminPanelPage.form.category")}
-                  options={
-                    (activeTab === "technicopro"
-                      ? technicoproCategories
-                      : articleCategories || []
-                    ).map((c) => ({
-                      label: c.name,
-                      value: c.id,
-                    }))
-                  }
-                  value={formData.category_id}
-                  onChange={(val) =>
-                    setFormData({ ...formData, category_id: val })
-                  }
+              <ModalSection title={translate("modalBatchOne.basicInformation")}>
+                <FormField
+                  label={translate("adminPanelPage.form.articleTitle")}
+                  value={formData.title || ""}
+                  onChange={(val) => setFormData({ ...formData, title: val })}
                 />
-              </div>
-              <FormField
-                label={translate("adminPanelPage.form.excerpt")}
-                value={formData.excerpt || ""}
-                onChange={(val) => setFormData({ ...formData, excerpt: val })}
-              />
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                  {translate("adminPanelPage.form.contentRichText")}
-                </label>
-                <TiptapEditor
-                  content={formData.body || ""}
-                  onChange={(content) =>
-                    setFormData({ ...formData, body: content })
-                  }
-                  placeholder={translate(
-                    "adminPanelPage.placeholders.articleContent",
-                  )}
-                  onImageUpload={handleImageUpload}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                  {translate("articlesPage.thumbnailLabel")}
-                </label>
-                <div className="grid items-stretch gap-4 md:grid-cols-[minmax(0,1.35fr)_280px]">
-                  <FileUploadDropzone
-                    inputId="admin-article-thumbnail"
-                    accept="image/*"
-                    multiple={false}
-                    title={translate("articlesPage.uploadThumbnail")}
-                    className="h-full md:min-h-[336px]"
-                    selectedLabel={
-                      formData.thumbnail
-                        ? formData.thumbnail.name
-                        : formData.thumbnail_url
-                          ? translate("articlesPage.replaceThumbnail")
-                          : undefined
+                <ModalFieldGrid>
+                  <SelectField
+                    label={translate("adminPanelPage.form.category")}
+                    options={
+                      (activeTab === "technicopro"
+                        ? technicoproCategories
+                        : articleCategories || []
+                      ).map((c) => ({
+                        label: c.name,
+                        value: c.id,
+                      }))
                     }
-                    hint={translate("articlesPage.thumbnailHelp")}
-                    onFilesSelected={(files) =>
-                      setFormData({
-                        ...formData,
-                        thumbnail: files[0] || null,
-                      })
+                    value={formData.category_id}
+                    onChange={(val) =>
+                      setFormData({ ...formData, category_id: val })
                     }
                   />
-                  <div className="flex h-full w-full max-w-[280px] justify-self-center md:max-w-none md:justify-self-auto">
+                </ModalFieldGrid>
+                <FormField
+                  label={translate("adminPanelPage.form.excerpt")}
+                  value={formData.excerpt || ""}
+                  onChange={(val) => setFormData({ ...formData, excerpt: val })}
+                />
+              </ModalSection>
+              <ModalSection title={translate("adminPanelPage.form.contentRichText")}>
+                <div className="space-y-2">
+                  <label id={`${adminFieldId}-article-content`} className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                    {translate("adminPanelPage.form.contentRichText")}
+                  </label>
+                  <TiptapEditor
+                    ariaLabelledBy={`${adminFieldId}-article-content`}
+                    content={formData.body || ""}
+                    onChange={(content) =>
+                      setFormData({ ...formData, body: content })
+                    }
+                    placeholder={translate(
+                      "adminPanelPage.placeholders.articleContent",
+                    )}
+                    onImageUpload={handleImageUpload}
+                  />
+                </div>
+              </ModalSection>
+              <ModalSection title={translate("modalBatchOne.mediaAttachments")}>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                    {translate("articlesPage.thumbnailLabel")}
+                  </label>
+                  <ModalMediaSplit preview={<>
                     {formData.thumbnail_url || formData.thumbnail ? (
                       <FilePreviewCard
+                        presentation="compact"
                         file={formData.thumbnail}
                         url={formData.thumbnail_url}
                         name={
@@ -4961,126 +4316,146 @@ export default function AdminPanel() {
                             ? null
                             : translate("articlesPage.viewDocument")
                         }
-                        className="h-full w-full"
                         onRemove={
                           formData.thumbnail
                             ? () =>
-                                setFormData({ ...formData, thumbnail: null })
+                              setFormData({ ...formData, thumbnail: null })
                             : undefined
                         }
-                        aspectClassName="aspect-square"
                       />
                     ) : (
-                      <div className="flex h-full min-h-[336px] w-full items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-6">
-                        <div className="flex h-28 w-28 items-center justify-center rounded-full bg-white text-center text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 shadow-sm">
+                      <div className="batch-four-empty">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-center text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 shadow-sm">
                           {translate("articlesPage.thumbnailLabel")}
                         </div>
                       </div>
                     )}
-                  </div>
+                  </>}>
+                    <FileUploadDropzone
+                      presentation="compact"
+                      inputId="admin-article-thumbnail"
+                      accept="image/*"
+                      multiple={false}
+                      title={translate("articlesPage.uploadThumbnail")}
+                      selectedLabel={
+                        formData.thumbnail
+                          ? formData.thumbnail.name
+                          : formData.thumbnail_url
+                            ? translate("articlesPage.replaceThumbnail")
+                            : undefined
+                      }
+                      hint={translate("articlesPage.thumbnailHelp")}
+                      onFilesSelected={(files) =>
+                        setFormData({
+                          ...formData,
+                          thumbnail: files[0] || null,
+                        })
+                      }
+                    />
+                  </ModalMediaSplit>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                  {translate("adminPanelPage.form.attachmentsArticle")}
-                </label>
-                {editingItem &&
-                  formData.structured_fields?.file_urls?.length > 0 && (
-                    <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-                      {formData.structured_fields.file_urls.map(
-                        (url: string, idx: number) => {
-                          const isRemoved = removedFileUrls.includes(url);
-                          const name = url.split("/").pop();
-                          return (
-                            <div
-                              key={idx}
-                              className={`${isRemoved ? "opacity-60" : ""}`}
-                            >
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                    {translate("adminPanelPage.form.attachmentsArticle")}
+                  </label>
+                  {editingItem &&
+                    formData.structured_fields?.file_urls?.length > 0 && (
+                      <ModalFieldGrid>
+                        {formData.structured_fields.file_urls.map(
+                          (url: string, idx: number) => {
+                            const isRemoved = removedFileUrls.includes(url);
+                            const name = url.split("/").pop();
+                            return (
                               <div
-                                className={`overflow-hidden rounded-2xl border transition-all ${
-                                  isRemoved
-                                    ? "border-red-100 bg-red-50"
-                                    : "border-slate-200 bg-white"
-                                }`}
+                                key={idx}
+                                className={`${isRemoved ? "opacity-60" : ""}`}
                               >
-                                <FilePreviewCard
-                                  url={url}
-                                  href={url}
-                                  name={name}
-                                  subtitle={translate(
-                                    "adminPanelPage.actions.viewFile",
-                                  )}
-                                />
-                                <div className="flex items-center justify-end border-t border-slate-100 px-4 py-3">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (isRemoved)
-                                        setRemovedFileUrls(
-                                          removedFileUrls.filter(
-                                            (u) => u !== url,
-                                          ),
-                                        );
-                                      else
-                                        setRemovedFileUrls([
-                                          ...removedFileUrls,
-                                          url,
-                                        ]);
-                                    }}
-                                    className={`rounded-full p-2 transition-all cursor-pointer ${
-                                      isRemoved
-                                        ? "bg-emerald-100 text-emerald-600"
-                                        : "bg-red-100 text-red-600 hover:bg-red-200"
+                                <div
+                                  className={`overflow-hidden rounded-2xl border transition-all ${isRemoved
+                                      ? "border-red-100 bg-red-50"
+                                      : "border-slate-200 bg-white"
                                     }`}
-                                    title={
-                                      isRemoved
-                                        ? translate(
+                                >
+                                  <FilePreviewCard
+                                    presentation="compact"
+                                    url={url}
+                                    href={url}
+                                    name={name}
+                                    subtitle={translate(
+                                      "adminPanelPage.actions.viewFile",
+                                    )}
+                                  />
+                                  <div className="flex items-center justify-end border-t border-slate-100 px-4 py-3">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if(isRemoved)
+                                          setRemovedFileUrls(
+                                            removedFileUrls.filter(
+                                              (u) => u !== url,
+                                            ),
+                                          );
+                                        else
+                                          setRemovedFileUrls([
+                                            ...removedFileUrls,
+                                            url,
+                                          ]);
+                                      }}
+                                      className={`rounded-full p-2 transition-all cursor-pointer ${isRemoved
+                                          ? "bg-emerald-100 text-emerald-600"
+                                          : "bg-red-100 text-red-600 hover:bg-red-200"
+                                        }`}
+                                      title={
+                                        isRemoved
+                                          ? translate(
                                             "adminPanelPage.actions.restoreFile",
                                           )
-                                        : translate(
+                                          : translate(
                                             "adminPanelPage.actions.removeFile",
                                           )
-                                    }
-                                  >
-                                    {isRemoved ? (
-                                      <Plus className="w-3 h-3" />
-                                    ) : (
-                                      <X className="w-3 h-3" />
-                                    )}
-                                  </button>
+                                      }
+                                    >
+                                      {isRemoved ? (
+                                        <Plus className="w-3 h-3" />
+                                      ) : (
+                                        <X className="w-3 h-3" />
+                                      )}
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        },
-                      )}
-                    </div>
-                  )}
-                <FileDropzone
-                  files={selectedFiles}
-                  onFilesChange={setSelectedFiles}
-                  inputId={
-                    activeTab === "technicopro"
-                      ? "admin-technicopro-attachments-upload"
-                      : "admin-article-attachments-upload"
-                  }
-                  title={translate("articlesPage.uploadPrompt")}
-                  hint={translate("articlesPage.uploadHelp")}
-                  emptyLabel={translate("articlesPage.attachmentsOptional")}
-                />
-              </div>
+                            );
+                          },
+                        )}
+                      </ModalFieldGrid>
+                    )}
+                  <FileDropzone
+                    files={selectedFiles}
+                    onFilesChange={setSelectedFiles}
+                    inputId={
+                      activeTab === "technicopro"
+                        ? "admin-technicopro-attachments-upload"
+                        : "admin-article-attachments-upload"
+                    }
+                    title={translate("articlesPage.uploadPrompt")}
+                    hint={translate("articlesPage.uploadHelp")}
+                    emptyLabel={translate("articlesPage.attachmentsOptional")}
+                  />
+                </div>
+              </ModalSection>
             </>
           )}
-
           {/* EVENT FORM (AGENDA) */}
           {activeTab === "events" && (
             <>
-              <FormField
-                label={translate("adminPanelPage.form.eventTitle")}
-                value={formData.title || ""}
-                onChange={(val) => setFormData({ ...formData, title: val })}
-              />
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <ModalFieldGrid>
+                <ModalFullWidth>
+                  <FormField
+                    label={translate("adminPanelPage.form.eventTitle")}
+                    value={formData.title || ""}
+                    onChange={(val) => setFormData({ ...formData, title: val })}
+                  />
+                </ModalFullWidth>
                 <BeautifulDateTimePicker
                   label={translate("adminPanelPage.form.startDate")}
                   type="date"
@@ -5108,8 +4483,6 @@ export default function AdminPanel() {
                   }
                   icon={<Clock className="w-4 h-4 text-primary" />}
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
                 <SelectField
                   label={translate("adminPanelPage.form.eventType")}
                   options={eventCategories.map((category) => ({
@@ -5132,219 +4505,213 @@ export default function AdminPanel() {
                     })
                   }
                 />
-              </div>
-              <div className="space-y-2">
-                <FormField
-                  label={translate("adminPanelPage.form.location")}
-                  value={formData.location || ""}
-                  onChange={(val) =>
-                    setFormData({ ...formData, location: val })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                  {translate("adminPanelPage.form.description")}
-                </label>
-                <TiptapEditor
-                  content={formData.description || ""}
-                  onChange={(content) =>
-                    setFormData({ ...formData, description: content })
-                  }
-                  onImageUpload={handleImageUpload}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                  {translate("adminPanelPage.form.attachmentsTraining")}
-                </label>
-                {editingItem && formData.attachments?.length > 0 && (
-                  <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-                    {formData.attachments.map((url: string, idx: number) => {
-                      const isRemoved = removedFileUrls.includes(url);
-                      return (
-                        <div
-                          key={idx}
-                          className={`${isRemoved ? "opacity-60" : ""}`}
-                        >
-                          <div
-                            className={`overflow-hidden rounded-2xl border transition-all ${
-                              isRemoved
-                                ? "border-red-100 bg-red-50"
-                                : "border-slate-200 bg-white"
-                            }`}
-                          >
-                            <FilePreviewCard
-                              url={url}
-                              href={url}
-                              name={getLastPathSegment(url)}
-                              subtitle={translate(
-                                "adminPanelPage.actions.viewFile",
-                              )}
-                            />
-                            <div className="flex items-center justify-end border-t border-slate-100 px-4 py-3">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (isRemoved)
-                                    setRemovedFileUrls(
-                                      removedFileUrls.filter((u) => u !== url),
-                                    );
-                                  else
-                                    setRemovedFileUrls([
-                                      ...removedFileUrls,
-                                      url,
-                                    ]);
-                                }}
-                                className={`rounded-full p-2 transition-all cursor-pointer ${
-                                  isRemoved
-                                    ? "bg-emerald-100 text-emerald-600"
-                                    : "bg-red-100 text-red-600 hover:bg-red-200"
-                                }`}
-                                title={
-                                  isRemoved
-                                    ? translate(
-                                        "adminPanelPage.actions.restoreFile",
-                                      )
-                                    : translate(
-                                        "adminPanelPage.actions.removeFile",
-                                      )
-                                }
-                              >
-                                {isRemoved ? (
-                                  <Plus className="w-3 h-3" />
-                                ) : (
-                                  <X className="w-3 h-3" />
-                                )}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                <ModalFullWidth>
+                  <div className="space-y-2">
+                    <FormField
+                      label={translate("adminPanelPage.form.location")}
+                      value={formData.location || ""}
+                      onChange={(val) =>
+                        setFormData({ ...formData, location: val })
+                      }
+                    />
                   </div>
-                )}
-                <FileDropzone
-                  files={selectedFiles}
-                  onFilesChange={setSelectedFiles}
-                  inputId={`admin-event-attachments-${editingItem ? "edit" : "create"}`}
-                  title={translate("agendaPage.addFiles")}
-                  hint={
-                    editingItem
-                      ? translate("agendaPage.uploadNewFilesForThisEvent")
-                      : translate("agendaPage.uploadFilesForThisEvent")
-                  }
-                  emptyLabel={translate("agendaPage.attachmentsPreview")}
-                />
-              </div>
-              <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <input
-                  type="checkbox"
-                  id="is_public"
-                  className="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
-                  checked={formData.is_public || false}
-                  onChange={(e) =>
-                    setFormData({ ...formData, is_public: e.target.checked })
-                  }
-                />
-                <label
-                  htmlFor="is_public"
-                  className="text-xs font-bold text-slate-700 uppercase tracking-widest cursor-pointer"
-                >
-                  {translate("adminPanelPage.form.publicEvent")}
-                </label>
-              </div>
+                </ModalFullWidth>
+                <ModalFullWidth>
+                  <div className="space-y-2">
+                    <label id={`${adminFieldId}-event-content`} className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      {translate("adminPanelPage.form.description")}
+                    </label>
+                    <TiptapEditor
+                      ariaLabelledBy={`${adminFieldId}-event-content`}
+                      content={formData.description || ""}
+                      onChange={(content) =>
+                        setFormData({ ...formData, description: content })
+                      }
+                      onImageUpload={handleImageUpload}
+                    />
+                  </div>
+                </ModalFullWidth>
+                <ModalFullWidth>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      {translate("adminPanelPage.form.attachmentsTraining")}
+                    </label>
+                    {editingItem && formData.attachments?.length > 0 && (
+                      <ModalFieldGrid>
+                        {formData.attachments.map((url: string, idx: number) => {
+                          const isRemoved = removedFileUrls.includes(url);
+                          return (
+                            <div
+                              key={idx}
+                              className={`${isRemoved ? "opacity-60" : ""}`}
+                            >
+                              <div
+                                className={`overflow-hidden rounded-2xl border transition-all ${isRemoved
+                                    ? "border-red-100 bg-red-50"
+                                    : "border-slate-200 bg-white"
+                                  }`}
+                              >
+                                <FilePreviewCard
+                                  presentation="compact"
+                                  url={url}
+                                  href={url}
+                                  name={getLastPathSegment(url)}
+                                  subtitle={translate(
+                                    "adminPanelPage.actions.viewFile",
+                                  )}
+                                />
+                                <div className="flex items-center justify-end border-t border-slate-100 px-4 py-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if(isRemoved)
+                                        setRemovedFileUrls(
+                                          removedFileUrls.filter((u) => u !== url),
+                                        );
+                                      else
+                                        setRemovedFileUrls([
+                                          ...removedFileUrls,
+                                          url,
+                                        ]);
+                                    }}
+                                    className={`rounded-full p-2 transition-all cursor-pointer ${isRemoved
+                                        ? "bg-emerald-100 text-emerald-600"
+                                        : "bg-red-100 text-red-600 hover:bg-red-200"
+                                      }`}
+                                    title={
+                                      isRemoved
+                                        ? translate(
+                                          "adminPanelPage.actions.restoreFile",
+                                        )
+                                        : translate(
+                                          "adminPanelPage.actions.removeFile",
+                                        )
+                                    }
+                                  >
+                                    {isRemoved ? (
+                                      <Plus className="w-3 h-3" />
+                                    ) : (
+                                      <X className="w-3 h-3" />
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </ModalFieldGrid>
+                    )}
+                    <FileDropzone
+                      files={selectedFiles}
+                      onFilesChange={setSelectedFiles}
+                      inputId={`admin-event-attachments-${editingItem ? "edit" : "create"}`}
+                      title={translate("agendaPage.addFiles")}
+                      hint={
+                        editingItem
+                          ? translate("agendaPage.uploadNewFilesForThisEvent")
+                          : translate("agendaPage.uploadFilesForThisEvent")
+                      }
+                      emptyLabel={translate("agendaPage.attachmentsPreview")}
+                    />
+                  </div>
+                </ModalFullWidth>
+                <ModalFullWidth>
+                  <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <input
+                      type="checkbox"
+                      id={`${adminFieldId}-is_public`}
+                      className="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
+                      checked={formData.is_public || false}
+                      onChange={(e) =>
+                        setFormData({ ...formData, is_public: e.target.checked })
+                      }
+                    />
+                    <label
+                      htmlFor={`${adminFieldId}-is_public`}
+                      className="text-xs font-bold text-slate-700 uppercase tracking-widest cursor-pointer"
+                    >
+                      {translate("adminPanelPage.form.publicEvent")}
+                    </label>
+                  </div>
+                </ModalFullWidth>
+              </ModalFieldGrid>
             </>
           )}
-
           {/* TRAINING FORM */}
           {activeTab === "trainings" && (
             <>
-              <FormField
-                label={translate("adminPanelPage.form.trainingTitle")}
-                value={formData.title || ""}
-                onChange={(val) => setFormData({ ...formData, title: val })}
-              />
-              <SelectField
-                label={translate("adminPanelPage.form.category")}
-                options={trainingCategories.map((category) => ({
-                  label: category.name,
-                  value: category.id,
-                }))}
-                value={formData.category_id || ""}
-                onChange={(val) =>
-                  setFormData({ ...formData, category_id: val })
-                }
-              />
-              <FormField
-                label={translate("adminPanelPage.form.excerpt")}
-                value={formData.excerpt || ""}
-                onChange={(val) => setFormData({ ...formData, excerpt: val })}
-                required={false}
-              />
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                  {translate("adminPanelPage.form.contentRichText")}
-                </label>
-                <TiptapEditor
-                  content={formData.description || ""}
-                  onChange={(content) =>
-                    setFormData({ ...formData, description: content })
-                  }
-                  placeholder={translate("adminPanelPage.form.description")}
-                  onImageUpload={handleImageUpload}
-                />
-              </div>
-              <SelectField
-                label={translate("adminPanelPage.form.statusOptional")}
-                options={[
-                  {
-                    label: translate("adminPanelPage.articleStatuses.draft"),
-                    value: "draft",
-                  },
-                  {
-                    label: translate("adminPanelPage.articleStatuses.pending"),
-                    value: "pending",
-                  },
-                  {
-                    label: translate(
-                      "adminPanelPage.articleStatuses.published",
-                    ),
-                    value: "published",
-                  },
-                ]}
-                value={formData.status || "draft"}
-                onChange={(val) => setFormData({ ...formData, status: val })}
-              />
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                  {translate("articlesPage.thumbnailLabel")}
-                </label>
-                <div className="grid items-stretch gap-4 md:grid-cols-[minmax(0,1.35fr)_280px]">
-                  <FileUploadDropzone
-                    inputId="admin-training-thumbnail"
-                    accept="image/*"
-                    multiple={false}
-                    title={translate("trainingsPage.uploadThumbnail")}
-                    className="h-full md:min-h-[336px]"
-                    selectedLabel={
-                      formData.thumbnail
-                        ? formData.thumbnail.name
-                        : formData.thumbnail_url
-                          ? translate("trainingsPage.replaceThumbnail")
-                          : undefined
-                    }
-                    hint="PNG, JPG, WEBP"
-                    onFilesSelected={(files) =>
-                      setFormData({
-                        ...formData,
-                        thumbnail: files[0] || null,
-                      })
+              <ModalSection title={translate("modalBatchOne.basicInformation")}>
+                <ModalFieldGrid>
+                  <ModalFullWidth>
+                    <FormField
+                      label={translate("adminPanelPage.form.trainingTitle")}
+                      value={formData.title || ""}
+                      onChange={(val) => setFormData({ ...formData, title: val })}
+                    />
+                  </ModalFullWidth>
+                  <SelectField
+                    label={translate("adminPanelPage.form.category")}
+                    options={trainingCategories.map((category) => ({
+                      label: category.name,
+                      value: category.id,
+                    }))}
+                    value={formData.category_id || ""}
+                    onChange={(val) =>
+                      setFormData({ ...formData, category_id: val })
                     }
                   />
-                  <div className="flex h-full w-full max-w-[280px] justify-self-center md:max-w-none md:justify-self-auto">
+                  <SelectField
+                    label={translate("adminPanelPage.form.statusOptional")}
+                    options={[
+                      {
+                        label: translate("adminPanelPage.articleStatuses.draft"),
+                        value: "draft",
+                      },
+                      {
+                        label: translate(
+                          "adminPanelPage.articleStatuses.published",
+                        ),
+                        value: "published",
+                      },
+                    ]}
+                    value={formData.status || "draft"}
+                    onChange={(val) => setFormData({ ...formData, status: val })}
+                  />
+                  <ModalFullWidth>
+                    <FormField
+                      label={translate("adminPanelPage.form.excerpt")}
+                      value={formData.excerpt || ""}
+                      onChange={(val) => setFormData({ ...formData, excerpt: val })}
+                      required={false}
+                    />
+                  </ModalFullWidth>
+                </ModalFieldGrid>
+              </ModalSection>
+              <ModalSection title={translate("modalBatchTwo.trainingContent")}>
+                <div className="space-y-2">
+                  <label id={`${adminFieldId}-training-content`} className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                    {translate("adminPanelPage.form.contentRichText")}
+                  </label>
+                  <TiptapEditor
+                    ariaLabelledBy={`${adminFieldId}-training-content`}
+                    content={formData.description || ""}
+                    onChange={(content) =>
+                      setFormData({ ...formData, description: content })
+                    }
+                    placeholder={translate("adminPanelPage.form.description")}
+                    onImageUpload={handleImageUpload}
+                  />
+                </div>
+              </ModalSection>
+              <ModalSection title={translate("modalBatchOne.mediaAttachments")}>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                    {translate("articlesPage.thumbnailLabel")}
+                  </label>
+                  <ModalMediaSplit preview={<>
                     {formData.thumbnail_url || formData.thumbnail ? (
                       <FilePreviewCard
+                        presentation="compact"
                         file={formData.thumbnail}
                         url={formData.thumbnail_url}
                         name={
@@ -5352,181 +4719,144 @@ export default function AdminPanel() {
                           getLastPathSegment(formData.thumbnail_url || "") ||
                           translate("trainingsPage.thumbnailLabel")
                         }
-                        className="h-full w-full"
                         onRemove={
                           formData.thumbnail
                             ? () =>
-                                setFormData({
-                                  ...formData,
-                                  thumbnail: null,
-                                })
+                              setFormData({
+                                ...formData,
+                                thumbnail: null,
+                              })
                             : undefined
                         }
-                        aspectClassName="aspect-square"
                       />
                     ) : (
-                      <div className="flex h-full min-h-[336px] w-full items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-6">
-                        <div className="flex h-28 w-28 items-center justify-center rounded-full bg-white text-center text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 shadow-sm">
+                      <div className="batch-four-empty">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-center text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 shadow-sm">
                           {translate("articlesPage.thumbnailLabel")}
                         </div>
                       </div>
                     )}
-                  </div>
+                  </>}>
+                    <FileUploadDropzone
+                      presentation="compact"
+                      inputId="admin-training-thumbnail"
+                      accept="image/*"
+                      multiple={false}
+                      title={translate("trainingsPage.uploadThumbnail")}
+                      selectedLabel={
+                        formData.thumbnail
+                          ? formData.thumbnail.name
+                          : formData.thumbnail_url
+                            ? translate("trainingsPage.replaceThumbnail")
+                            : undefined
+                      }
+                      hint="PNG, JPG, WEBP"
+                      onFilesSelected={(files) =>
+                        setFormData({
+                          ...formData,
+                          thumbnail: files[0] || null,
+                        })
+                      }
+                    />
+                  </ModalMediaSplit>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                  {translate("adminPanelPage.form.attachmentsTraining")}
-                </label>
-                {editingItem && formData.attachments?.length > 0 && (
-                  <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-                    {formData.attachments.map((attachment: any, idx: number) => {
-                      const url =
-                        typeof attachment === "string"
-                          ? attachment
-                          : attachment.url || attachment.file_url || "";
-                      const name =
-                        typeof attachment === "string"
-                          ? getLastPathSegment(attachment)
-                          : attachment.original_name ||
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                    {translate("adminPanelPage.form.attachmentsTraining")}
+                  </label>
+                  {editingItem && formData.attachments?.length > 0 && (
+                    <ModalFieldGrid>
+                      {formData.attachments.map((attachment: any, idx: number) => {
+                        const url =
+                          typeof attachment === "string"
+                            ? attachment
+                            : attachment.url || attachment.file_url || "";
+                        const name =
+                          typeof attachment === "string"
+                            ? getLastPathSegment(attachment)
+                            : attachment.original_name ||
                             attachment.file_name ||
                             getLastPathSegment(url);
-                      const isRemoved = removedFileUrls.includes(url);
-                      return (
-                        <div
-                          key={idx}
-                          className={`${isRemoved ? "opacity-60" : ""}`}
-                        >
+                        const isRemoved = removedFileUrls.includes(url);
+                        return (
                           <div
-                            className={`overflow-hidden rounded-2xl border transition-all ${
-                              isRemoved
-                                ? "border-red-100 bg-red-50"
-                                : "border-slate-200 bg-white"
-                            }`}
+                            key={idx}
+                            className={`${isRemoved ? "opacity-60" : ""}`}
                           >
-                            <FilePreviewCard
-                              url={url}
-                              href={url}
-                              name={name}
-                              subtitle={translate(
-                                "adminPanelPage.actions.viewFile",
-                              )}
-                            />
-                            <div className="flex items-center justify-end border-t border-slate-100 px-4 py-3">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (isRemoved)
-                                    setRemovedFileUrls(
-                                      removedFileUrls.filter((u) => u !== url),
-                                    );
-                                  else
-                                    setRemovedFileUrls([
-                                      ...removedFileUrls,
-                                      url,
-                                    ]);
-                                }}
-                                className={`rounded-full p-2 transition-all cursor-pointer ${
-                                  isRemoved
-                                    ? "bg-emerald-100 text-emerald-600"
-                                    : "bg-red-100 text-red-600 hover:bg-red-200"
+                            <div
+                              className={`overflow-hidden rounded-2xl border transition-all ${isRemoved
+                                  ? "border-red-100 bg-red-50"
+                                  : "border-slate-200 bg-white"
                                 }`}
-                                title={
-                                  isRemoved
-                                    ? translate(
+                            >
+                              <FilePreviewCard
+                                presentation="compact"
+                                url={url}
+                                href={url}
+                                name={name}
+                                subtitle={translate(
+                                  "adminPanelPage.actions.viewFile",
+                                )}
+                              />
+                              <div className="flex items-center justify-end border-t border-slate-100 px-4 py-3">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if(isRemoved)
+                                      setRemovedFileUrls(
+                                        removedFileUrls.filter((u) => u !== url),
+                                      );
+                                    else
+                                      setRemovedFileUrls([
+                                        ...removedFileUrls,
+                                        url,
+                                      ]);
+                                  }}
+                                  className={`rounded-full p-2 transition-all cursor-pointer ${isRemoved
+                                      ? "bg-emerald-100 text-emerald-600"
+                                      : "bg-red-100 text-red-600 hover:bg-red-200"
+                                    }`}
+                                  title={
+                                    isRemoved
+                                      ? translate(
                                         "adminPanelPage.actions.restoreFile",
                                       )
-                                    : translate(
+                                      : translate(
                                         "adminPanelPage.actions.removeFile",
                                       )
-                                }
-                              >
-                                {isRemoved ? (
-                                  <Plus className="w-3 h-3" />
-                                ) : (
-                                  <X className="w-3 h-3" />
-                                )}
-                              </button>
+                                  }
+                                >
+                                  {isRemoved ? (
+                                    <Plus className="w-3 h-3" />
+                                  ) : (
+                                    <X className="w-3 h-3" />
+                                  )}
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                <FileDropzone
-                  files={selectedFiles}
-                  onFilesChange={setSelectedFiles}
-                  inputId="admin-training-attachments-upload"
-                  title={translate("trainingsPage.clickOrDragDrop")}
-                  hint={translate("trainingsPage.attachmentsHint")}
-                  emptyLabel={translate("trainingsPage.attachmentsLabel")}
-                />
-              </div>
+                        );
+                      })}
+                    </ModalFieldGrid>
+                  )}
+                  <FileDropzone
+                    files={selectedFiles}
+                    onFilesChange={setSelectedFiles}
+                    inputId="admin-training-attachments-upload"
+                    title={translate("trainingsPage.clickOrDragDrop")}
+                    hint={translate("trainingsPage.attachmentsHint")}
+                    emptyLabel={translate("trainingsPage.attachmentsLabel")}
+                  />
+                </div>
+              </ModalSection>
             </>
           )}
 
-          <button
-            type="submit"
-            disabled={
-              isCreatingMember ||
-              isUpdatingMember ||
-              isCreatingForum ||
-              isUpdatingForum ||
-              isCreatingArticle ||
-              isUpdatingArticle ||
-              isCreatingTechnicoPro ||
-              isUpdatingTechnicoPro ||
-              isCreatingEvent ||
-              isUpdatingEvent ||
-              isCreatingTraining ||
-              isUpdatingTraining
-            }
-            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs hover:bg-slate-800 disabled:bg-slate-400 disabled:cursor-not-allowed transition-all mt-6 shadow-xl uppercase tracking-[0.2em] flex items-center justify-center gap-3 group cursor-pointer"
-          >
-            {isCreatingMember ||
-            isUpdatingMember ||
-            isCreatingForum ||
-            isUpdatingForum ||
-            isCreatingArticle ||
-            isUpdatingArticle ||
-            isCreatingTechnicoPro ||
-            isUpdatingTechnicoPro ||
-            isCreatingEvent ||
-            isUpdatingEvent ||
-            isCreatingTraining ||
-            isUpdatingTraining ? (
-              editingItem ? (
-                <Edit2 className="w-4 h-4 text-primary" />
-              ) : (
-                <Plus className="w-4 h-4 text-primary" />
-              )
-            ) : editingItem ? (
-              <Edit2 className="w-4 h-4 text-primary" />
-            ) : (
-              <Plus className="w-4 h-4 text-primary" />
-            )}
-            {isCreatingMember ||
-            isUpdatingMember ||
-            isCreatingForum ||
-            isUpdatingForum ||
-            isCreatingArticle ||
-            isUpdatingArticle ||
-            isCreatingTechnicoPro ||
-            isUpdatingTechnicoPro ||
-            isCreatingEvent ||
-            isUpdatingEvent ||
-            isCreatingTraining ||
-            isUpdatingTraining
-              ? translate("adminPanelPage.submitting")
-              : editingItem
-                ? translate("adminPanelPage.submitEdit")
-                : translate("adminPanelPage.submitCreate")}
-          </button>
         </form>
       </Modal>
-      <ConfirmModal
-        isOpen={isConfirmOpen}
+      <ConfirmModal presentation="compact"
+
+        isOpen={isConfirmOpen && (activeTab !== "articles" || canModify(articlesData?.results.find((article) => article.id === deletingId), "delete"))}
         onClose={() => {
           if (
             !isDeletingForum &&
@@ -5587,7 +4917,8 @@ export default function AdminPanel() {
         }
       />
 
-      <ConfirmModal
+      <ConfirmModal presentation="compact"
+
         isOpen={isModConfirmOpen}
         onClose={() => setIsModConfirmOpen(false)}
         onConfirm={() =>
@@ -5599,7 +4930,8 @@ export default function AdminPanel() {
         isLoading={isModerating}
       />
 
-      <ConfirmModal
+      <ConfirmModal presentation="compact"
+
         isOpen={isRoleDeleteConfirmOpen}
         onClose={() => {
           if (!isDeletingUserRole) {
@@ -5618,7 +4950,8 @@ export default function AdminPanel() {
         isLoading={isDeletingUserRole}
       />
 
-      <ConfirmModal
+      <ConfirmModal presentation="compact"
+
         isOpen={Boolean(backupToDelete)}
         onClose={() => {
           if (!isDeletingBackup) {
@@ -5637,703 +4970,49 @@ export default function AdminPanel() {
       />
 
       <Modal
-        isOpen={isPermissionModalOpen}
-        onClose={() => setIsPermissionModalOpen(false)}
-        title={translate("adminPanelPage.setForumPermission")}
-        maxWidth="max-w-4xl"
-      >
-        <div className="flex gap-6 border-b border-slate-100 mb-6">
+        className="batch-four-modal admin-details-drawer"
+        layout="drawer"
+        footer={isDetailsLoading ? undefined : isDetailsError ? (<div className="flex gap-3 pt-4">
           <button
-            onClick={() => setPermissionTab("view")}
-            className={`pb-2 text-xs font-black uppercase tracking-widest transition-all relative cursor-pointer ${
-              permissionTab === "view"
-                ? "text-primary"
-                : "text-slate-400 hover:text-slate-600"
-            }`}
+            onClick={() => setIsDetailsOpen(false)}
+            className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase hover:bg-slate-200 transition-all cursor-pointer"
           >
-            {translate("adminPanelPage.currentPermissions")}
-            {permissionTab === "view" && (
-              <div className="absolute -bottom-[1px] left-0 right-0 h-0.5 bg-primary" />
-            )}
+            {translate("adminPanelPage.close")}
           </button>
           <button
-            onClick={() => setPermissionTab("edit")}
-            className={`pb-2 text-xs font-black uppercase tracking-widest transition-all relative cursor-pointer ${
-              permissionTab === "edit"
-                ? "text-primary"
-                : "text-slate-400 hover:text-slate-600"
-            }`}
+            onClick={handleRetryDetails}
+            className="flex-1 py-4 bg-primary text-white rounded-2xl font-black text-xs uppercase hover:bg-primary-dark shadow-xl shadow-primary/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            {translate("adminPanelPage.managePermissions")}
-            {permissionTab === "edit" && (
-              <div className="absolute -bottom-[1px] left-0 right-0 h-0.5 bg-primary" />
-            )}
+            <RefreshCw className="w-4 h-4" />
+            {translate("adminPanelPage.retryFetch")}
           </button>
-        </div>
-
-        {permissionTab === "view" ? (
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                {translate("adminPanelPage.selectForumToView")}
-              </label>
-              <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto p-2 bg-slate-50 border border-slate-200 rounded-xl text-left">
-                {forumsData?.map((forum) => (
-                  <label
-                    key={forum.id}
-                    className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors"
-                  >
-                    <input
-                      type="radio"
-                      name="view-forum-permission-admin"
-                      checked={permissionData.forumIds.includes(forum.id)}
-                      onChange={() => {
-                        setPermissionData({
-                          ...permissionData,
-                          forumIds: [forum.id],
-                        });
-                      }}
-                      className="h-4 w-4 border-slate-300 text-primary focus:ring-primary"
-                    />
-                    <span className="text-sm font-bold text-slate-700">
-                      {forum.name}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {singleSelectedForumId ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    {translate("adminPanelPage.permissionsFor", {
-                      forum:
-                        currentPermissions?.[0]?.forum_name ||
-                        forumsData?.find((f) => f.id === singleSelectedForumId)
-                          ?.name ||
-                        "",
-                    })}
-                  </label>
-                  <button
-                    onClick={() => setPermissionTab("edit")}
-                    className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline cursor-pointer"
-                  >
-                    {translate("adminPanelPage.editThese")}
-                  </button>
-                </div>
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden">
-                  {isLoadingCurrentPermissions ? (
-                    <ForumPermissionsSkeleton />
-                  ) : (
-                    <table className="w-full text-xs text-left">
-                      <thead>
-                        <tr className="bg-slate-100/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
-                          <th className="px-4 py-3">
-                            {translate("adminPanelPage.table.role")}
-                          </th>
-                          <th className="px-4 py-3 text-center">
-                            {translate("adminPanelPage.read")}
-                          </th>
-                          <th className="px-4 py-3 text-center">
-                            {translate("adminPanelPage.post")}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {(currentPermissions || []).map((p) => (
-                          <tr
-                            key={p.id}
-                            className="hover:bg-white transition-colors"
-                          >
-                            <td className="px-4 py-3">
-                              <p className="font-bold text-slate-700 capitalize">
-                                {p.role_name
-                                  ? getRoleLabel(p.role_name)
-                                  : forumPermissionRoleLabelsById[p.role_id] ||
-                                    ""}
-                              </p>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              {p.can_read ? (
-                                <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
-                              ) : (
-                                <span className="mx-auto block h-2 w-2 rounded-full bg-slate-300" />
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              {p.can_post ? (
-                                <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
-                              ) : (
-                                <span className="mx-auto block h-2 w-2 rounded-full bg-slate-300" />
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="p-12 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] text-center">
-                <ShieldAlert className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-relaxed max-w-[200px] mx-auto">
-                  {translate("adminPanelPage.selectForumPrompt")}
-                </p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <form onSubmit={handleSetForumPermission} className="space-y-6">
-            <div className="space-y-2 text-left">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                {translate("adminPanelPage.selectForumsToUpdate")}
-              </label>
-              <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto p-2 bg-slate-50 border border-slate-200 rounded-xl">
-                {forumsData?.map((forum) => (
-                  <label
-                    key={forum.id}
-                    className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={permissionData.forumIds.includes(forum.id)}
-                      onChange={(e) => {
-                        const nextIds = e.target.checked
-                          ? [...permissionData.forumIds, forum.id]
-                          : permissionData.forumIds.filter(
-                              (id) => id !== forum.id,
-                            );
-                        setPermissionData({
-                          ...permissionData,
-                          forumIds: nextIds,
-                        });
-                      }}
-                      className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                    />
-                    <span className="text-sm font-bold text-slate-700">
-                      {forum.name}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2 text-left">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                {translate("adminPanelPage.rolesLabel")}
-              </label>
-              <div className="grid grid-cols-2 gap-2 p-2 bg-slate-50 border border-slate-200 rounded-xl">
-                {forumPermissionRoleOptions.map((role) => (
-                  <label
-                    key={role.id}
-                    className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={permissionData.roleIds.includes(role.id)}
-                      onChange={(e) => {
-                        const nextRoleIds = e.target.checked
-                          ? [...permissionData.roleIds, role.id]
-                          : permissionData.roleIds.filter(
-                              (id) => id !== role.id,
-                            );
-                        setPermissionData({
-                          ...permissionData,
-                          roleIds: nextRoleIds,
-                        });
-                      }}
-                      className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                    />
-                    <span className="text-sm font-bold text-slate-700">
-                      {role.label}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-3 text-left">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                {translate("adminPanelPage.accessSettings")}
-              </label>
-              <div className="grid grid-cols-2 gap-4">
-                <label className="flex items-center justify-between gap-4 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-white transition-colors">
-                  <span className="text-xs font-black text-slate-700 uppercase tracking-wider">
-                    {translate("adminPanelPage.canRead")}
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={permissionData.canRead}
-                    onChange={(e) =>
-                      setPermissionData({
-                        ...permissionData,
-                        canRead: e.target.checked,
-                      })
-                    }
-                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-4 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-white transition-colors">
-                  <span className="text-xs font-black text-slate-700 uppercase tracking-wider">
-                    {translate("adminPanelPage.canPost")}
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={permissionData.canPost}
-                    onChange={(e) =>
-                      setPermissionData({
-                        ...permissionData,
-                        canPost: e.target.checked,
-                      })
-                    }
-                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                  />
-                </label>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSettingPermission}
-              className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs hover:bg-slate-800 disabled:bg-slate-400 disabled:cursor-not-allowed transition-all mt-4 shadow-xl uppercase tracking-[0.2em] flex items-center justify-center gap-3 cursor-pointer"
-            >
-              {isSettingPermission
-                ? translate("adminPanelPage.savingPermission")
-                : translate("adminPanelPage.applyBulkPermissions")}
-            </button>
-          </form>
-        )}
-      </Modal>
-
-      <Modal
-        isOpen={isTrainingPermissionModalOpen}
-        onClose={() => setIsTrainingPermissionModalOpen(false)}
-        title={translate("adminPanelPage.trainingPermissions")}
-        maxWidth="max-w-4xl"
-      >
-        <div className="flex gap-6 border-b border-slate-100 mb-6">
-          <button
-            onClick={() => setTrainingPermissionTab("view")}
-            className={`pb-2 text-xs font-black uppercase tracking-widest transition-all relative cursor-pointer ${
-              trainingPermissionTab === "view"
-                ? "text-primary"
-                : "text-slate-400 hover:text-slate-600"
-            }`}
-          >
-            {translate("adminPanelPage.currentPermissions")}
-            {trainingPermissionTab === "view" && (
-              <div className="absolute -bottom-[1px] left-0 right-0 h-0.5 bg-primary" />
-            )}
-          </button>
-          <button
-            onClick={() => setTrainingPermissionTab("edit")}
-            className={`pb-2 text-xs font-black uppercase tracking-widest transition-all relative cursor-pointer ${
-              trainingPermissionTab === "edit"
-                ? "text-primary"
-                : "text-slate-400 hover:text-slate-600"
-            }`}
-          >
-            {translate("adminPanelPage.managePermissions")}
-            {trainingPermissionTab === "edit" && (
-              <div className="absolute -bottom-[1px] left-0 right-0 h-0.5 bg-primary" />
-            )}
-          </button>
-        </div>
-
-        {trainingPermissionTab === "view" ? (
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                {translate("adminPanelPage.selectTrainingToView")}
-              </label>
-              <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto p-2 bg-slate-50 border border-slate-200 rounded-xl text-left">
-                {trainingsData?.map((training) => (
-                  <label
-                    key={training.id}
-                    className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors"
-                  >
-                    <input
-                      type="radio"
-                      name="view-training-permission-admin"
-                      checked={trainingPermissionData.trainingIds.includes(
-                        training.id,
-                      )}
-                      onChange={() => {
-                        setTrainingPermissionData({
-                          ...trainingPermissionData,
-                          trainingIds: [training.id],
-                        });
-                      }}
-                      className="h-4 w-4 border-slate-300 text-primary focus:ring-primary"
-                    />
-                    <span className="text-sm font-bold text-slate-700">
-                      {training.title}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {singleSelectedTrainingId ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    {translate("adminPanelPage.currentPermissionsFor")}{" "}
-                    {currentTrainingPermissions?.[0]?.training_name ||
-                      trainingsData?.find(
-                        (training) => training.id === singleSelectedTrainingId,
-                      )?.title ||
-                      ""}
-                  </label>
-                  <button
-                    onClick={() => setTrainingPermissionTab("edit")}
-                    className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline cursor-pointer"
-                  >
-                    {translate("adminPanelPage.editThese")}
-                  </button>
-                </div>
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden">
-                  {isLoadingCurrentTrainingPermissions ? (
-                    <ForumPermissionsSkeleton />
-                  ) : (
-                    <table className="w-full text-xs text-left">
-                      <thead>
-                        <tr className="bg-slate-100/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
-                          <th className="px-4 py-3">
-                            {translate("adminPanelPage.rolesLabel")}
-                          </th>
-                          <th className="px-4 py-3 text-center">
-                            {translate("adminPanelPage.read")}
-                          </th>
-                          <th className="px-4 py-3 text-center">
-                            {translate("adminPanelPage.canWrite")}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {(currentTrainingPermissions || []).map(
-                          (permission) => (
-                            <tr
-                              key={permission.id}
-                              className="hover:bg-white transition-colors"
-                            >
-                              <td className="px-4 py-3">
-                                <p className="font-bold text-slate-700 capitalize">
-                                  {getRoleLabel(
-                                    permission.role_name ||
-                                      userRolesData.find(
-                                        (role) =>
-                                          role.id === permission.role_id,
-                                      )?.slug ||
-                                      userRolesData.find(
-                                        (role) =>
-                                          role.id === permission.role_id,
-                                      )?.name,
-                                  )}
-                                </p>
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                {permission.can_read ? (
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
-                                ) : (
-                                  <span className="mx-auto block h-2 w-2 rounded-full bg-slate-300" />
-                                )}
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                {permission.can_write ? (
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
-                                ) : (
-                                  <span className="mx-auto block h-2 w-2 rounded-full bg-slate-300" />
-                                )}
-                              </td>
-                            </tr>
-                          ),
-                        )}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="p-12 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] text-center">
-                <ShieldAlert className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-relaxed max-w-[200px] mx-auto">
-                  {translate("adminPanelPage.selectTrainingPrompt")}
-                </p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <form onSubmit={handleSetTrainingPermission} className="space-y-6">
-            <div className="space-y-2 text-left">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                {translate("adminPanelPage.selectTrainingsToUpdate")}
-              </label>
-              <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto p-2 bg-slate-50 border border-slate-200 rounded-xl">
-                {trainingsData?.map((training) => (
-                  <label
-                    key={training.id}
-                    className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={trainingPermissionData.trainingIds.includes(
-                        training.id,
-                      )}
-                      onChange={(e) => {
-                        const nextTrainingIds = e.target.checked
-                          ? [...trainingPermissionData.trainingIds, training.id]
-                          : trainingPermissionData.trainingIds.filter(
-                              (id) => id !== training.id,
-                            );
-                        setTrainingPermissionData({
-                          ...trainingPermissionData,
-                          trainingIds: nextTrainingIds,
-                        });
-                      }}
-                      className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                    />
-                    <span className="text-sm font-bold text-slate-700">
-                      {training.title}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2 text-left">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                {translate("adminPanelPage.rolesLabel")}
-              </label>
-              <div className="grid grid-cols-2 gap-2 p-2 bg-slate-50 border border-slate-200 rounded-xl">
-                {userRolesData.map((role) => (
-                  <label
-                    key={role.id}
-                    className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={trainingPermissionData.roleIds.includes(role.id)}
-                      onChange={(e) => {
-                        const nextRoleIds = e.target.checked
-                          ? [...trainingPermissionData.roleIds, role.id]
-                          : trainingPermissionData.roleIds.filter(
-                              (id) => id !== role.id,
-                            );
-                        setTrainingPermissionData({
-                          ...trainingPermissionData,
-                          roleIds: nextRoleIds,
-                        });
-                      }}
-                      className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                    />
-                    <span className="text-sm font-bold text-slate-700">
-                      {getRoleLabel(role.slug || role.name)}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-3 text-left">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                {translate("adminPanelPage.accessSettings")}
-              </label>
-              <div className="grid grid-cols-2 gap-4">
-                <label className="flex items-center justify-between gap-4 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-white transition-colors">
-                  <span className="text-xs font-black text-slate-700 uppercase tracking-wider">
-                    {translate("adminPanelPage.canRead")}
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={trainingPermissionData.canRead}
-                    onChange={(e) =>
-                      setTrainingPermissionData({
-                        ...trainingPermissionData,
-                        canRead: e.target.checked,
-                      })
-                    }
-                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-4 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-white transition-colors">
-                  <span className="text-xs font-black text-slate-700 uppercase tracking-wider">
-                    {translate("adminPanelPage.canWrite")}
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={trainingPermissionData.canWrite}
-                    onChange={(e) =>
-                      setTrainingPermissionData({
-                        ...trainingPermissionData,
-                        canWrite: e.target.checked,
-                      })
-                    }
-                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                  />
-                </label>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSettingTrainingPermission}
-              className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs hover:bg-slate-800 disabled:bg-slate-400 disabled:cursor-not-allowed transition-all mt-4 shadow-xl uppercase tracking-[0.2em] flex items-center justify-center gap-3 cursor-pointer"
-            >
-              {isSettingTrainingPermission
-                ? translate("adminPanelPage.savingPermission")
-                : translate("adminPanelPage.applyBulkPermissions")}
-            </button>
-          </form>
-        )}
-      </Modal>
-
-      <Modal
-        isOpen={isMemberPermissionsModalOpen}
-        onClose={handleCloseMemberPermissionsModal}
-        title={translate("adminPanelPage.memberPermissions.title")}
-        maxWidth="max-w-4xl"
-      >
-        {selectedMemberForPermissions ? (
-          <div className="space-y-6">
-            <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    {translate(
-                      "adminPanelPage.memberPermissions.permissionsFor",
-                    )}
-                  </p>
-                  <h4 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
-                    {`${selectedMemberForPermissions.first_name || ""} ${selectedMemberForPermissions.last_name || ""}`.trim() ||
-                      selectedMemberForPermissions.email}
-                  </h4>
-                  <p className="mt-2 text-xs font-bold uppercase tracking-widest text-slate-400">
-                    {selectedMemberForPermissions.email}
-                  </p>
-                </div>
-                <p className="text-xs font-medium text-slate-500">
-                  {isFetchingMemberPermissions
-                    ? translate("adminPanelPage.pagination.refreshing")
-                    : translate(
-                        "adminPanelPage.memberPermissions.permissionsHint",
-                      )}
-                </p>
-              </div>
-            </div>
-
-            {isLoadingMemberPermissions ? (
-              <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                <ForumPermissionsSkeleton />
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {ROLE_PERMISSION_FEATURES.map((feature) => {
-                  const permission = memberPermissionDrafts[feature];
-                  const originalPermission = memberPermissionsData.find(
-                    (item) => item.feature === feature,
-                  );
-                  const isDirty =
-                    permission &&
-                    (!originalPermission ||
-                    (permission.can_view !== originalPermission.can_view ||
-                      permission.can_create !== originalPermission.can_create ||
-                      permission.can_edit !== originalPermission.can_edit ||
-                      permission.can_delete !== originalPermission.can_delete));
-
-                  return (
-                    <div
-                      key={feature}
-                      className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm"
-                    >
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
-                          <h5 className="text-lg font-black uppercase tracking-tight text-slate-900">
-                            {getRolePermissionFeatureLabel(feature)}
-                          </h5>
-                          <p className="mt-1 text-xs font-medium text-slate-500">
-                            {translate(
-                              "adminPanelPage.rolePermissions.permissionRowHint",
-                            )}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleSaveMemberPermission(feature)}
-                          disabled={
-                            !permission ||
-                            !isDirty ||
-                            isCreatingMemberPermission ||
-                            isUpdatingMemberPermission
-                          }
-                          className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white transition-all hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 cursor-pointer"
-                        >
-                          {translate(
-                            "adminPanelPage.rolePermissions.savePermission",
-                          )}
-                        </button>
-                      </div>
-
-                      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        {PERMISSION_ACTION_FIELDS.map(([field, actionKey]) => (
-                          <label
-                            key={field}
-                            className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
-                          >
-                            <span className="text-xs font-black uppercase tracking-wider text-slate-700">
-                              {translate(
-                                `adminPanelPage.rolePermissions.actions.${actionKey}`,
-                              )}
-                            </span>
-                            <input
-                              type="checkbox"
-                              checked={Boolean(permission?.[field])}
-                              onChange={(e) =>
-                                handleMemberPermissionToggle(
-                                  feature,
-                                  field,
-                                  e.target.checked,
-                                )
-                              }
-                              className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                            />
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ) : null}
-      </Modal>
-
-      <Modal
+        </div>) : viewingItem ? (<button
+          onClick={() => setIsDetailsOpen(false)}
+          className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase hover:bg-slate-800 transition-colors shadow-lg cursor-pointer"
+        >
+          {translate("adminPanelPage.close")}
+        </button>) : undefined}
         isOpen={isDetailsOpen}
         onClose={() => setIsDetailsOpen(false)}
         title={translate("adminPanelPage.detailsTitle", {
           entity: getTabLabel(activeTab),
         })}
-        maxWidth="max-w-4xl"
       >
         {isDetailsLoading ? (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-3xl border border-slate-200">
+          <div className="space-y-4">
+            <ModalFieldGrid>
               {[...Array(6)].map((_, i) => (
                 <div key={i} className="animate-pulse space-y-2">
                   <div className="h-2 w-12 bg-slate-200 rounded" />
                   <div className="h-4 w-full bg-slate-200 rounded" />
                 </div>
               ))}
-            </div>
+            </ModalFieldGrid>
             <div className="h-24 w-full bg-slate-50 rounded-3xl animate-pulse" />
             <div className="h-14 w-full bg-slate-900/10 rounded-2xl animate-pulse" />
           </div>
         ) : isDetailsError ? (
-          <div className="py-12 text-center space-y-6">
+          <div className="py-12 text-center space-y-4">
             <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
               <AlertCircle className="w-8 h-8" />
             </div>
@@ -6345,27 +5024,12 @@ export default function AdminPanel() {
                 {translate("adminPanelPage.detailsErrorMessage")}
               </p>
             </div>
-            <div className="flex gap-3 pt-4">
-              <button
-                onClick={() => setIsDetailsOpen(false)}
-                className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase hover:bg-slate-200 transition-all cursor-pointer"
-              >
-                {translate("adminPanelPage.close")}
-              </button>
-              <button
-                onClick={handleRetryDetails}
-                className="flex-1 py-4 bg-primary text-white rounded-2xl font-black text-xs uppercase hover:bg-primary-dark shadow-xl shadow-primary/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <RefreshCw className="w-4 h-4" />
-                {translate("adminPanelPage.retryFetch")}
-              </button>
-            </div>
           </div>
         ) : viewingItem ? (
-          <div className="space-y-6 overflow-hidden text-left">
+          <div className="space-y-4 overflow-hidden text-left">
             {activeTab === "members" ? (
-              <div className="space-y-6">
-                <div className="flex flex-col gap-5 rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+              <div className="space-y-4">
+                <div className="flex flex-col gap-5 rounded-3xl border border-slate-200 bg-slate-50 p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex min-w-0 items-center gap-4">
                     <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-3xl bg-slate-900 text-xl font-black uppercase text-primary">
                       {detailsItem?.avatar_url ? (
@@ -6395,48 +5059,45 @@ export default function AdminPanel() {
                         <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-700">
                           {getRoleLabel(
                             detailsItem?.role_details?.slug ||
-                              detailsItem?.role,
+                            detailsItem?.role,
                           )}
                         </span>
                         <span
-                          className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${
-                            detailsItem?.status === "active"
+                          className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${detailsItem?.status === "active"
                               ? "bg-emerald-100 text-emerald-700"
-                              : detailsItem?.status === "pending"
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-red-100 text-red-700"
-                          }`}
+                              : detailsItem?.status === "suspended"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-slate-100 text-slate-500"
+                            }`}
                         >
                           {getMemberStatusLabel(detailsItem?.status)}
                         </span>
                         <span
-                          className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${
-                            detailsItem?.is_superuser
+                          className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${detailsItem?.is_superuser
                               ? "bg-slate-900 text-white"
                               : "bg-slate-200 text-slate-700"
-                          }`}
+                            }`}
                         >
                           {detailsItem?.is_superuser
                             ? translate(
-                                "adminPanelPage.memberDetails.superuser",
-                              )
+                              "adminPanelPage.memberDetails.superuser",
+                            )
                             : translate(
-                                "adminPanelPage.memberDetails.standardUser",
-                              )}
+                              "adminPanelPage.memberDetails.standardUser",
+                            )}
                         </span>
                       </div>
                     </div>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+                <ModalFieldGrid>
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                     <h4 className="mb-4 text-xs font-black uppercase tracking-widest text-slate-400">
                       {translate(
                         "adminPanelPage.memberDetails.registryDetails",
                       )}
                     </h4>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <ModalFieldGrid>
                       <DetailField
                         label={translate("adminPanelPage.form.firstName")}
                         value={
@@ -6505,16 +5166,15 @@ export default function AdminPanel() {
                           detailsItem?.last_login_at,
                         )}
                       />
-                    </div>
+                    </ModalFieldGrid>
                   </div>
-
-                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                     <h4 className="mb-4 text-xs font-black uppercase tracking-widest text-slate-400">
                       {translate(
                         "adminPanelPage.memberDetails.contactLocation",
                       )}
                     </h4>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <ModalFieldGrid>
                       <DetailField
                         label={translate("adminPanelPage.memberDetails.phone")}
                         value={
@@ -6576,14 +5236,13 @@ export default function AdminPanel() {
                           translate("adminPanelPage.fallbacks.notAvailable")
                         }
                       />
-                    </div>
+                    </ModalFieldGrid>
                   </div>
-
-                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 xl:col-span-2">
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 shared-modal-full-width">
                     <h4 className="mb-4 text-xs font-black uppercase tracking-widest text-slate-400">
                       {translate("adminPanelPage.memberDetails.companyDetails")}
                     </h4>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <ModalFieldGrid>
                       <DetailField
                         label={translate(
                           "adminPanelPage.memberDetails.companyName",
@@ -6630,13 +5289,13 @@ export default function AdminPanel() {
                           translate("adminPanelPage.fallbacks.notAvailable")
                         }
                       />
-                    </div>
+                    </ModalFieldGrid>
                   </div>
-                </div>
+                </ModalFieldGrid>
               </div>
             ) : (
               /* BASIC INFO GRID */
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-3xl border border-slate-200">
+              <ModalFieldGrid>
                 {Object.entries(viewingItem)
                   .filter(([key, value]) => {
                     const internalFields = [
@@ -6649,10 +5308,10 @@ export default function AdminPanel() {
                       "updated_at",
                       "password",
                     ];
-                    if (internalFields.includes(key)) return false;
-                    if (value === null || value === undefined || value === "")
+                    if(internalFields.includes(key)) return false;
+                    if(value === null || value === undefined || value === "")
                       return false;
-                    if (
+                    if(
                       typeof value === "object" &&
                       !Array.isArray(value) &&
                       Object.keys(value).length === 0
@@ -6661,7 +5320,7 @@ export default function AdminPanel() {
                     return true;
                   })
                   .flatMap(([key, value]) => {
-                    if (key === "structured_fields" && value) {
+                    if(key === "structured_fields" && value) {
                       const fields =
                         typeof value === "string" ? JSON.parse(value) : value;
                       return Object.entries(fields)
@@ -6674,7 +5333,7 @@ export default function AdminPanel() {
                         )
                         .map(([subKey, subVal]) => {
                           let cleanSubKey = subKey;
-                          if (subKey === "file_urls")
+                          if(subKey === "file_urls")
                             cleanSubKey = translate(
                               "adminPanelPage.mediaAssets",
                             );
@@ -6682,7 +5341,7 @@ export default function AdminPanel() {
                         });
                     }
                     let cleanKey = key;
-                    if (
+                    if(
                       key === "pdf_url" ||
                       key === "youtube_url" ||
                       key === "file_url"
@@ -6693,8 +5352,7 @@ export default function AdminPanel() {
                   .map(([key, value]) => {
                     let displayKey = key.replace(/_/g, " ");
                     let displayValue: React.ReactNode = String(value);
-
-                    if (
+                    if(
                       (key === "created_by" || key === "author") &&
                       typeof value === "object" &&
                       value !== null
@@ -6708,7 +5366,7 @@ export default function AdminPanel() {
                         (value as any).name ||
                         (value as any).email ||
                         translate("adminPanelPage.fallbacks.nexusAdmin");
-                    } else if (
+                    } else if(
                       key === "category" &&
                       typeof value === "object" &&
                       value !== null
@@ -6716,7 +5374,7 @@ export default function AdminPanel() {
                       displayValue =
                         (value as any).name ||
                         translate("adminPanelPage.fallbacks.uncategorized");
-                    } else if (key === "tags" && Array.isArray(value)) {
+                    } else if(key === "tags" && Array.isArray(value)) {
                       displayValue = (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {value.map((tag: string) => (
@@ -6729,11 +5387,13 @@ export default function AdminPanel() {
                           ))}
                         </div>
                       );
-                    } else if (typeof value === "boolean") {
+                    } else if(["status", "moderation_status"].includes(key) && isUndisplayedAdminStatus(String(value))) {
+                      displayValue = translate("adminUi.neutralStatus");
+                    } else if(typeof value === "boolean") {
                       displayValue = value
                         ? translate("adminPanelPage.yes")
                         : translate("adminPanelPage.no");
-                    } else if (
+                    } else if(
                       typeof value === "string" &&
                       /^\d{4}-\d{2}-\d{2}/.test(value)
                     ) {
@@ -6744,7 +5404,7 @@ export default function AdminPanel() {
                       } catch {
                         displayValue = value;
                       }
-                    } else if (
+                    } else if(
                       Array.isArray(value) ||
                       (typeof value === "string" && value.includes("http"))
                     ) {
@@ -6752,7 +5412,7 @@ export default function AdminPanel() {
                       displayValue = (
                         <div className="flex flex-wrap gap-2 mt-2">
                           {urls.map((url, idx) => {
-                            if (
+                            if(
                               typeof url !== "string" ||
                               !url.includes("http")
                             )
@@ -6763,7 +5423,6 @@ export default function AdminPanel() {
                               url.includes("youtube.com") ||
                               url.includes("vimeo.com") ||
                               url.match(/\.(mp4|webm)$/) != null;
-
                             return isImage ? (
                               <div
                                 key={idx}
@@ -6811,7 +5470,6 @@ export default function AdminPanel() {
                         </div>
                       );
                     }
-
                     return (
                       <div key={key}>
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
@@ -6823,14 +5481,13 @@ export default function AdminPanel() {
                       </div>
                     );
                   })}
-              </div>
+              </ModalFieldGrid>
             )}
-
             {/* FULL WIDTH TEXT BLOCKS */}
             {(detailsItem?.description || detailsItem?.body) && (
               <div className="space-y-4">
                 {detailsItem?.description && (
-                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200">
+                  <div className="bg-slate-50 p-4 rounded-3xl border border-slate-200">
                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">
                       {translate("adminPanelPage.descriptionSummary")}
                     </p>
@@ -6840,7 +5497,7 @@ export default function AdminPanel() {
                   </div>
                 )}
                 {detailsItem?.body && (
-                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200">
+                  <div className="bg-slate-50 p-4 rounded-3xl border border-slate-200">
                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">
                       {translate("adminPanelPage.fullNarrativeContent")}
                     </p>
@@ -6852,109 +5509,98 @@ export default function AdminPanel() {
                 )}
               </div>
             )}
-
             {/* ATTACHMENTS */}
             {(activeTab === "forums" ||
               activeTab === "articles" ||
               activeTab === "technicopro" ||
               activeTab === "trainings" ||
               activeTab === "events") && (
-              <div className="space-y-4">
-                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                  <Database className="w-4 h-4 text-primary" />
-                  {translate("adminPanelPage.secureAttachmentsRepository")}
-                </h4>
-
-                {(() => {
-                  const attachmentUrls =
-                    activeTab === "articles" || activeTab === "technicopro"
-                      ? detailsItem?.structured_fields?.file_urls || []
-                      : detailsItem?.attachments || [];
-
-                  return attachmentUrls.length > 0 ? (
-                    <div className="flex flex-wrap gap-3">
-                      {attachmentUrls.map((file: any) => {
-                        const url =
-                          typeof file === "string" ? file : file.url || "";
-                        const name =
-                          typeof file === "string"
-                            ? getLastPathSegment(file)
-                            : file.file_name ||
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                    <Database className="w-4 h-4 text-primary" />
+                    {translate("adminPanelPage.secureAttachmentsRepository")}
+                  </h4>
+                  {(() => {
+                    const attachmentUrls =
+                      activeTab === "articles" || activeTab === "technicopro"
+                        ? detailsItem?.structured_fields?.file_urls || []
+                        : detailsItem?.attachments || [];
+                    return attachmentUrls.length > 0 ? (
+                      <div className="flex flex-wrap gap-3">
+                        {attachmentUrls.map((file: any) => {
+                          const url =
+                            typeof file === "string" ? file : file.url || "";
+                          const name =
+                            typeof file === "string"
+                              ? getLastPathSegment(file)
+                              : file.file_name ||
                               getLastPathSegment(file.url || "");
-                        const isImage =
-                          typeof file === "string"
-                            ? isImageUrl(file)
-                            : file.file_type?.includes("image");
-                        const isVideo =
-                          typeof file === "string"
-                            ? /\.(mp4|webm)$/i.test(url)
-                            : file.file_type?.includes("video") ||
+                          const isImage =
+                            typeof file === "string"
+                              ? isImageUrl(file)
+                              : file.file_type?.includes("image");
+                          const isVideo =
+                            typeof file === "string"
+                              ? /\.(mp4|webm)$/i.test(url)
+                              : file.file_type?.includes("video") ||
                               file.url?.match(/\.(mp4|webm)$/) != null;
-
-                        return isImage ? (
-                          <div
-                            key={url}
-                            className="w-24 h-24 rounded-2xl overflow-hidden border border-slate-200 group relative shadow-sm"
-                          >
-                            <img
-                              src={url}
-                              alt={name}
-                              className="w-full h-full object-cover"
-                            />
+                          return isImage ? (
+                            <div
+                              key={url}
+                              className="w-24 h-24 rounded-2xl overflow-hidden border border-slate-200 group relative shadow-sm"
+                            >
+                              <img
+                                src={url}
+                                alt={name}
+                                className="w-full h-full object-cover"
+                              />
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity text-white text-[8px] font-black uppercase"
+                              >
+                                <Eye className="w-5 h-5 mb-1" />
+                                {translate("adminPanelPage.view")}
+                              </a>
+                            </div>
+                          ) : (
                             <a
+                              key={url}
                               href={url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity text-white text-[8px] font-black uppercase"
+                              className="flex flex-col items-center justify-center w-24 h-24 bg-white border border-slate-200 rounded-2xl hover:border-primary hover:bg-slate-50 transition-all group shadow-sm text-center p-2"
                             >
-                              <Eye className="w-5 h-5 mb-1" />
-                              {translate("adminPanelPage.view")}
+                              {isVideo ? (
+                                <PlayCircle className="w-6 h-6 text-emerald-500 mb-2" />
+                              ) : (
+                                <FileIcon className="w-6 h-6 text-blue-500 mb-2" />
+                              )}
+                              <p className="text-[8px] font-bold text-slate-900 truncate w-full px-1">
+                                {name ||
+                                  translate("adminPanelPage.fallbacks.asset")}
+                              </p>
+                              <span className="text-[6px] font-black uppercase text-slate-400 mt-1">
+                                {isVideo
+                                  ? translate("adminPanelPage.playMedia")
+                                  : translate("adminPanelPage.download")}
+                              </span>
                             </a>
-                          </div>
-                        ) : (
-                          <a
-                            key={url}
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex flex-col items-center justify-center w-24 h-24 bg-white border border-slate-200 rounded-2xl hover:border-primary hover:bg-slate-50 transition-all group shadow-sm text-center p-2"
-                          >
-                            {isVideo ? (
-                              <PlayCircle className="w-6 h-6 text-emerald-500 mb-2" />
-                            ) : (
-                              <FileIcon className="w-6 h-6 text-blue-500 mb-2" />
-                            )}
-                            <p className="text-[8px] font-bold text-slate-900 truncate w-full px-1">
-                              {name ||
-                                translate("adminPanelPage.fallbacks.asset")}
-                            </p>
-                            <span className="text-[6px] font-black uppercase text-slate-400 mt-1">
-                              {isVideo
-                                ? translate("adminPanelPage.playMedia")
-                                : translate("adminPanelPage.download")}
-                            </span>
-                          </a>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="py-8 text-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-                      <p className="text-[10px] text-slate-300 uppercase tracking-widest">
-                        {translate("adminPanelPage.noActiveAttachments")}
-                      </p>
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
-
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="py-8 text-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                        <p className="text-[10px] text-slate-300 uppercase tracking-widest">
+                          {translate("adminPanelPage.noActiveAttachments")}
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             {/* CLOSE BUTTON */}
-            <button
-              onClick={() => setIsDetailsOpen(false)}
-              className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase hover:bg-slate-800 transition-colors shadow-lg cursor-pointer"
-            >
-              {translate("adminPanelPage.close")}
-            </button>
           </div>
         ) : (
           <div className="py-20 text-center">
@@ -6974,7 +5620,6 @@ const Actions = ({
   onEdit,
   onDelete,
   onView,
-  onManagePermissions,
   onPublish,
   onPermanentDelete,
   deleteLabel,
@@ -6984,7 +5629,6 @@ const Actions = ({
   onEdit: () => void;
   onDelete: () => void;
   onView: () => void;
-  onManagePermissions?: () => void;
   onPublish?: () => void;
   onPermanentDelete?: () => void;
   deleteLabel?: string;
@@ -6994,27 +5638,19 @@ const Actions = ({
   const { translate } = useI18n();
 
   return (
-    <span className="flex max-w-full flex-wrap justify-end gap-1 overflow-hidden opacity-20 transition-opacity group-hover:opacity-100 sm:gap-2">
+    <span className="admin-actions flex max-w-full flex-wrap justify-end gap-1">
       <button
         onClick={onView}
+        aria-label={translate("adminPanelPage.view")}
         title={translate("adminPanelPage.view")}
         className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-colors cursor-pointer"
       >
         <Eye className="w-4 h-4" />
       </button>
 
-      {onManagePermissions && (
-        <button
-          onClick={onManagePermissions}
-          title={translate("adminPanelPage.managePermissions")}
-          className="p-2 hover:bg-primary/10 rounded-lg text-slate-400 hover:text-primary-dark transition-colors cursor-pointer"
-        >
-          <Shield className="w-4 h-4" />
-        </button>
-      )}
-
       <button
         onClick={onEdit}
+        aria-label={translate("adminPanelPage.edit")}
         title={translate("adminPanelPage.edit")}
         className="p-2 hover:bg-primary/20 rounded-lg text-slate-400 hover:text-slate-900 transition-colors cursor-pointer"
       >
@@ -7086,6 +5722,7 @@ const BeautifulDateTimePicker = ({
   type: "date" | "time";
   icon: React.ReactNode;
 }) => {
+  const controlId = React.useId();
   const { dateLocale, translate } = useI18n();
   const [isOpen, setIsOpen] = React.useState(false);
   const [viewDate, setViewDate] = React.useState(new Date());
@@ -7244,17 +5881,20 @@ const BeautifulDateTimePicker = ({
 
   return (
     <div className="space-y-2 relative" ref={pickerRef}>
-      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+      <label htmlFor={controlId} className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
         {label}
       </label>
-      <div
+      <button
+        type="button"
+        id={controlId}
+        aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}
-        className="relative group cursor-pointer"
+        className="relative group cursor-pointer block w-full text-left"
       >
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none group-hover:scale-110 transition-transform">
+        <span className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none group-hover:scale-110 transition-transform">
           {icon}
-        </div>
-        <div className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm transition-all hover:bg-white flex items-center min-h-[46px]">
+        </span>
+        <span className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm transition-all hover:bg-white flex items-center min-h-[46px]">
           {value ? (
             type === "date" ? (
               format(parse(value, "yyyy-MM-dd", new Date()), "PPP", {
@@ -7268,11 +5908,11 @@ const BeautifulDateTimePicker = ({
               {translate("adminPanelPage.selectLabel", { label })}
             </span>
           )}
-        </div>
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300">
+        </span>
+        <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300">
           <Plus className="w-3 h-3 rotate-45" />
-        </div>
-      </div>
+        </span>
+      </button>
 
       {isOpen && (
         <div className="absolute left-0 z-[100] mt-2 origin-top-left">
@@ -7299,22 +5939,26 @@ const FormField = ({
   required?: boolean;
   autoComplete?: string;
   minLength?: number;
-}) => (
-  <div className="space-y-2">
-    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-      {label}
-    </label>
-    <input
-      required={required}
-      type={type}
-      autoComplete={autoComplete}
-      minLength={minLength}
-      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary/10 outline-none font-bold text-sm transition-all"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  </div>
-);
+}) => {
+  const controlId = React.useId();
+  return (
+    <div className="space-y-2">
+      <label htmlFor={controlId} className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+        {label}
+      </label>
+      <input
+        id={controlId}
+        required={required}
+        type={type}
+        autoComplete={autoComplete}
+        minLength={minLength}
+        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary/10 outline-none font-bold text-sm transition-all"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+};
 
 const SelectField = ({
   label,
@@ -7327,14 +5971,16 @@ const SelectField = ({
   value: any;
   onChange: (val: string) => void;
 }) => {
+  const controlId = React.useId();
   const { translate } = useI18n();
 
   return (
     <div className="space-y-2">
-      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+      <label htmlFor={controlId} className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
         {label}
       </label>
       <select
+        id={controlId}
         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary/10 outline-none font-bold text-sm uppercase tracking-widest cursor-pointer"
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -7342,6 +5988,7 @@ const SelectField = ({
         <option value="">
           {translate("adminPanelPage.selectLabel", { label })}
         </option>
+        {value && !options.some((opt) => (typeof opt === "string" ? opt : opt.value) === value) ? <option value={value} disabled>{translate("adminUi.neutralStatus")}</option> : null}
         {options.map((opt) => {
           const labelText = typeof opt === "string" ? opt : opt.label;
           const valueVal = typeof opt === "string" ? opt : opt.value;
@@ -7377,43 +6024,33 @@ const FileDropzone = ({
     const droppedFiles = Array.from(e.dataTransfer.files);
     onFilesChange([...files, ...droppedFiles]);
   };
-
   const removeFile = (index: number) => {
     onFilesChange(files.filter((_, i) => i !== index));
   };
-
   return (
     <div className="space-y-3">
       <div onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
         <FileUploadDropzone
+          presentation="compact"
           inputId={inputId}
           title={title || translate("adminPanelPage.dropzone.clickOrDrag")}
           hint={hint || translate("adminPanelPage.dropzone.attachmentsHint")}
           selectedLabel={
             files.length
               ? translate("adminPanelPage.dropzone.filesSelected", {
-                  count: files.length,
-                })
+                count: files.length,
+              })
               : undefined
           }
           onFilesSelected={(newFiles) => onFilesChange([...files, ...newFiles])}
           preview={
             files.length ? (
               <SelectedFilesPreview
+                presentation="compact"
                 files={files}
                 onRemove={removeFile}
-                className="h-full w-full"
               />
             ) : undefined
-          }
-          emptyPreview={
-            <div className="flex h-full min-h-[336px] w-full items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-6">
-              <div className="flex h-28 w-28 items-center justify-center rounded-full bg-white px-3 text-center text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 shadow-sm">
-                {emptyLabel ||
-                  hint ||
-                  translate("adminPanelPage.dropzone.attachmentsHint")}
-              </div>
-            </div>
           }
         />
       </div>

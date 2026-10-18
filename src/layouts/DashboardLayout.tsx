@@ -199,14 +199,12 @@ const DashboardLayout: React.FC = () => {
   const [technicoProDropdownOpen, setTechnicoProDropdownOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const dispatch = useDispatch();
   const location = useLocation();
   const isAdminRoute = location.pathname === "/admin";
   const navigate = useNavigate();
   const { translate } = useI18n();
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
-  const mobileSearchContainerRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const lastSearchQueryRef = useRef("");
   const lastSyncedProfileRef = useRef<string>("");
@@ -251,14 +249,12 @@ const DashboardLayout: React.FC = () => {
     setTechnicoProDropdownOpen(location.pathname.startsWith("/technicopro"));
     setSidebarOpen(false);
     setSearchOpen(false);
-    setMobileSearchOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
-        !searchContainerRef.current?.contains(event.target as Node) &&
-        !mobileSearchContainerRef.current?.contains(event.target as Node)
+        !searchContainerRef.current?.contains(event.target as Node)
       ) {
         setSearchOpen(false);
       }
@@ -267,11 +263,6 @@ const DashboardLayout: React.FC = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  useEffect(() => {
-    if (!mobileSearchOpen) return;
-    window.setTimeout(() => searchInputRef.current?.focus(), 0);
-  }, [mobileSearchOpen]);
 
   const getRoleLabel = (role?: string | null) => {
     const roleDetailsName = user?.role_details?.name;
@@ -430,7 +421,7 @@ const DashboardLayout: React.FC = () => {
   }, [searchTerm]);
 
   const handleSearchSubmit = async () => {
-    await executeSearch(searchTerm);
+    await executeSearch(searchTerm, true);
   };
 
   const handleSearchKeyDown = async (
@@ -448,15 +439,7 @@ const DashboardLayout: React.FC = () => {
 
   const handleResultNavigation = (path: string) => {
     setSearchOpen(false);
-    setMobileSearchOpen(false);
     navigate(path);
-  };
-
-  const handleClearSearch = () => {
-    setSearchTerm("");
-    setSearchOpen(false);
-    lastSearchQueryRef.current = "";
-    searchInputRef.current?.focus();
   };
 
   const getResultIcon = (type: GlobalSearchResultType) => {
@@ -537,7 +520,7 @@ const DashboardLayout: React.FC = () => {
                 >
                   <ResultIcon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--archi-muted)]" />
                   <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex min-w-0 items-center gap-2">
+                    <div className="mb-1 flex min-w-0 flex-wrap items-center gap-2">
                       <span className="rounded-full bg-slate-100 px-2 py-[2px] text-[9px] font-bold uppercase tracking-[0.08em] text-slate-500">
                         {getResultTypeLabel(result.type)}
                       </span>
@@ -551,7 +534,7 @@ const DashboardLayout: React.FC = () => {
                       {result.title}
                     </div>
                     {meta ? (
-                      <div className="line-clamp-2 text-[11px] text-[var(--archi-secondary)]">
+                      <div className="line-clamp-2 break-words text-[11px] text-[var(--archi-secondary)]">
                         {meta}
                       </div>
                     ) : null}
@@ -581,7 +564,7 @@ const DashboardLayout: React.FC = () => {
       )}
 
       <aside
-        className={`archi-scrollbar fixed inset-y-0 left-0 z-40 flex h-screen w-[240px] flex-col overflow-y-auto border-r border-[var(--archi-border)] bg-[var(--archi-surface)] transition-transform duration-300 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
+        className={`archi-scrollbar fixed inset-y-0 left-0 z-40 flex h-screen w-[240px] max-w-[85vw] shrink-0 flex-col overflow-y-auto border-r border-[var(--archi-border)] bg-[var(--archi-surface)] transition-transform duration-300 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -801,160 +784,79 @@ const DashboardLayout: React.FC = () => {
             : "h-screen overflow-y-auto"
         }`}
       >
-        <header className="sticky top-0 z-30 flex h-[60px] shrink-0 items-center gap-4 border-b border-[var(--archi-border)] bg-[var(--archi-surface)] px-4 lg:px-7">
+        <header className="dashboard-header sticky top-0 z-30 flex shrink-0 flex-wrap items-center border-b border-[var(--archi-border)] bg-[var(--archi-surface)]">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] text-[var(--archi-secondary)] transition-all hover:bg-[var(--archi-surface-soft)] hover:text-[var(--archi-text)] lg:hidden"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-[var(--archi-secondary)] hover:bg-[var(--archi-surface-soft)] lg:hidden"
             aria-label={translate("layout.openMenu")}
           >
             <Menu className="h-5 w-5" />
           </button>
-
-          <div className="min-w-0 flex-1 text-[15px] font-semibold text-[var(--archi-text)]">
+          <div className="min-w-0 flex-1 break-words text-[15px] font-semibold text-[var(--archi-text)]">
             {pageTitle}
           </div>
-
-          <div
-            ref={searchContainerRef}
-            className="relative hidden w-[420px] md:block"
-          >
-            <div className="flex items-center gap-2">
-              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-[10px] border border-[var(--archi-border)] bg-[var(--archi-surface-soft)] px-3 py-[7px] transition-all focus-within:border-[var(--archi-accent)] focus-within:bg-white focus-within:archi-surface-ring">
-                <Search className="h-4 w-4 shrink-0 text-[var(--archi-muted)]" />
-                <input
-                  type="text"
-                  placeholder={translate("layout.searchPlaceholder")}
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  onFocus={() => {
-                    if (searchResults || isSearchError) {
-                      setSearchOpen(true);
-                    }
+          <div ref={searchContainerRef} className="dashboard-search relative min-w-0">
+            <div className="relative rounded-[10px] border border-[var(--archi-border)] bg-[var(--archi-surface-soft)] focus-within:border-[var(--archi-accent)] focus-within:bg-white focus-within:archi-surface-ring">
+              <input
+                ref={searchInputRef}
+                type="text"
+                aria-label={translate("layout.searchButton")}
+                aria-expanded={searchOpen}
+                aria-controls="global-search-results"
+                placeholder={translate("layout.searchPlaceholder")}
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                onFocus={() => {
+                  if (trimmedSearchTerm && (searchResults || isSearchError)) setSearchOpen(true);
+                }}
+                onKeyDown={handleSearchKeyDown}
+                className="block w-full min-w-0 rounded-[10px] border-0 bg-transparent py-2 pl-3 pr-20 text-[13px] outline-none placeholder:text-[var(--archi-muted)]"
+              />
+              {searchTerm ? (
+                <button
+                  type="button"
+                  aria-label={translate("layout.searchClear")}
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSearchOpen(false);
+                    lastSearchQueryRef.current = "";
+                    searchInputRef.current?.focus();
                   }}
-                  onKeyDown={handleSearchKeyDown}
-                  className="w-full border-0 bg-transparent text-[13px] outline-none placeholder:text-[var(--archi-muted)]"
-                />
-                {searchTerm ? (
-                  <button
-                    type="button"
-                    onClick={handleClearSearch}
-                    className="shrink-0 text-[var(--archi-muted)] transition-colors hover:text-[var(--archi-text)]"
-                    aria-label={translate("layout.searchClear")}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                ) : null}
-              </div>
+                  className="absolute inset-y-0 right-10 flex w-8 items-center justify-center text-[var(--archi-muted)] hover:text-[var(--archi-text)]"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={handleSearchSubmit}
                 disabled={!trimmedSearchTerm}
-                className="inline-flex h-[38px] shrink-0 items-center justify-center gap-2 rounded-[10px] border border-[var(--archi-border)] bg-white px-3 text-[12px] font-semibold text-[var(--archi-secondary)] transition-all hover:border-[var(--archi-border-strong)] hover:bg-[var(--archi-surface-soft)] hover:text-[var(--archi-text)] disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label={translate("layout.searchButton")}
+                className="absolute inset-y-0 right-0 flex w-10 cursor-pointer items-center justify-center rounded-r-[10px] text-[var(--archi-secondary)] hover:bg-[var(--archi-accent-soft)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-[var(--archi-accent)]"
               >
-                <Search className="h-3.5 w-3.5" />
-                <span>{translate("layout.searchButton")}</span>
+                <Search className="h-4 w-4" />
               </button>
             </div>
-
             {searchOpen ? (
-              <div className="absolute right-0 top-[calc(100%+10px)] z-40 w-full">
+              <div id="global-search-results" className="absolute right-0 top-[calc(100%+10px)] z-40 w-full" aria-live="polite">
                 {renderSearchResults()}
               </div>
             ) : null}
           </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              setMobileSearchOpen(true);
-              setSearchOpen(Boolean(trimmedSearchTerm));
-            }}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] text-[var(--archi-secondary)] transition-all hover:bg-[var(--archi-surface-soft)] hover:text-[var(--archi-text)] md:hidden"
-            aria-label={translate("layout.searchButton")}
-          >
-            <Search className="h-5 w-5" />
-          </button>
-
-          {/* <div className="hidden items-center gap-2 text-xs text-[var(--archi-secondary)] md:flex">
-            <span className="h-[7px] w-[7px] rounded-full bg-[var(--archi-green)] shadow-[0_0_6px_rgba(22,163,74,.55)]" />
-            <span>{onlineUsersData?.count || 0} membres en ligne</span>
-          </div> */}
-
-          <LanguageSwitcher compact className="hidden lg:inline-flex" />
-
+          <LanguageSwitcher compact className="shrink-0" />
           <a
             href="https://extra.archicopro.com/index.php"
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden items-center gap-2 rounded-[10px] border border-[var(--archi-border)] bg-white px-3 py-2 text-[12px] font-semibold text-[var(--archi-secondary)] transition-all hover:border-[var(--archi-border-strong)] hover:bg-[var(--archi-surface-soft)] hover:text-[var(--archi-text)] md:inline-flex"
+            className="inline-flex shrink-0 items-center gap-2 rounded-[10px] border border-[var(--archi-border)] bg-white px-3 py-2 text-[12px] font-semibold text-[var(--archi-secondary)] hover:bg-[var(--archi-surface-soft)]"
           >
             <ExternalLink className="h-3.5 w-3.5" />
             {translate("layout.extranet")}
           </a>
-
-          {/* <Link
-            to="/profile"
-            className="flex h-[34px] w-[34px] items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-fuchsia-400 to-rose-500 text-[12px] font-bold text-white"
-          >
-            {user?.avatar_url ? (
-              <img
-                src={user.avatar_url}
-                alt={fullName}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              userInitials
-            )}
-          </Link> */}
         </header>
 
-        {mobileSearchOpen ? (
-          <div
-            ref={mobileSearchContainerRef}
-            className="sticky top-[60px] z-30 border-b border-[var(--archi-border)] bg-white p-3 shadow-sm md:hidden"
-          >
-            <div className="flex items-center gap-2">
-              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-[10px] border border-[var(--archi-border)] bg-[var(--archi-surface-soft)] px-3 py-2 focus-within:border-[var(--archi-accent)] focus-within:bg-white">
-                <Search className="h-4 w-4 shrink-0 text-[var(--archi-muted)]" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder={translate("layout.searchPlaceholder")}
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  onFocus={() => {
-                    if (searchResults || isSearchError || trimmedSearchTerm) {
-                      setSearchOpen(true);
-                    }
-                  }}
-                  onKeyDown={handleSearchKeyDown}
-                  className="w-full border-0 bg-transparent text-[13px] outline-none placeholder:text-[var(--archi-muted)]"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={handleSearchSubmit}
-                disabled={!trimmedSearchTerm}
-                className="inline-flex h-[38px] shrink-0 items-center justify-center gap-1.5 rounded-[10px] border border-[var(--archi-border)] bg-white px-2.5 text-[12px] font-semibold text-[var(--archi-secondary)] transition-all hover:border-[var(--archi-border-strong)] hover:bg-[var(--archi-surface-soft)] hover:text-[var(--archi-text)] disabled:cursor-not-allowed disabled:opacity-50"
-                aria-label={translate("layout.searchButton")}
-              >
-                <Search className="h-3.5 w-3.5" />
-                <span className="hidden min-[380px]:inline">
-                  {translate("layout.searchButton")}
-                </span>
-              </button>
-            </div>
-            {searchOpen ? (
-              <div className="mt-2">
-                {renderSearchResults()}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        <main className="flex-1">
+        <main className="min-w-0 flex-1">
           <Suspense fallback={<OutletLoadingFallback />}>
             <Outlet />
           </Suspense>

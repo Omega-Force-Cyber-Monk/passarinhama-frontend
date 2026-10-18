@@ -1,0 +1,86 @@
+.documents-page { width: 100%; min-width: 0; max-width: 100%; padding: clamp(1rem, 2.5vw, 2rem); }
+.documents-content { container: documents / inline-size; display: flex; flex-direction: column; min-width: 0; gap: 1.75rem; }
+.documents-content > *, .documents-heading, .documents-search, .documents-content section { min-width: 0; max-width: 100%; }
+.documents-header { display: flex; flex-direction: column; gap: 1rem; }
+.documents-title { font-size: clamp(1.5rem, 3.5cqi, 1.875rem); line-height: 1.35; overflow-wrap: anywhere; }
+.documents-breadcrumbs { display: flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; margin-top: 0.75rem; color: var(--archi-secondary); font-size: 0.875rem; }
+.documents-breadcrumb { display: flex; align-items: center; min-width: 0; max-width: 100%; gap: 0.5rem; }
+.documents-breadcrumb button { min-width: 0; min-height: 2.75rem; text-align: left; overflow-wrap: anywhere; }
+.documents-breadcrumb svg { flex-shrink: 0; }
+.documents-header-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.625rem; min-width: 0; }
+.documents-header-actions > button { flex: 1 1 9rem; min-width: 0; white-space: normal; }
+.documents-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+.documents-search { flex: 1 1 16rem; }
+.documents-search input { min-width: 0; min-height: 2.75rem; }
+.documents-search svg { pointer-events: none; }
+.documents-view-toggle { flex-shrink: 0; width: fit-content; max-width: 100%; margin-left: auto; }
+.documents-view-toggle button { display: inline-flex; align-items: center; justify-content: center; min-width: 2.75rem; min-height: 2.75rem; }
+.documents-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 1rem; }
+.documents-folder-card, .documents-file-card { display: flex; flex-direction: column; min-width: 0; max-width: 100%; }
+.documents-folder-icon { display: flex; align-items: center; justify-content: center; width: 3rem; height: 3rem; flex-shrink: 0; }
+.documents-name { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.documents-open { display: block; max-width: 100%; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+.documents-grid h4 { min-height: 2.75em; line-height: 1.375; }
+.documents-grid .documents-open { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.documents-file-footer { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; margin-top: 0.75rem; }
+.documents-file-footer > span { overflow-wrap: anywhere; }
+.documents-file-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; }
+.documents-grid button:not(.documents-open), .documents-table td button:not(.documents-open) { display: inline-flex; align-items: center; justify-content: center; min-width: 2.75rem; min-height: 2.75rem; flex-shrink: 0; }
+.documents-thumbnail { min-width: 0; flex-shrink: 0; }
+.documents-file-card .relative > span { max-width: calc(100% - 1rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.documents-list-wrap { min-width: 0; max-width: 100%; }
+.documents-table { display: block; width: 100%; text-align: left; }
+.documents-table thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.documents-table tbody { display: block; }
+.documents-table tbody tr { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.5rem; padding: 1rem; }
+.documents-table td { display: block; min-width: 0; padding: 0; overflow-wrap: anywhere; }
+.documents-table td:first-child > div { min-width: 0; }
+.documents-table td:first-child svg { flex-shrink: 0; }
+.documents-table td[data-label]::before { content: attr(data-label) ": "; font-size: 0.75rem; font-weight: 600; }
+.documents-table td:last-child { text-align: left; margin-top: 0.25rem; }
+.documents-table td:last-child > div { flex-wrap: wrap; justify-content: flex-start; gap: 0.25rem; }
+.documents-page :is(a, button, [role="button"]):focus-visible, .documents-dialog :is(button, [role="button"]):focus-visible { outline: 2px solid var(--archi-accent); outline-offset: 2px; }
+.documents-page .animate-pulse { min-width: 0; max-width: 100%; }
+.documents-loading-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
+
+@container documents (min-width: 30rem) { .documents-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container documents (min-width: 42rem) {
+  .documents-header { flex-direction: row; align-items: center; justify-content: space-between; }
+  .documents-heading { flex: 1 1 20rem; }
+  .documents-header-actions { flex: 0 1 auto; justify-content: flex-end; }
+  .documents-header-actions > button { flex: 0 1 auto; }
+}
+@container documents (min-width: 46rem) {
+  .documents-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .documents-table { display: table; table-layout: fixed; }
+  .documents-table thead { position: static; display: table-header-group; width: auto; height: auto; clip-path: none; white-space: normal; }
+  .documents-table tbody { display: table-row-group; }
+  .documents-table tbody tr { display: table-row; padding: 0; }
+  .documents-table th { padding: 1rem; overflow-wrap: anywhere; }
+  .documents-table td { display: table-cell; padding: 1rem; vertical-align: middle; }
+  .documents-table th:first-child { width: 40%; }
+  .documents-table th:last-child { width: 10rem; }
+  .documents-table td[data-label]::before { content: none; }
+  .documents-table td:last-child { text-align: right; margin-top: 0; }
+  .documents-table td:last-child > div { justify-content: flex-end; }
+}
+@container documents (min-width: 62rem) { .documents-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* Opt-in dialog styles leave other modules' dialog layouts unchanged. */
+.documents-dialog { padding: clamp(0.5rem, 2vw, 1rem); }
+.documents-dialog > .relative { min-width: 0; max-height: calc(100dvh - 2rem); }
+.documents-dialog > .relative > :first-child { min-width: 0; flex-shrink: 0; gap: 0.5rem; padding: clamp(1rem, 3vw, 1.5rem); }
+.documents-dialog h3 { min-width: 0; overflow-wrap: anywhere; }
+.documents-dialog > .relative > :first-child > button { display: inline-flex; align-items: center; justify-content: center; min-width: 2.75rem; min-height: 2.75rem; flex-shrink: 0; }
+.documents-dialog > .relative > .flex-1 { min-width: 0; min-height: 0; padding: clamp(1rem, 3vw, 1.5rem); overscroll-behavior: contain; }
+.documents-dialog input { min-width: 0; max-width: 100%; min-height: 2.75rem; }
+.documents-dialog p { overflow-wrap: anywhere; }
+.documents-dialog form button { min-height: 2.75rem; white-space: normal; }
+.documents-dropzone { padding: clamp(1rem, 5vw, 2.5rem); text-align: center; }
+.documents-preview-toolbar > :first-child { flex: 1 1 14rem; min-width: 0; }
+.documents-preview-toolbar > :last-child { display: flex; flex-wrap: wrap; min-width: 0; max-width: 100%; }
+.documents-preview-toolbar button { min-height: 2.75rem; justify-content: center; white-space: normal; }
+.documents-dialog :is(iframe, video, audio, img) { max-width: 100%; }
+.documents-confirm-dialog > .relative { display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }
+.documents-confirm-dialog > .relative > :last-child { display: flex; flex-wrap: wrap; gap: 0.75rem; padding: clamp(1rem, 3vw, 1.5rem); }
+.documents-confirm-dialog > .relative > :last-child > button { flex: 1 1 8rem; min-width: 0; min-height: 2.75rem; overflow-wrap: anywhere; }

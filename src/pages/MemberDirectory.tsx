@@ -1,7 +1,8 @@
+import { ModalFieldGrid, ModalFullWidth, ModalSection, ModalMediaSplit, ModalSubmitButton } from "../components/ui/ModalLayout";
+import "./MemberAdminModals.css";
 import React, { useEffect, useState } from "react";
 import {
   Search,
-  Filter,
   MapPin,
   Mail,
   Phone,
@@ -10,15 +11,14 @@ import {
   UserPlus,
   ChevronLeft,
   ChevronRight,
-  CheckCircle2,
+  Eye,
+  EyeOff,
   AlertCircle,
   Loader2,
   Download,
   RefreshCw,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { useSelector } from "react-redux";
-import { RootState } from "../redux/store";
 import { usePermissions } from "../hooks/usePermissions";
 import Modal from "../components/ui/Modal";
 import ConfirmModal from "../components/ui/ConfirmModal";
@@ -47,6 +47,7 @@ import type {
   UserRoleDetails,
 } from "../redux/features/members/membersTypes";
 import { getApiErrorDisplayMessage } from "../utils/apiErrorMessages";
+import "./MemberDirectory.css";
 
 const PAGE_SIZE = 21;
 
@@ -208,7 +209,6 @@ const buildFormData = (
 };
 
 export default function MemberDirectory() {
-  const { user } = useSelector((state: RootState) => state.auth);
   const { translate } = useI18n();
   const { hasPermission } = usePermissions();
   const canViewUsers = hasPermission("user", "view");
@@ -222,6 +222,7 @@ export default function MemberDirectory() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [memberActionTarget, setMemberActionTarget] = useState<ApiUser | null>(null);
   const [editingMember, setEditingMember] = useState<ApiUser | null>(null);
@@ -309,7 +310,14 @@ export default function MemberDirectory() {
     if ((member && !canEditUser) || (!member && !canCreateUser)) return;
     setEditingMember(member || null);
     setFormData(buildFormData(member, defaultMemberRoleId));
+    setShowPassword(false);
     setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setShowPassword(false);
+    setFormData((current) => ({ ...current, password: "" }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -395,6 +403,7 @@ export default function MemberDirectory() {
       }
 
       setIsModalOpen(false);
+      setShowPassword(false);
       setEditingMember(null);
       setFormData({ ...emptyMemberForm, role_id: defaultMemberRoleId });
       notify(
@@ -445,17 +454,18 @@ export default function MemberDirectory() {
   };
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="member-directory-page">
       <FeedbackToast toast={toast} />
 
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 underline decoration-primary decoration-4 underline-offset-8">
+      <div className="member-directory-content">
+      <header className="member-directory-header">
+        <div className="min-w-0">
+          <h2 className="member-directory-title text-3xl font-bold tracking-tight text-slate-900 underline decoration-primary decoration-4 underline-offset-8">
             {translate("memberDirectory.title")}
           </h2>
         </div>
         {(canCreateUser || canViewUsers) && (
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="member-directory-header-actions">
             {canViewUsers && (
               <button
                 onClick={handleExportUsers}
@@ -483,11 +493,12 @@ export default function MemberDirectory() {
         )}
       </header>
 
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
+      <div className="member-directory-toolbar bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="member-directory-search relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <input
-            type="text"
+            type="search"
+            aria-label={translate("memberDirectory.searchPlaceholder")}
             placeholder={translate("memberDirectory.searchPlaceholder")}
             value={search}
             onChange={(e) => {
@@ -497,14 +508,15 @@ export default function MemberDirectory() {
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
           />
         </div>
-        <div className="grid w-full grid-cols-2 gap-2 md:flex md:w-auto">
+        <div className="member-directory-filters">
           <select
+            aria-label={translate("memberDirectory.role")}
             value={roleFilter}
             onChange={(e) => {
               setRoleFilter(e.target.value);
               setPage(1);
             }}
-            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all text-sm font-medium cursor-pointer md:w-auto"
+            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all text-sm font-medium cursor-pointer"
           >
             <option value="all" className="cursor-pointer ">{translate("memberDirectory.allRoles")}</option>
             {userRoles.map((role) => (
@@ -514,12 +526,13 @@ export default function MemberDirectory() {
             ))}
           </select>
           <select
+            aria-label={translate("memberDirectory.status")}
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
               setPage(1);
             }}
-            className="w-full cursor-pointer px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all text-sm font-medium md:w-auto"
+            className="w-full cursor-pointer px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all text-sm font-medium"
           >
             <option className="cursor-pointer " value="all">{translate("memberDirectory.allStatuses")}</option>
             <option className="cursor-pointer " value="active">{translate("memberDirectory.active")}</option>
@@ -543,32 +556,31 @@ export default function MemberDirectory() {
       )}
 
       {isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="member-directory-grid">
           {Array.from({ length: MEMBER_SKELETON_COUNT }).map((_, index) => (
             <div
               key={index}
-              className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm animate-pulse"
+              className="member-directory-card bg-white rounded-2xl border border-slate-200 shadow-sm animate-pulse"
             >
-              <div className="flex items-start gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-slate-200 shrink-0" />
+              <div className="member-directory-identity">
+                <div className="member-directory-avatar w-16 h-16 rounded-full bg-slate-200 shrink-0" />
                 <div className="flex-1 min-w-0 space-y-3">
                   <div className="h-5 w-3/5 rounded bg-slate-200" />
                   <div className="h-4 w-2/5 rounded bg-slate-100" />
                   <div className="flex flex-wrap gap-2 pt-1">
                     <div className="h-5 w-20 rounded bg-slate-200" />
                     <div className="h-5 w-16 rounded bg-slate-100" />
-                    <div className="h-5 w-24 rounded bg-slate-100" />
                   </div>
                 </div>
               </div>
 
-              <div className="mt-6 space-y-3">
+              <div className="member-directory-contact">
                 <div className="h-4 w-4/5 rounded bg-slate-100" />
                 <div className="h-4 w-2/3 rounded bg-slate-100" />
               </div>
 
               {showMemberActions && (
-                <div className="mt-6 pt-6 border-t border-slate-100 flex gap-2">
+                <div className="member-directory-card-actions border-t border-slate-100">
                   <div className="h-9 flex-1 rounded-lg bg-slate-100" />
                   <div className="h-9 flex-1 rounded-lg bg-slate-100" />
                 </div>
@@ -580,7 +592,7 @@ export default function MemberDirectory() {
 
       {!isLoading && !isError && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="member-directory-grid">
             <AnimatePresence mode="popLayout">
               {members.map((member) => {
                 const category =
@@ -597,10 +609,10 @@ export default function MemberDirectory() {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group relative overflow-hidden"
+                    className="member-directory-card bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group relative"
                   >
-                    <div className="flex items-start gap-4">
-                      <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-xl font-bold text-slate-900 border-2 border-white shadow-sm ring-1 ring-slate-100 overflow-hidden">
+                    <div className="member-directory-identity">
+                      <div className="member-directory-avatar w-16 h-16 rounded-full bg-primary flex items-center justify-center text-xl font-bold text-slate-900 border-2 border-white shadow-sm ring-1 ring-slate-100 overflow-hidden">
                         {member.avatar_url ? (
                           <img
                             src={member.avatar_url}
@@ -612,50 +624,41 @@ export default function MemberDirectory() {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-bold group-hover:text-primary-dark transition-colors truncate">
+                        <h3 title={getDisplayName(member, translate)}
+                          className="member-directory-name text-lg font-bold group-hover:text-primary-dark transition-colors">
                           {getDisplayName(member, translate)}
                         </h3>
-                        <p className="text-slate-500 text-sm flex items-center gap-1 mt-0.5">
+                        <p className="member-directory-location text-slate-500 text-sm flex items-start gap-1 mt-0.5">
                           <MapPin className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{city}</span>
+                          <span title={city}>{city}</span>
                         </p>
-                        <div className="flex flex-wrap items-center gap-2 mt-3">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700">
-                            {category}
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${getStatusClassName(member.status)}`}
-                          >
-                            {formatStatus(member.status, translate)}
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                              member.is_payment_validated
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-slate-100 text-slate-500"
-                            }`}
-                          >
-                            {member.is_payment_validated
-                              ? translate("memberDirectory.paymentOk")
-                              : translate("memberDirectory.paymentPending")}
-                          </span>
-                        </div>
                       </div>
                     </div>
 
-                    <div className="mt-6 space-y-3">
+                    <div className="member-directory-badges">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700">
+                        {category}
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${getStatusClassName(member.status)}`}
+                      >
+                        {formatStatus(member.status, translate)}
+                      </span>
+                    </div>
+
+                    <div className="member-directory-contact">
                       <div className="flex items-center gap-3 text-sm text-slate-600">
                         <Mail className="w-4 h-4 text-slate-400 shrink-0" />
-                        <span className="truncate">{member.email}</span>
+                        <span title={member.email}>{member.email}</span>
                       </div>
                       <div className="flex items-center gap-3 text-sm text-slate-600">
                         <Phone className="w-4 h-4 text-slate-400 shrink-0" />
-                        <span className="truncate">{phone}</span>
+                        <span>{phone}</span>
                       </div>
                     </div>
 
                     {showMemberActions && (
-                      <div className="mt-6 pt-6 border-t border-slate-100 flex gap-2">
+                      <div className="member-directory-card-actions border-t border-slate-100">
                         {canEditUser && (
                           <button
                             onClick={() => handleOpenModal(member)}
@@ -700,7 +703,7 @@ export default function MemberDirectory() {
         </>
       )}
 
-      <footer className="flex items-center justify-between border-t border-slate-100 pt-6">
+      <footer className="member-directory-footer border-t border-slate-100 pt-6">
         <p className="text-sm text-slate-500">
           {translate("memberDirectory.showingMembers", {
             count: members.length,
@@ -710,6 +713,7 @@ export default function MemberDirectory() {
         </p>
         <div className="flex gap-2">
           <button
+            aria-label={translate("memberDirectory.previousPage")}
             onClick={() =>
               setPage((currentPage) => Math.max(1, currentPage - 1))
             }
@@ -719,6 +723,7 @@ export default function MemberDirectory() {
             <ChevronLeft className="w-5 h-5" />
           </button>
           <button
+            aria-label={translate("memberDirectory.nextPage")}
             onClick={() => setPage((currentPage) => currentPage + 1)}
             className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
             disabled={page >= totalPages || isFetching}
@@ -727,200 +732,292 @@ export default function MemberDirectory() {
           </button>
         </div>
       </footer>
+      </div>
 
       {(canCreateUser || canEditUser) && (
         <>
           <Modal
             isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            maxWidth="max-w-4xl"
+            onClose={handleCloseModal}
             title={
               editingMember
                 ? translate("memberDirectory.editMember")
                 : translate("memberDirectory.createMember")
             }
-          >
-            <form noValidate onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            className="batch-four-modal"
+            layout={"compact"}
+            footer={(<ModalSubmitButton
+              formId="directory-member-form"
+              disabled={isSaving}
+              className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all shadow-xl uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+              {editingMember
+                ? translate("memberDirectory.saveChanges")
+                : translate("memberDirectory.createMemberSubmit")}
+            </ModalSubmitButton>)}>
+            <form
+              id="directory-member-form"
+              noValidate
+              onSubmit={handleSubmit}
+              className="member-directory-form space-y-4">
+              <ModalSection title={translate("modalBatchFour.personalInformation")}>
+                <ModalFieldGrid>
+                  <div className="space-y-2">
+                    <label htmlFor="member-first_name" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      {translate("memberDirectory.firstName")}
+                    </label>
+                    <input
+                      required
+                      type="text"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                      id="member-first_name"
+                      value={formData.first_name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, first_name: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="member-last_name" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      {translate("memberDirectory.lastName")}
+                    </label>
+                    <input
+                      required
+                      type="text"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                      id="member-last_name"
+                      value={formData.last_name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, last_name: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="member-email" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      {translate("memberDirectory.email")}
+                    </label>
+                    <input
+                      required
+                      type="email"
+                      disabled={Boolean(editingMember)}
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none disabled:bg-slate-100 disabled:text-slate-500"
+                      id="member-email"
+                      value={formData.email}
+                      onChange={(e) =>
+                        setFormData({ ...formData, email: e.target.value })
+                      }
+                    />
+                  </div>
+                  {!editingMember && (
+                    <div className="space-y-2">
+                      <label htmlFor="member-password" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        {translate("memberDirectory.password")}
+                      </label>
+                      <div className="member-password-field">
+                        <input
+                          id="member-password"
+                          required
+                          type={showPassword ? "text" : "password"}
+                          autoComplete="new-password"
+                          minLength={8}
+                          className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                          value={formData.password}
+                          onChange={(e) =>
+                            setFormData({ ...formData, password: e.target.value })
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="member-password-toggle"
+                          aria-controls="member-password"
+                          aria-pressed={showPassword}
+                          aria-label={translate(showPassword ? "memberDirectory.hidePassword" : "memberDirectory.showPassword")}
+                          title={translate(showPassword ? "memberDirectory.hidePassword" : "memberDirectory.showPassword")}
+                          onClick={() => setShowPassword((visible) => !visible)}
+                        >
+                          {showPassword ? <EyeOff aria-hidden="true" className="h-5 w-5" /> : <Eye aria-hidden="true" className="h-5 w-5" />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <label htmlFor="member-phone" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      {translate("memberDirectory.phone")}
+                    </label>
+                    <input
+                      type="tel"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                      id="member-phone"
+                      value={formData.phone}
+                      onChange={(e) =>
+                        setFormData({ ...formData, phone: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="member-mobile" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      {translate("memberDirectory.mobile")}
+                    </label>
+                    <input
+                      type="tel"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                      id="member-mobile"
+                      value={formData.mobile}
+                      onChange={(e) =>
+                        setFormData({ ...formData, mobile: e.target.value })
+                      }
+                    />
+                  </div>
+                </ModalFieldGrid>
+              </ModalSection>
+              <ModalSection title={translate("modalBatchFour.organizationLocation")}>
+                <ModalFieldGrid>
+                  <div className="space-y-2">
+                    <label htmlFor="member-city" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      {translate("memberDirectory.city")}
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                      id="member-city"
+                      value={formData.city}
+                      onChange={(e) =>
+                        setFormData({ ...formData, city: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="member-society" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      {translate("memberDirectory.society")}
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                      id="member-society"
+                      value={formData.society}
+                      onChange={(e) =>
+                        setFormData({ ...formData, society: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="member-department" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      {translate("memberDirectory.department")}
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                      id="member-department"
+                      value={formData.department}
+                      onChange={(e) =>
+                        setFormData({ ...formData, department: e.target.value })
+                      }
+                    />
+                  </div>
+                  <ModalFullWidth>
+                    <div className="space-y-2">
+                      <label htmlFor="member-address" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        {translate("memberDirectory.address")}
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                        id="member-address"
+                        value={formData.address}
+                        onChange={(e) =>
+                          setFormData({ ...formData, address: e.target.value })
+                        }
+                      />
+                    </div>
+                  </ModalFullWidth>
+                </ModalFieldGrid>
+              </ModalSection>
+              <ModalSection title={translate("modalBatchFour.accountInformation")}>
+                <ModalFieldGrid>
+                  <div className="space-y-2">
+                    <label htmlFor="member-role_id" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      {translate("memberDirectory.role")}
+                    </label>
+                    <select
+                      required
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                      id="member-role_id"
+                      value={formData.role_id}
+                      onChange={(e) =>
+                        setFormData({ ...formData, role_id: e.target.value })
+                      }
+                    >
+                      {userRoles.map((role) => (
+                        <option key={role.id} value={role.id}>
+                          {getRoleDisplayName(role, translate)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="member-status" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      {translate("memberDirectory.status")}
+                    </label>
+                    <select
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                      id="member-status"
+                      value={formData.status}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          status: isMemberStatus(e.target.value)
+                            ? e.target.value
+                            : "active",
+                        })
+                      }
+                    >
+                      {MEMBER_STATUSES.map((status) => (
+                        <option key={status} value={status}>
+                          {translate(`memberDirectory.${status}`)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={formData.is_payment_validated}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          is_payment_validated: e.target.checked,
+                        })
+                      }
+                      className="w-4 h-4 accent-slate-900"
+                    />
+                    {translate("memberDirectory.paymentValidated")}
+                  </label>
+                  <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={formData.is_superuser}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          is_superuser: e.target.checked,
+                        })
+                      }
+                      className="w-4 h-4 accent-slate-900"
+                    />
+                    {translate("memberDirectory.superuser")}
+                  </label>
+                </ModalFieldGrid>
+              </ModalSection>
+              <ModalSection title={translate("memberDirectory.profilePhoto")}>
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    {translate("memberDirectory.firstName")}
+                    {translate("memberDirectory.profilePhoto")}
                   </label>
-                  <input
-                    required
-                    type="text"
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                    value={formData.first_name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, first_name: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    {translate("memberDirectory.lastName")}
-                  </label>
-                  <input
-                    required
-                    type="text"
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                    value={formData.last_name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, last_name: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  {translate("memberDirectory.email")}
-                </label>
-                <input
-                  required
-                  type="email"
-                  disabled={Boolean(editingMember)}
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none disabled:bg-slate-100 disabled:text-slate-500"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                />
-              </div>
-              {!editingMember && (
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    {translate("memberDirectory.password")}
-                  </label>
-                  <input
-                    required
-                    type="password"
-                    autoComplete="new-password"
-                    minLength={8}
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                    value={formData.password}
-                    onChange={(e) =>
-                      setFormData({ ...formData, password: e.target.value })
-                    }
-                  />
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    {translate("memberDirectory.phone")}
-                  </label>
-                  <input
-                    type="tel"
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                    value={formData.phone}
-                    onChange={(e) =>
-                      setFormData({ ...formData, phone: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    {translate("memberDirectory.mobile")}
-                  </label>
-                  <input
-                    type="tel"
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                    value={formData.mobile}
-                    onChange={(e) =>
-                      setFormData({ ...formData, mobile: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  {translate("memberDirectory.city")}
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                  value={formData.city}
-                  onChange={(e) =>
-                    setFormData({ ...formData, city: e.target.value })
-                  }
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    {translate("memberDirectory.society")}
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                    value={formData.society}
-                    onChange={(e) =>
-                      setFormData({ ...formData, society: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    {translate("memberDirectory.department")}
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                    value={formData.department}
-                    onChange={(e) =>
-                      setFormData({ ...formData, department: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  {translate("memberDirectory.address")}
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                  value={formData.address}
-                  onChange={(e) =>
-                    setFormData({ ...formData, address: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  {translate("memberDirectory.profilePhoto")}
-                </label>
-                <div className="grid items-stretch gap-4 md:grid-cols-[minmax(0,1.35fr)_280px]">
-                  <FileUploadDropzone
-                    inputId="member-avatar-upload"
-                    accept="image/*"
-                    multiple={false}
-                    title={translate("memberDirectory.uploadProfilePhoto")}
-                    className="h-full md:min-h-[336px]"
-                    selectedLabel={
-                      formData.avatar
-                        ? formData.avatar.name
-                        : editingMember?.avatar_url
-                          ? translate("memberDirectory.replaceProfilePhoto")
-                          : undefined
-                    }
-                    hint={
-                      formData.avatar
-                        ? translate("memberDirectory.profilePhotoSelectedHint")
-                        : editingMember?.avatar_url
-                          ? translate("memberDirectory.profilePhotoExistingHint")
-                          : translate("memberDirectory.profilePhotoUploadHint")
-                    }
-                    onFilesSelected={(files) =>
-                      setFormData({
-                        ...formData,
-                        avatar: files[0] || null,
-                      })
-                    }
-                  />
-                  <div className="flex h-full w-full max-w-[280px] justify-self-center md:max-w-none md:justify-self-auto">
+                  <ModalMediaSplit preview={<>
                     {avatarPreviewUrl ? (
                       <FilePreviewCard
+                        presentation="compact"
                         file={formData.avatar}
                         url={!formData.avatar ? avatarPreviewUrl : undefined}
                         name={
@@ -928,111 +1025,56 @@ export default function MemberDirectory() {
                           translate("memberDirectory.profilePhoto")
                         }
                         subtitle={translate("memberDirectory.profilePhotoPreview")}
-                        className="h-full w-full"
                         onRemove={
                           formData.avatar
                             ? () => setFormData({ ...formData, avatar: null })
                             : undefined
                         }
-                        aspectClassName="aspect-square"
-                        mediaShapeClassName="rounded-full"
+
                       />
                     ) : (
-                      <div className="flex h-full min-h-[336px] w-full items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-6">
-                        <div className="flex h-28 w-28 items-center justify-center rounded-full bg-white text-3xl font-bold text-slate-400 shadow-sm">
+                      <div className="batch-four-empty">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-sm font-bold text-slate-400 shadow-sm">
                           {(formData.first_name?.[0] || formData.email?.[0] || "U").toUpperCase()}
                         </div>
                       </div>
                     )}
-                  </div>
+                  </>}>
+                    <FileUploadDropzone
+                      presentation="compact"
+                      inputId="member-avatar-upload"
+                      accept="image/*"
+                      multiple={false}
+                      title={translate("memberDirectory.uploadProfilePhoto")}
+                      selectedLabel={
+                        formData.avatar
+                          ? formData.avatar.name
+                          : editingMember?.avatar_url
+                            ? translate("memberDirectory.replaceProfilePhoto")
+                            : undefined
+                      }
+                      hint={
+                        formData.avatar
+                          ? translate("memberDirectory.profilePhotoSelectedHint")
+                          : editingMember?.avatar_url
+                            ? translate("memberDirectory.profilePhotoExistingHint")
+                            : translate("memberDirectory.profilePhotoUploadHint")
+                      }
+                      onFilesSelected={(files) =>
+                        setFormData({
+                          ...formData,
+                          avatar: files[0] || null,
+                        })
+                      }
+                    />
+                  </ModalMediaSplit>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    {translate("memberDirectory.role")}
-                  </label>
-                  <select
-                    required
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                    value={formData.role_id}
-                    onChange={(e) =>
-                      setFormData({ ...formData, role_id: e.target.value })
-                    }
-                  >
-                    {userRoles.map((role) => (
-                      <option key={role.id} value={role.id}>
-                        {getRoleDisplayName(role, translate)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    {translate("memberDirectory.status")}
-                  </label>
-                  <select
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                    value={formData.status}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        status: isMemberStatus(e.target.value)
-                          ? e.target.value
-                          : "active",
-                      })
-                    }
-                  >
-                    {MEMBER_STATUSES.map((status) => (
-                      <option key={status} value={status}>
-                        {translate(`memberDirectory.${status}`)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={formData.is_payment_validated}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      is_payment_validated: e.target.checked,
-                    })
-                  }
-                  className="w-4 h-4 accent-slate-900"
-                />
-                {translate("memberDirectory.paymentValidated")}
-              </label>
-              <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={formData.is_superuser}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      is_superuser: e.target.checked,
-                    })
-                  }
-                  className="w-4 h-4 accent-slate-900"
-                />
-                    {translate("memberDirectory.superuser")}
-              </label>
-              <button
-                type="submit"
-                disabled={isSaving}
-                className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all mt-6 shadow-xl uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-                {editingMember
-                  ? translate("memberDirectory.saveChanges")
-                  : translate("memberDirectory.createMemberSubmit")}
-              </button>
+              </ModalSection>
             </form>
           </Modal>
 
-          <ConfirmModal
+          <ConfirmModal presentation="compact"
+
             isOpen={isConfirmOpen}
             onClose={() => {
               if (!isDeletingMember && !isRestoringMember) {

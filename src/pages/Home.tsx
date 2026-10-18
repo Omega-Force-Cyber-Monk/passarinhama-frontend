@@ -1,19 +1,15 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   BookOpen,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
   FileText,
   MapPin,
   MessageSquare,
 } from "lucide-react";
-import { useSelector } from "react-redux";
 import AccessRestrictedNotice from "../components/ui/AccessRestrictedNotice";
 import {
   useGetForumsQuery,
-  useGetPinnedTopicsQuery,
 } from "../redux/features/forum/forumApi";
 import {
   useGetArticlesQuery,
@@ -21,192 +17,80 @@ import {
 import { useGetUpcomingEventsQuery } from "../redux/features/events/eventsApi";
 import { useGetTrainingsPaginatedQuery } from "../redux/features/trainings/trainingsApi";
 import { useI18n } from "../i18n";
-import { RootState } from "../redux/store";
 import { usePermissions } from "../hooks/usePermissions";
 
 const stripHtml = (value?: string | null) =>
   (value || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
-const truncate = (value: string, maxLength: number) =>
-  value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
-
 const SkeletonLine = ({ className }: { className: string }) => (
   <div className={`rounded-full bg-[var(--archi-surface-soft)] ${className}`} />
 );
 
-const ForumCardSkeleton = () => (
-  <div className="overflow-hidden rounded-[14px] border border-[var(--archi-border)] bg-white shadow-[var(--archi-shadow-sm)] animate-pulse">
-    <div className="relative h-[100px] bg-[var(--archi-surface-soft)]">
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="h-[42px] w-[42px] rounded-full bg-white/80" />
-      </div>
-    </div>
-    <div className="flex flex-col px-4 pb-4 pt-3.5">
-      <SkeletonLine className="mb-[8px] h-4 w-3/5" />
-      <SkeletonLine className="mb-2 h-3.5 w-full" />
-      <SkeletonLine className="h-3.5 w-4/5" />
-      <div className="mt-4 flex items-center gap-2">
-        <div className="h-4 w-4 rounded-full bg-[var(--archi-surface-soft)]" />
-        <SkeletonLine className="h-3.5 w-20" />
-      </div>
-    </div>
-  </div>
-);
-
-const TrainingCardSkeleton = () => (
-  <div className="overflow-hidden rounded-[14px] border border-[var(--archi-border)] bg-white shadow-[var(--archi-shadow-sm)] animate-pulse">
-    <div className="h-[150px] bg-[var(--archi-surface-soft)]" />
-    <div className="flex flex-col px-4 pb-4 pt-3.5">
-      <SkeletonLine className="mb-[8px] h-3.5 w-2/5" />
-      <SkeletonLine className="mb-2 h-4 w-4/5" />
-      <SkeletonLine className="mb-3 h-4 w-3/5" />
-      <div className="flex items-center gap-2">
-        <div className="h-5 w-5 rounded-full bg-[var(--archi-surface-soft)]" />
-        <SkeletonLine className="h-3.5 w-28" />
-      </div>
-    </div>
-  </div>
-);
-
-const ArticleCardSkeleton = () => (
-  <div className="flex h-full flex-col overflow-hidden rounded-[14px] border border-[var(--archi-border)] bg-white shadow-[var(--archi-shadow-sm)] animate-pulse">
-    <div className="relative h-[140px] bg-[var(--archi-surface-soft)]">
-      <div className="absolute left-2.5 top-2.5 h-5 w-20 rounded-full bg-white/80" />
-    </div>
-    <div className="flex flex-1 flex-col px-4 pb-4 pt-3.5">
-      <SkeletonLine className="mb-[8px] h-3.5 w-2/5" />
-      <SkeletonLine className="mb-2 h-4 w-4/5" />
-      <SkeletonLine className="mb-2 h-4 w-3/5" />
-      <SkeletonLine className="mb-2 h-3.5 w-full" />
-      <SkeletonLine className="h-3.5 w-5/6" />
-    </div>
-  </div>
-);
-
-const PostCardSkeleton = () => (
-  <div className="flex h-full flex-col overflow-hidden rounded-[14px] border border-[var(--archi-border)] bg-white shadow-[var(--archi-shadow-sm)] animate-pulse">
-    <div className="relative h-[120px] bg-[var(--archi-surface-soft)]">
-      <div className="absolute bottom-2 left-2.5 h-5 w-32 rounded-full bg-white/80" />
-    </div>
-    <div className="flex flex-1 flex-col px-4 pb-4 pt-3.5">
-      <SkeletonLine className="mb-[8px] h-3.5 w-2/5" />
-      <SkeletonLine className="mb-2 h-4 w-4/5" />
-      <SkeletonLine className="mb-2 h-4 w-3/5" />
-      <SkeletonLine className="mb-2 h-3.5 w-full" />
-      <SkeletonLine className="h-3.5 w-4/5" />
-      <div className="mt-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="h-[22px] w-[22px] rounded-full bg-[var(--archi-surface-soft)]" />
-          <SkeletonLine className="h-3.5 w-24" />
-        </div>
-        <SkeletonLine className="h-3.5 w-6" />
-      </div>
-    </div>
-  </div>
-);
-
 const MAX_SECTION_CARDS = 4;
-const HOME_SECTION_FETCH_LIMIT = 100;
 
-type SectionCarouselProps<T> = {
+type SectionGridProps<T> = {
   items: T[];
   getKey: (item: T) => string;
   renderItem: (item: T) => ReactNode;
-  previousLabel: string;
-  nextLabel: string;
+  agenda?: boolean;
 };
 
-const SectionCarousel = <T,>({
-  items,
-  getKey,
-  renderItem,
-  previousLabel,
-  nextLabel,
-}: SectionCarouselProps<T>) => {
-  const [startIndex, setStartIndex] = useState(0);
-  const hasNavigation = items.length > MAX_SECTION_CARDS;
-  const maxStartIndex = Math.max(0, items.length - MAX_SECTION_CARDS);
-  const visibleItems = items.slice(
-    startIndex,
-    startIndex + MAX_SECTION_CARDS,
-  );
+const SectionGrid = <T,>({ items, getKey, renderItem, agenda = false }: SectionGridProps<T>) => (
+  <div className={`home-card-grid${agenda ? "" : " home-content-grid"}`}>
+    {items.slice(0, MAX_SECTION_CARDS).map((item) => (
+      <div className="min-w-0" key={getKey(item)}>{renderItem(item)}</div>
+    ))}
+  </div>
+);
 
-  useEffect(() => {
-    setStartIndex((current) => Math.min(current, maxStartIndex));
-  }, [maxStartIndex]);
-
-  const goPrevious = () => {
-    setStartIndex((current) =>
-      Math.max(0, current - MAX_SECTION_CARDS),
-    );
-  };
-
-  const goNext = () => {
-    setStartIndex((current) =>
-      Math.min(maxStartIndex, current + MAX_SECTION_CARDS),
-    );
-  };
-
-  if (!hasNavigation) {
-    return (
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {items.map((item) => (
-          <div key={getKey(item)}>{renderItem(item)}</div>
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-3">
-      <button
-        type="button"
-        onClick={goPrevious}
-        disabled={startIndex === 0}
-        aria-label={previousLabel}
-        className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-[var(--archi-border)] bg-white text-[var(--archi-secondary)] shadow-[var(--archi-shadow-sm)] transition-all hover:border-[var(--archi-border-strong)] hover:bg-[var(--archi-surface-soft)] hover:text-[var(--archi-text)] disabled:cursor-not-allowed disabled:opacity-40 sm:inline-flex"
-      >
-        <ChevronLeft className="h-5 w-5" />
-      </button>
-
-      <div className="min-w-0 flex-1">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {visibleItems.map((item) => (
-            <div key={getKey(item)}>{renderItem(item)}</div>
-          ))}
-        </div>
-        <div className="mt-3 flex justify-center gap-2 sm:hidden">
-          <button
-            type="button"
-            onClick={goPrevious}
-            disabled={startIndex === 0}
-            aria-label={previousLabel}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--archi-border)] bg-white text-[var(--archi-secondary)] shadow-[var(--archi-shadow-sm)] transition-all hover:bg-[var(--archi-surface-soft)] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={goNext}
-            disabled={startIndex >= maxStartIndex}
-            aria-label={nextLabel}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--archi-border)] bg-white text-[var(--archi-secondary)] shadow-[var(--archi-shadow-sm)] transition-all hover:bg-[var(--archi-surface-soft)] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      <button
-        type="button"
-        onClick={goNext}
-        disabled={startIndex >= maxStartIndex}
-        aria-label={nextLabel}
-        className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-[var(--archi-border)] bg-white text-[var(--archi-secondary)] shadow-[var(--archi-shadow-sm)] transition-all hover:border-[var(--archi-border-strong)] hover:bg-[var(--archi-surface-soft)] hover:text-[var(--archi-text)] disabled:cursor-not-allowed disabled:opacity-40 sm:inline-flex"
-      >
-        <ChevronRight className="h-5 w-5" />
-      </button>
+const AgendaCardSkeleton = () => (
+  <div className="home-agenda-card flex items-center rounded-[24px] border border-[var(--archi-border)] bg-white animate-pulse" aria-hidden="true">
+    <div className="home-agenda-date shrink-0 rounded-[20px] bg-[var(--archi-surface-soft)]" />
+    <div className="min-w-0 flex-1 space-y-2">
+      <SkeletonLine className="h-4 w-full" />
+      <SkeletonLine className="h-3 w-3/4" />
     </div>
+  </div>
+);
+
+const ContentCardSkeleton = () => (
+  <div className="home-content-card animate-pulse" aria-hidden="true">
+    <div className="home-card-image" />
+    <div className="home-card-body">
+      <SkeletonLine className="home-card-title w-4/5" />
+      <SkeletonLine className="home-card-description w-full" />
+      <SkeletonLine className="home-card-metadata w-3/5" />
+    </div>
+  </div>
+);
+
+type ContentCardProps = {
+  image?: string | null;
+  icon: ReactNode;
+  badge?: string | null;
+  title: string;
+  description?: string | null;
+  metadata?: ReactNode;
+  onClick: () => void;
+};
+
+const ContentCard = ({ image, icon, badge, title, description, metadata, onClick }: ContentCardProps) => {
+  const [failedImage, setFailedImage] = useState<string | null>(null);
+  return (
+    <button type="button" onClick={onClick} className="home-content-card group cursor-pointer text-left transition-all hover:-translate-y-0.5 hover:border-[var(--archi-border-strong)] hover:shadow-[var(--archi-shadow-md)]">
+      <div className="home-card-image">
+        <div className="absolute inset-0 flex items-center justify-center text-[var(--archi-muted)]" aria-hidden="true">{icon}</div>
+        {image && failedImage !== image ? (
+          <img src={image} alt="" loading="lazy" onError={() => setFailedImage(image)} className="relative h-full w-full object-cover transition-transform duration-[400ms] group-hover:scale-105" />
+        ) : null}
+        {badge ? <span className="home-card-badge">{badge}</span> : null}
+      </div>
+      <div className="home-card-body">
+        <div className="home-card-title">{title}</div>
+        <div className="home-card-description">{description}</div>
+        <div className="home-card-metadata"><span>{metadata}</span></div>
+      </div>
+    </button>
   );
 };
 
@@ -214,7 +98,6 @@ export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
   const { localeCode, translate } = useI18n();
-  const { user } = useSelector((state: RootState) => state.auth);
   const { hasPermission } = usePermissions();
   const canViewForum = hasPermission("forum", "view");
   const canViewArticle = hasPermission("article", "view");
@@ -232,38 +115,38 @@ export default function Home() {
     !canViewAnyHomeSection;
 
   const { data: forumsData, isLoading: isForumsLoading } = useGetForumsQuery(
-    { pageSize: HOME_SECTION_FETCH_LIMIT },
-    { skip: !canViewForum } as any,
+    { pageSize: MAX_SECTION_CARDS },
+    { skip: !canViewForum },
   );
   const { data: upcomingEvents = [], isLoading: isEventsLoading } =
     useGetUpcomingEventsQuery(
-      { limit: HOME_SECTION_FETCH_LIMIT },
-      { skip: !canViewEvent } as any,
+      { limit: MAX_SECTION_CARDS },
+      { skip: !canViewEvent },
     );
   const { data: articlesData, isLoading: isArticlesLoading } = useGetArticlesQuery(
     {
       page: 1,
-      pageSize: HOME_SECTION_FETCH_LIMIT,
+      pageSize: MAX_SECTION_CARDS,
       status: "published",
     },
-    { skip: !canViewArticle } as any,
+    { skip: !canViewArticle },
   );
   const { data: trainingsData, isLoading: isTrainingsLoading } =
     useGetTrainingsPaginatedQuery(
       {
         page: 1,
-        pageSize: HOME_SECTION_FETCH_LIMIT,
+        pageSize: MAX_SECTION_CARDS,
         status: "published",
         details: true,
       },
-      { skip: !canViewTraining } as any,
+      { skip: !canViewTraining },
     );
 
   const articles = articlesData?.results || [];
   const trainings = trainingsData?.results || [];
   const forums = forumsData?.results ?? [];
 
-const formatDate = (value?: string | null) => {
+  const formatDate = (value?: string | null) => {
     if (!value) return "";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
@@ -272,21 +155,21 @@ const formatDate = (value?: string | null) => {
       month: "long",
       year: "numeric",
     });
-};
+  };
 
-const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
-  typeof value === "string" ? value : value?.url || null;
+  const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
+    typeof value === "string" ? value : value?.url || null;
 
   if (!canViewAnyHomeSection) {
     return (
-      <main className="bg-[var(--archi-bg)] px-4 pb-12 pt-8 lg:px-8">
+      <main className="home-page bg-[var(--archi-bg)]">
         <AccessRestrictedNotice />
       </main>
     );
   }
 
   return (
-    <main className="bg-[var(--archi-bg)] px-4 pb-12 pt-8 lg:px-8">
+    <main className="home-page bg-[var(--archi-bg)]">
       {showRestrictedNotice && (
         <section className="mb-10">
           <AccessRestrictedNotice />
@@ -295,13 +178,13 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
 
       {canViewForum && <section className="mb-10">
         <div className="mb-5">
-          <div className="flex items-center justify-between gap-3">
+          <div className="home-section-heading">
             <div className="min-w-0">
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[var(--archi-accent)]/20 text-[var(--archi-text)]">
+                <div className="home-section-icon flex shrink-0 items-center justify-center rounded-[14px] bg-[var(--archi-accent)]/20 text-[var(--archi-text)]">
                   <MessageSquare className="h-5 w-5" />
                 </div>
-                <h2 className="text-[22px] font-bold tracking-[-0.02em] text-[var(--archi-text)]">
+                <h2 className="home-section-title font-bold tracking-[-0.02em] text-[var(--archi-text)]">
                   {translate("memberHome.forumsTitle")}
                 </h2>
               </div>
@@ -324,55 +207,24 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
         </div>
 
         {isForumsLoading ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="home-card-grid">
             {Array.from({ length: MAX_SECTION_CARDS }).map((_, index) => (
-              <ForumCardSkeleton key={index} />
+              <ContentCardSkeleton key={index} />
             ))}
           </div>
         ) : forums.length > 0 ? (
-          <SectionCarousel
+          <SectionGrid
             items={forums}
             getKey={(forum) => forum.id}
-            previousLabel={translate("memberHome.previous")}
-            nextLabel={translate("memberHome.next")}
             renderItem={(forum) => (
-              <button
-                type="button"
+              <ContentCard
+                image={forum.thumbnail_url}
+                icon={<MessageSquare className="h-8 w-8" />}
+                title={forum.name}
+                description={stripHtml(forum.description) || translate("memberHome.defaultForumDescription")}
+                metadata={<><MessageSquare className="mr-1 inline h-3.5 w-3.5" /><span>{forum.topic_count} {translate("memberHome.topics")}{forum.author_name ? " \u00b7 " + forum.author_name : ""}</span></>}
                 onClick={() => navigate(`/forums/${forum.id}`)}
-                className="cursor-pointer group flex h-full w-full flex-col overflow-hidden rounded-[14px] border border-[var(--archi-border)] bg-white text-left shadow-[var(--archi-shadow-sm)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--archi-border-strong)] hover:shadow-[var(--archi-shadow-md)]"
-              >
-                {forum.thumbnail_url ? (
-                  <div className="relative h-[120px] overflow-hidden">
-                    <img
-                      src={forum.thumbnail_url}
-                      alt={forum.name}
-                      className="h-full w-full object-cover transition-transform duration-[400ms] group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,.35)_0%,transparent_60%)]" />
-                  </div>
-                ) : (
-                  <div className="px-4 pt-4">
-                    <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-[14px] bg-[var(--archi-accent)]/20 text-[var(--archi-text)]">
-                      <MessageSquare className="h-5 w-5" />
-                    </div>
-                  </div>
-                )}
-                <div className="flex flex-1 flex-col px-4 pb-4 pt-3.5">
-                  <div className="mb-[5px] text-[13.5px] font-bold text-[var(--archi-text)]">
-                    {forum.name}
-                  </div>
-                  <div className="line-clamp-3 text-[11.5px] leading-[1.5] text-[var(--archi-secondary)]">
-                    {forum.author_name ||
-                      translate("memberHome.defaultForumDescription")}
-                  </div>
-                  <div className="mt-3 flex items-center justify-between text-[11px]">
-                    <div className="flex items-center gap-1.5 text-[var(--archi-secondary)]">
-                      <MessageSquare className="h-3.5 w-3.5" />
-                      {forum.topic_count} {translate("memberHome.topics")}
-                    </div>
-                  </div>
-                </div>
-              </button>
+              />
             )}
           />
         ) : (
@@ -388,13 +240,13 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
 
       {canViewEvent && <section className="mb-10">
         <div className="mb-5">
-          <div className="flex items-center justify-between gap-3">
+          <div className="home-section-heading">
             <div className="min-w-0">
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[var(--archi-accent)]/20 text-[var(--archi-text)]">
+                <div className="home-section-icon flex shrink-0 items-center justify-center rounded-[14px] bg-[var(--archi-accent)]/20 text-[var(--archi-text)]">
                   <Calendar className="h-5 w-5" />
                 </div>
-                <h2 className="text-[22px] font-bold tracking-[-0.02em] text-[var(--archi-text)]">
+                <h2 className="home-section-title font-bold tracking-[-0.02em] text-[var(--archi-text)]">
                   {translate("memberHome.agenda.title")}
                 </h2>
               </div>
@@ -417,17 +269,16 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
         </div>
 
         {isEventsLoading ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="home-card-grid">
             {Array.from({ length: 4 }).map((_, index) => (
-              <TrainingCardSkeleton key={index} />
+              <AgendaCardSkeleton key={index} />
             ))}
           </div>
         ) : upcomingEvents.length > 0 ? (
-          <SectionCarousel
+          <SectionGrid
+            agenda
             items={upcomingEvents}
             getKey={(event) => event.id}
-            previousLabel={translate("memberHome.previous")}
-            nextLabel={translate("memberHome.next")}
             renderItem={(event) => {
               const eventDate = new Date(event.event_date);
 
@@ -435,15 +286,15 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
                 <button
                   type="button"
                   onClick={() => navigate(`/agenda/${event.id}`)}
-                  className="cursor-pointer flex h-full w-full items-center gap-4 rounded-[24px] border border-[#e7e3dd] bg-white px-6 py-5 text-left shadow-[0_4px_18px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_26px_rgba(15,23,42,0.1)]"
+                  className="home-agenda-card cursor-pointer flex h-full w-full items-center rounded-[24px] border border-[#e7e3dd] bg-white text-left shadow-[0_4px_18px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_26px_rgba(15,23,42,0.1)]"
                 >
-                  <div className="flex h-[88px] w-[88px] shrink-0 flex-col items-center justify-center rounded-[20px] border border-[#d7d8df] bg-[#f4f5f8] text-center">
-                    <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8b92a4]">
+                  <div className="home-agenda-date flex shrink-0 flex-col items-center justify-center rounded-[20px] border border-[#d7d8df] bg-[#f4f5f8] text-center">
+                    <span className="home-agenda-month font-bold uppercase tracking-[0.12em] text-[#8b92a4]">
                       {eventDate.toLocaleDateString(localeCode, {
                         month: "short",
                       })}
                     </span>
-                    <span className="mt-1 text-[24px] font-bold leading-none text-[var(--archi-text)]">
+                    <span className="home-agenda-day mt-1 font-bold leading-none text-[var(--archi-text)]">
                       {eventDate.toLocaleDateString(localeCode, {
                         day: "2-digit",
                       })}
@@ -451,7 +302,7 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
                   </div>
 
                   <div className="min-w-0">
-                    <div className="text-[18px] font-bold leading-[1.25] text-[var(--archi-text)]">
+                    <div className="home-agenda-title font-bold leading-[1.25] text-[var(--archi-text)]">
                       {event.title}
                     </div>
                     <div className="mt-2 flex items-center gap-2 text-[13px] text-[#73798c]">
@@ -476,13 +327,13 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
 
       {canViewTraining && <section className="mb-10">
         <div className="mb-5">
-          <div className="flex items-center justify-between gap-3">
+          <div className="home-section-heading">
             <div className="min-w-0">
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[var(--archi-accent)]/20 text-[var(--archi-text)]">
+                <div className="home-section-icon flex shrink-0 items-center justify-center rounded-[14px] bg-[var(--archi-accent)]/20 text-[var(--archi-text)]">
                   <BookOpen className="h-5 w-5" />
                 </div>
-                <h2 className="text-[22px] font-bold tracking-[-0.02em] text-[var(--archi-text)]">
+                <h2 className="home-section-title font-bold tracking-[-0.02em] text-[var(--archi-text)]">
                   {translate("memberHome.trainingsTitle")}
                 </h2>
               </div>
@@ -505,17 +356,15 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
         </div>
 
         {isTrainingsLoading ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="home-card-grid">
             {Array.from({ length: 4 }).map((_, index) => (
-              <TrainingCardSkeleton key={index} />
+              <ContentCardSkeleton key={index} />
             ))}
           </div>
         ) : trainings.length > 0 ? (
-          <SectionCarousel
+          <SectionGrid
             items={trainings}
             getKey={(training) => training.id}
-            previousLabel={translate("memberHome.previous")}
-            nextLabel={translate("memberHome.next")}
             renderItem={(training) => {
               const trainingImage =
                 training.thumbnail_url || getAttachmentUrl(training.attachments?.[0]) || null;
@@ -531,47 +380,16 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
                   .trim();
 
               return (
-              <button
-                type="button"
-                onClick={() => navigate(`/trainings/${training.id}`)}
-                className="cursor-pointer group h-full w-full overflow-hidden rounded-[14px] border border-[var(--archi-border)] bg-white text-left shadow-[var(--archi-shadow-sm)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--archi-border-strong)] hover:shadow-[var(--archi-shadow-md)]"
-              >
-                {trainingImage ? (
-                  <div className="relative h-[150px] overflow-hidden">
-                    <img
-                      src={trainingImage}
-                      alt={training.title}
-                      className="h-full w-full object-cover transition-transform duration-[400ms] group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,.45)_0%,transparent_60%)]" />
-                  </div>
-                ) : null}
-                <div className="flex flex-col px-4 pb-4 pt-3.5">
-                  <div className="mb-[5px] text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--archi-secondary)]">
-                    {trainingMeta}
-                  </div>
-                  <div className="mb-2 text-[13px] font-bold leading-[1.4] text-[var(--archi-text)]">
-                    {training.title}
-                  </div>
-                  {trainingSummary ? (
-                    <p className="mb-3 line-clamp-2 text-[12px] leading-relaxed text-[var(--archi-secondary)]">
-                      {trainingSummary}
-                    </p>
-                  ) : null}
-                  <div className="flex items-center gap-1.5 text-[11.5px] text-[var(--archi-secondary)]">
-                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-sky-400 to-cyan-400 text-[8px] font-bold text-white">
-                      {`${training.created_by?.first_name?.[0] || ""}${training.created_by?.last_name?.[0] || ""}`.trim() ||
-                        "AC"}
-                    </div>
-                    <span>
-                      {[training.created_by?.first_name, training.created_by?.last_name]
-                        .filter(Boolean)
-                        .join(" ") || translate("articlesPage.defaultAuthor")}
-                    </span>
-                  </div>
-                </div>
-              </button>
-            );
+                <ContentCard
+                  image={trainingImage}
+                  icon={<BookOpen className="h-8 w-8" />}
+                  badge={trainingMeta}
+                  title={training.title}
+                  description={trainingSummary}
+                  metadata={[training.created_by?.first_name, training.created_by?.last_name].filter(Boolean).join(" ") || translate("articlesPage.defaultAuthor")}
+                  onClick={() => navigate('/trainings/' + training.id)}
+                />
+              );
             }}
           />
         ) : (
@@ -587,13 +405,13 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
 
       {canViewArticle && <section className="mb-10">
         <div className="mb-5">
-          <div className="flex items-center justify-between gap-3">
+          <div className="home-section-heading">
             <div className="min-w-0">
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[var(--archi-accent)]/20 text-[var(--archi-text)]">
+                <div className="home-section-icon flex shrink-0 items-center justify-center rounded-[14px] bg-[var(--archi-accent)]/20 text-[var(--archi-text)]">
                   <FileText className="h-5 w-5" />
                 </div>
-                <h2 className="text-[22px] font-bold tracking-[-0.02em] text-[var(--archi-text)]">
+                <h2 className="home-section-title font-bold tracking-[-0.02em] text-[var(--archi-text)]">
                   {translate("memberHome.articlesTitle")}
                 </h2>
               </div>
@@ -616,17 +434,15 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
         </div>
 
         {isArticlesLoading ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="home-card-grid">
             {Array.from({ length: 4 }).map((_, index) => (
-              <ArticleCardSkeleton key={index} />
+              <ContentCardSkeleton key={index} />
             ))}
           </div>
         ) : articles.length > 0 ? (
-          <SectionCarousel
+          <SectionGrid
             items={articles}
             getKey={(article) => article.id}
-            previousLabel={translate("memberHome.previous")}
-            nextLabel={translate("memberHome.next")}
             renderItem={(article) => {
               const articleImage =
                 article.thumbnail_url ||
@@ -634,48 +450,16 @@ const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
                 null;
 
               return (
-              <button
-                type="button"
-                onClick={() => navigate(`/articles/${article.id}`)}
-                className="cursor-pointer group flex h-full w-full flex-col overflow-hidden rounded-[14px] border border-[var(--archi-border)] bg-white text-left shadow-[var(--archi-shadow-sm)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--archi-border-strong)] hover:shadow-[var(--archi-shadow-md)]"
-              >
-                {articleImage ? (
-                  <div className="relative h-[140px] overflow-hidden">
-                    <img
-                      src={articleImage}
-                      alt={article.title}
-                      className="h-full w-full object-cover transition-transform duration-[400ms] group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,.45)_0%,transparent_55%)]" />
-                    <span className="absolute left-2.5 top-2.5 rounded-full bg-[var(--archi-accent)] px-2 py-[3px] text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--archi-text)] backdrop-blur">
-                      {article.category?.name}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="px-4 pt-4">
-                    <span className="inline-flex rounded-full bg-[var(--archi-accent)] px-2 py-[3px] text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--archi-text)]">
-                      {article.category?.name}
-                    </span>
-                  </div>
-                )}
-                <div className="flex flex-1 flex-col px-4 pb-4 pt-3.5">
-                  <div className="mb-[5px] text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--archi-muted)]">
-                    {formatDate(article.created_at)}
-                  </div>
-                  <div className="mb-2 text-[13px] font-bold leading-[1.4] text-[var(--archi-text)]">
-                    {article.title}
-                  </div>
-                  <div className="text-xs leading-[1.5] text-[var(--archi-secondary)]">
-                    {truncate(
-                      article.excerpt ||
-                        stripHtml(article.body) ||
-                        translate("memberHome.articleFallback"),
-                      130,
-                    )}
-                  </div>
-                </div>
-              </button>
-            );
+                <ContentCard
+                  image={articleImage}
+                  icon={<FileText className="h-8 w-8" />}
+                  badge={article.category?.name}
+                  title={article.title}
+                  description={article.excerpt || stripHtml(article.body) || translate("memberHome.articleFallback")}
+                  metadata={[article.author?.name, formatDate(article.created_at)].filter(Boolean).join(" \u00b7 ")}
+                  onClick={() => navigate('/articles/' + article.id)}
+                />
+              );
             }}
           />
         ) : (

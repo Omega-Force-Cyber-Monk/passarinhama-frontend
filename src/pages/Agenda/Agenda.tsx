@@ -1,3 +1,6 @@
+import { ModalFieldGrid, ModalFullWidth, ModalSection, ModalSubmitButton } from "../../components/ui/ModalLayout";
+import "../AgendaDocumentModals.css";
+import CategoryManagerDialog, { type CategoryValues } from "../../components/ui/CategoryManagerDialog";
 import React, { useEffect, useState } from "react";
 import {
   Calendar as CalendarIcon,
@@ -71,7 +74,6 @@ import {
   Event as APIEvent,
   CreateEventRequest,
   UpdateEventRequest,
-  EventCategory,
 } from "../../redux/features/events/eventTypes";
 import { parseISO, isSameDay } from "date-fns";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
@@ -235,7 +237,7 @@ export default function Agenda() {
   const selectedMonth = currentMonth.getMonth() + 1;
 
   // API Fetching
-  const { data: apiEvents, isLoading: isLoadingEvents } = useGetEventsQuery({
+  const { data: apiEvents, isLoading: isLoadingEvents, isError: isCalendarError } = useGetEventsQuery({
     year: selectedYear,
     month: selectedMonth,
   });
@@ -244,7 +246,7 @@ export default function Agenda() {
     isLoading: isLoadingUpcoming,
     isError: isUpcomingError,
   } = useGetUpcomingEventsQuery({ limit: 6 });
-  const { data: eventCategoriesResponse } = useGetEventCategoriesQuery({
+  const { data: eventCategoriesResponse, isLoading: isLoadingCategories, error: categoriesError, refetch: refetchCategories } = useGetEventCategoriesQuery({
     pageSize: 100,
   });
   const eventCategories = eventCategoriesResponse?.results ?? [];
@@ -254,11 +256,11 @@ export default function Agenda() {
   const [updateEvent, { isLoading: isUpdatingEvent }] =
     useUpdateEventMutation();
   const [deleteEvent] = useDeleteEventMutation();
-  const [createEventCategory, { isLoading: isCreatingCategory }] =
+  const [createEventCategory] =
     useCreateEventCategoryMutation();
-  const [updateEventCategory, { isLoading: isUpdatingCategory }] =
+  const [updateEventCategory] =
     useUpdateEventCategoryMutation();
-  const [deleteEventCategory, { isLoading: isDeletingCategory }] =
+  const [deleteEventCategory] =
     useDeleteEventCategoryMutation();
   const [registerForEvent, { isLoading: isRegistering }] =
     useRegisterForEventMutation();
@@ -309,13 +311,6 @@ export default function Agenda() {
     getDefaultEventFormData,
   );
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<EventCategory | null>(null);
-  const [categoryForm, setCategoryForm] = useState({
-    name: "",
-    description: "",
-    color_code: "#F2C41E",
-  });
-  const [categoryDeletingId, setCategoryDeletingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"info" | "participants">("info");
   const [dayViewModal, setDayViewModal] = useState<{
     isOpen: boolean;
@@ -878,65 +873,22 @@ export default function Agenda() {
     setCurrentMonth(setYear(currentMonth, year));
   };
 
-  const resetCategoryForm = () => {
-    setEditingCategory(null);
-    setCategoryForm({
-      name: "",
-      description: "",
-      color_code: "#F2C41E",
-    });
+  const handleCreateCategory = async (values: CategoryValues) => {
+    await createEventCategory(values).unwrap();
+    notifySuccess();
   };
 
-  const handleSaveCategory = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    if (!categoryForm.name.trim()) {
-      toast.error(
-        translate("common.requiredField", {
-          field: translate("agendaPage.categories"),
-        }),
-      );
-      return;
-    }
-
-    try {
-      if (editingCategory) {
-        await updateEventCategory({
-          id: editingCategory.id,
-          name: categoryForm.name.trim(),
-          description: categoryForm.description.trim() || null,
-          color_code: categoryForm.color_code,
-        }).unwrap();
-      } else {
-        await createEventCategory({
-          name: categoryForm.name.trim(),
-          description: categoryForm.description.trim() || null,
-          color_code: categoryForm.color_code,
-        }).unwrap();
-      }
-      resetCategoryForm();
-      notifySuccess();
-    } catch (error) {
-      toast.error(getApiErrorDisplayMessage(error, translate, "apiErrors.default"));
-    }
+  const handleUpdateCategory = async (id: string, values: CategoryValues) => {
+    await updateEventCategory({ id, ...values }).unwrap();
+    notifySuccess();
   };
 
   const handleDeleteCategory = async (id: string) => {
-    setCategoryDeletingId(id);
-    try {
-      await deleteEventCategory(id).unwrap();
-      notifySuccess();
-      if (formData.event_category_id === id) {
-        setFormData((current) => ({
-          ...current,
-          event_category_id: eventCategories.find((category) => category.id !== id)?.id || "",
-        }));
-      }
-    } catch (error) {
-      toast.error(getApiErrorDisplayMessage(error, translate, "apiErrors.default"));
-    } finally {
-      setCategoryDeletingId(null);
+    await deleteEventCategory(id).unwrap();
+    if (formData.event_category_id === id) {
+      setFormData((current) => ({ ...current, event_category_id: eventCategories.find((category) => category.id !== id)?.id || "" }));
     }
+    notifySuccess();
   };
 
   if (!canViewEvent) {
@@ -944,20 +896,20 @@ export default function Agenda() {
   }
 
   return (
-    <div className="space-y-8 p-4 sm:p-6 lg:p-8">
-      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+    <div className="agenda-page">
+      <header className="agenda-page-header">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 underline decoration-primary decoration-4 underline-offset-8">
+          <h2 className="agenda-page-title font-bold tracking-tight text-slate-900 underline decoration-primary decoration-4 underline-offset-8">
             {translate("agendaPage.title")}
           </h2>
           {/* <p className="text-slate-500 mt-4 text-sm">
             {translate("agendaPage.description")}
           </p> */}
         </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+        <div className="agenda-page-actions">
           <button
             onClick={() => setIsCategoryModalOpen(true)}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-2 text-sm font-bold text-slate-900 shadow-sm transition-all hover:bg-slate-50 cursor-pointer sm:w-auto"
+            className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-2 text-sm font-bold text-slate-900 shadow-sm transition-all hover:bg-slate-50 cursor-pointer"
           >
             <Grid className="w-4 h-4 text-primary" />
             {translate("agendaPage.categories")}
@@ -965,7 +917,7 @@ export default function Agenda() {
           {canCreateEvent && (
             <button
               onClick={openCreateModal}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-2 text-sm font-bold text-slate-900 shadow-sm transition-all hover:bg-primary-dark cursor-pointer sm:w-auto"
+              className="flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-2 text-sm font-bold text-slate-900 shadow-sm transition-all hover:bg-primary-dark cursor-pointer"
             >
               <CalendarCheck className="w-4 h-4" />
               {translate("agendaPage.newEvent")}
@@ -974,15 +926,16 @@ export default function Agenda() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4 lg:gap-8">
+      <div className="agenda-main-layout">
         {/* Agenda Grid */}
-        <div className="lg:col-span-3 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="flex flex-col justify-between gap-4 border-b border-slate-100 bg-slate-50/50 p-4 sm:flex-row sm:items-center sm:p-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-              <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
+        <div className="agenda-calendar bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="agenda-calendar-toolbar border-b border-slate-100 bg-slate-50/50">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
                 <select
                   value={currentMonth.getMonth()}
                   onChange={(e) => handleMonthChange(parseInt(e.target.value))}
+                  aria-label={translate("agendaPage.month")}
                   className="bg-transparent border-none outline-none text-sm font-bold text-slate-900 cursor-pointer"
                 >
                   {Array.from({ length: 12 }, (_, index) => (
@@ -996,6 +949,7 @@ export default function Agenda() {
                 <select
                   value={currentMonth.getFullYear()}
                   onChange={(e) => handleYearChange(parseInt(e.target.value))}
+                  aria-label={translate("agendaPage.year")}
                   className="bg-transparent border-none outline-none text-sm font-bold text-slate-900 cursor-pointer"
                 >
                   {YEARS.map((year) => (
@@ -1008,12 +962,14 @@ export default function Agenda() {
               <div className="flex gap-1">
                 <button
                   onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                  aria-label={translate("agendaPage.previousMonth")}
                   className="p-2 hover:bg-slate-200 rounded-xl transition-colors text-slate-400 bg-white border border-slate-100 shadow-sm cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                  aria-label={translate("agendaPage.nextMonth")}
                   className="p-2 hover:bg-slate-200 rounded-xl transition-colors text-slate-400 bg-white border border-slate-100 shadow-sm cursor-pointer"
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -1038,94 +994,58 @@ export default function Agenda() {
                 </div>
               </div>
             )}
-            <div className="overflow-x-auto">
-              <div className="min-w-[680px]">
-              <div className="grid grid-cols-7 border-b border-slate-100">
-                {weekdayLabels.map((day) => (
-                    <div
-                      key={day}
-                      className="py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50/20"
-                    >
-                      {day}
-                    </div>
-                  ))}
-              </div>
-              <div className="grid auto-rows-[96px] grid-cols-7 sm:auto-rows-[120px]">
-                {days.map((day) => {
-                  const dayEvents = (apiEvents || []).filter((e) => {
-                    const startDate = parseISO(e.event_date);
-                    const endDate = parseISO(e.end_date || e.event_date);
-                    return isWithinInterval(day, {
-                      start: startDate,
-                      end: endDate,
-                    });
-                  });
-                  return (
-                    <div
-                      key={day.toString()}
-                      className={`border-r border-b border-slate-50 p-2 hover:bg-slate-50/50 transition-colors relative ${!isSameMonth(day, currentMonth) ? "opacity-30" : ""}`}
-                    >
-                      <span
-                        className={` text-sm font-bold ${isToday(day) ? "w-8 h-8 flex items-center justify-center bg-primary rounded-full shadow-sm text-slate-900" : " pl-4 text-slate-400"}`}
-                      >
-                        {format(day, "d")}
-                      </span>
-
-                      {/* Event posting */}
-                      {dayEvents.length > 0 ? (
-                        <div className="mt-2 space-y-1 text-slate-900">
-	                          <div
-	                            onClick={() => handleEventClick(dayEvents[0])}
-	                            style={getEventCategoryStyle(dayEvents[0])}
-	                            className="text-[9px] font-bold py-1 px-1.5 rounded truncate border shadow-xs group/item flex items-center justify-between overflow-hidden cursor-pointer"
-	                          >
-                            <span className="truncate">
-                              {dayEvents[0].title}
-                            </span>
-                          </div>
-
-                          {dayEvents.length > 1 && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDayViewModal({
-                                  isOpen: true,
-                                  date: day,
-                                  events: dayEvents,
-                                });
-                              }}
-                              className="w-full py-1 bg-slate-50 border border-slate-100 rounded text-[9px] font-bold text-slate-400 flex items-center justify-center gap-1 hover:bg-primary/20 hover:text-primary-dark transition-all cursor-pointer"
-                            >
-                              <Plus className="w-2 h-2" />{" "}
-                              {translate("agendaPage.calendarMore", {
-                                count: dayEvents.length - 1,
-                              })}
-                            </button>
-                          )}
+            {isCalendarError ? <p role="alert" className="m-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{translate("agendaPage.failedToLoadEvents")}</p> : null}
+            <table className="agenda-month-table" aria-label={format(currentMonth, "MMMM yyyy", { locale: dateLocale })} aria-busy={isLoadingEvents}>
+              <thead><tr>
+                {weekdayLabels.map((label) => <th key={label} scope="col">
+                  <span className="agenda-calendar-desktop">{label}</span>
+                  <abbr className="agenda-calendar-mobile no-underline" title={label}>{label.slice(0, 1)}</abbr>
+                </th>)}
+              </tr></thead>
+              <tbody>
+                {Array.from({ length: days.length / 7 }, (_, week) => <tr key={week}>
+                  {days.slice(week * 7, week * 7 + 7).map((day) => {
+                    const dayEvents = (apiEvents || []).filter((event) => isWithinInterval(day, {
+                      start: parseISO(event.event_date), end: parseISO(event.end_date || event.event_date),
+                    }));
+                    const dayLabel = format(day, "PPPP", { locale: dateLocale });
+                    const openDay = () => setDayViewModal({ isOpen: true, date: day, events: dayEvents });
+                    return <td key={day.toISOString()} className={!isSameMonth(day, currentMonth) ? "text-slate-400 bg-slate-50/50" : "text-slate-900"}>
+                      <time dateTime={format(day, "yyyy-MM-dd")} title={dayLabel} aria-current={isToday(day) ? "date" : undefined} className={
+                        "agenda-day-number" + (isToday(day) ? " bg-primary text-slate-900" : " text-slate-500")
+                      }>{format(day, "d")}</time>
+                      {dayEvents.length ? <>
+                        <div className="agenda-calendar-desktop mt-1 space-y-1">
+                          <button type="button" onClick={() => handleEventClick(dayEvents[0])} style={getEventCategoryStyle(dayEvents[0])} className="block w-full min-w-0 truncate rounded border px-1.5 py-1 text-left text-[10px] font-semibold" title={dayEvents[0].title}>
+                            {dayEvents[0].title}
+                          </button>
+                          {dayEvents.length > 1 ? <button type="button" onClick={openDay} className="block w-full truncate rounded border border-slate-100 bg-slate-50 py-1 text-[10px] font-bold text-slate-500 hover:bg-primary/20" aria-label={translate("agendaPage.eventsOnDate", { count: dayEvents.length, date: dayLabel })}>
+                            {translate("agendaPage.calendarMore", { count: dayEvents.length - 1 })}
+                          </button> : null}
                         </div>
-                      ) : (
-                        <></>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              </div>
-            </div>
+                        <button type="button" onClick={openDay} className="agenda-calendar-mobile agenda-day-count" style={getEventCategoryStyle(dayEvents[0])} aria-label={translate("agendaPage.eventsOnDate", { count: dayEvents.length, date: dayLabel })}>
+                          {dayEvents.length}
+                        </button>
+                      </> : null}
+                    </td>;
+                  })}
+                </tr>)}
+              </tbody>
+            </table>
           </div>
         </div>
 
         {/* Upcoming List */}
-        <div className="space-y-6">
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm text-slate-900">
-            <div className="flex items-center justify-between mb-6">
+        <div className="min-w-0">
+          <div className="agenda-upcoming-panel bg-white rounded-3xl border border-slate-200 shadow-sm text-slate-900">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
               <h3 className="text-lg font-bold">
                 {translate("agendaPage.upcoming")}
               </h3>
             </div>
 
-            {/* Upcomming event Items */}
-            <div className="space-y-6">
+            {/* Upcoming event items */}
+            <div className="space-y-4">
               {isLoadingUpcoming ? (
                 // Skeleton Loader
                 Array.from({ length: 3 }).map((_, i) => (
@@ -1148,16 +1068,17 @@ export default function Agenda() {
                 upcomingEvents.map((event) => {
                   const eDate = parseISO(event.event_date);
                   return (
-                    <motion.div
+                    <motion.button
+                      type="button"
                       layout
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
                       key={event.id}
-                      className="group cursor-pointer"
+                      className="group block w-full min-w-0 cursor-pointer text-left"
                       onClick={() => handleEventClick(event)}
                     >
-                      <div className="flex gap-4">
-                        <div className="flex-shrink-0 w-12 h-12 bg-slate-50 rounded-2xl flex flex-col items-center justify-center border border-slate-100 group-hover:bg-primary group-hover:border-primary transition-colors text-slate-900">
+                      <div className="flex gap-3">
+                        <div className="agenda-upcoming-date flex-shrink-0 bg-slate-50 rounded-2xl flex flex-col items-center justify-center border border-slate-100 group-hover:bg-primary group-hover:border-primary transition-colors text-slate-900">
                           <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-900 uppercase tracking-tighter">
                             {format(eDate, "MMM", { locale: dateLocale })}
                           </span>
@@ -1166,18 +1087,18 @@ export default function Agenda() {
                           </span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-bold group-hover:text-primary-dark transition-colors truncate">
+                          <h4 className="text-sm font-bold group-hover:text-primary-dark transition-colors line-clamp-2 break-words">
                             {event.title}
                           </h4>
                           <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> {event.event_time}
+                            <Clock className="w-3 h-3 shrink-0" /><span className="min-w-0 break-words">{event.event_time}</span>
                           </p>
                           <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
-                            <MapPin className="w-3 h-3" /> {event.location}
+                            <MapPin className="w-3 h-3 shrink-0" /><span className="min-w-0 line-clamp-2 break-words">{event.location}</span>
                           </p>
                         </div>
                       </div>
-                    </motion.div>
+                    </motion.button>
                   );
                 })
               ) : (
@@ -1209,24 +1130,45 @@ export default function Agenda() {
             ? translate("Edit")
             : translate("agendaPage.createNewEvent")
         }
-        maxWidth="max-w-4xl"
-      >
-        <form noValidate onSubmit={handleAddEvent} className="space-y-4 text-slate-900">
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              {translate("agendaPage.eventTitle")}
-            </label>
-            <input
-              required
-              type="text"
-              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none text-sm"
-              value={formData.title}
-              onChange={(e) =>
-                setFormData({ ...formData, title: e.target.value })
-              }
-            />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        layout="compact"
+        className="batch-three-modal agenda-event-editor"
+        footer={(<ModalSubmitButton
+          formId="agenda-event-form"
+          disabled={isCreatingEvent || isUpdatingEvent}
+          className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        >
+          {isCreatingEvent || isUpdatingEvent ? (
+            <>
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              {translate("agendaPage.syncingToNexus")}
+            </>
+          ) : (
+            isEditMode ? translate("Edit") : translate("agendaPage.createEvent")
+          )}
+        </ModalSubmitButton>)}>
+        <form
+          id="agenda-event-form"
+          noValidate
+          onSubmit={handleAddEvent}
+          className="space-y-4 text-slate-900">
+          <ModalFieldGrid>
+            <ModalFullWidth>
+              <div className="space-y-2">
+                <label htmlFor="agenda-event-field-1" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  {translate("agendaPage.eventTitle")}
+                </label>
+                <input
+                  id="agenda-event-field-1"
+                  required
+                  type="text"
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none text-sm"
+                  value={formData.title}
+                  onChange={(e) =>
+                    setFormData({ ...formData, title: e.target.value })
+                  }
+                />
+              </div>
+            </ModalFullWidth>
             <BeautifulDateTimePicker
               label={translate("agendaPage.startDate")}
               type="date"
@@ -1259,13 +1201,12 @@ export default function Agenda() {
               onChange={(val) => setFormData({ ...formData, event_time: val })}
               icon={<Clock className="w-4 h-4 text-primary" />}
             />
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+              <label htmlFor="agenda-event-field-2" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
                 {translate("agendaPage.eventType")}
               </label>
               <select
+                id="agenda-event-field-2"
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary/10 outline-none font-bold text-sm transition-all"
                 value={formData.event_category_id || ""}
                 onChange={(e) =>
@@ -1281,10 +1222,11 @@ export default function Agenda() {
               </select>
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+              <label htmlFor="agenda-event-field-3" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
                 {translate("agendaPage.maxAttendees")}
               </label>
               <input
+                id="agenda-event-field-3"
                 type="number"
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary/10 outline-none font-bold text-sm transition-all"
                 value={formData.max_attendees}
@@ -1296,147 +1238,126 @@ export default function Agenda() {
                 }
               />
             </div>
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              {translate("agendaPage.location")}
-            </label>
-            <input
-              required
-              type="text"
-              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-sm"
-              value={formData.location}
-              onChange={(e) =>
-                setFormData({ ...formData, location: e.target.value })
-              }
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              {translate("agendaPage.descriptionLabel")}
-            </label>
-            <TiptapEditor
-              content={formData.description}
-              onChange={(content) =>
-                setFormData({ ...formData, description: content })
-              }
-              placeholder={translate("agendaPage.descriptionPlaceholder")}
-              onImageUpload={handleImageUpload}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              {isEditMode
-                ? translate("agendaPage.newAttachments")
-                : translate("agendaPage.attachments")}
-            </label>
-            <FileUploadDropzone
-              inputId={`agenda-attachments-${isEditMode ? "edit" : "create"}`}
-              title={translate("agendaPage.addFiles")}
-              hint={
-                isEditMode
-                  ? translate("agendaPage.uploadNewFilesForThisEvent")
-                  : translate("agendaPage.uploadFilesForThisEvent")
-              }
-              selectedLabel={
-                (isEditMode ? formData.new_attachments.length : formData.attachments?.length)
-                  ? translate("agendaPage.filesSelected", {
-                      count:
-                        isEditMode
-                          ? formData.new_attachments.length
-                          : formData.attachments?.length || 0,
-                    })
-                  : undefined
-              }
-              onFilesSelected={(files) =>
-                isEditMode
-                  ? handleNewAttachmentsChange(files)
-                  : handleCreateAttachmentsChange(files)
-              }
-              preview={
-                (isEditMode ? formData.new_attachments.length : formData.attachments?.length) ? (
-                  <SelectedFilesPreview
+            <ModalFullWidth>
+              <div className="space-y-2">
+                <label htmlFor="agenda-event-field-4" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  {translate("agendaPage.location")}
+                </label>
+                <input
+                  id="agenda-event-field-4"
+                  required
+                  type="text"
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-sm"
+                  value={formData.location}
+                  onChange={(e) =>
+                    setFormData({ ...formData, location: e.target.value })
+                  }
+                />
+              </div>
+            </ModalFullWidth>
+            <ModalFullWidth>
+              <div
+                role="group"
+                aria-labelledby="agenda-event-description-label"
+                className="space-y-2">
+                <label id="agenda-event-description-label" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  {translate("agendaPage.descriptionLabel")}
+                </label>
+                <TiptapEditor
+                  content={formData.description}
+                  onChange={(content) =>
+                    setFormData({ ...formData, description: content })
+                  }
+                  placeholder={translate("agendaPage.descriptionPlaceholder")}
+                  onImageUpload={handleImageUpload}
+                />
+              </div>
+            </ModalFullWidth>
+            <ModalFullWidth>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  {isEditMode
+                    ? translate("agendaPage.newAttachments")
+                    : translate("agendaPage.attachments")}
+                </label>
+                <FileUploadDropzone
+                  presentation="compact"
+                  inputId={`agenda-attachments-${isEditMode ? "edit" : "create"}`}
+                  title={translate("agendaPage.addFiles")}
+                  hint={
+                    isEditMode
+                      ? translate("agendaPage.uploadNewFilesForThisEvent")
+                      : translate("agendaPage.uploadFilesForThisEvent")
+                  }
+                  selectedLabel={
+                    (isEditMode ? formData.new_attachments.length : formData.attachments?.length)
+                      ? translate("agendaPage.filesSelected", {
+                        count:
+                          isEditMode
+                            ? formData.new_attachments.length
+                            : formData.attachments?.length || 0,
+                      })
+                      : undefined
+                  }
+                  onFilesSelected={(files) =>
+                    isEditMode
+                      ? handleNewAttachmentsChange(files)
+                      : handleCreateAttachmentsChange(files)
+                  }
+                  preview={(isEditMode ? formData.new_attachments.length : formData.attachments?.length) ? (<SelectedFilesPreview
+                    presentation="compact"
                     files={isEditMode ? formData.new_attachments : formData.attachments || []}
                     onRemove={(index) =>
                       isEditMode ? removeNewAttachment(index) : removeCreateAttachment(index)
                     }
-                    className="h-full w-full"
-                  />
-                ) : isEditMode && formData.existing_attachments[0] ? (
-                  <FilePreviewCard
-                    url={formData.existing_attachments[0]}
-                    href={formData.existing_attachments[0]}
-                    name={getPreviewName(formData.existing_attachments[0])}
-                    subtitle={translate("agendaPage.openFile")}
-                    onRemove={() => removeExistingAttachment(formData.existing_attachments[0])}
-                    className="h-full w-full"
-                    aspectClassName="h-full"
-                  />
-                ) : undefined
-              }
-              emptyPreview={
-                <div className="flex h-full min-h-[336px] w-full items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-6">
-                  <div className="flex h-28 w-28 items-center justify-center rounded-full bg-white px-3 text-center text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 shadow-sm">
-                    {translate("agendaPage.attachmentsPreview")}
+                  />) : undefined}
+                />
+                {isEditMode && formData.existing_attachments.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      {translate("agendaPage.existingAttachments")}
+                    </div>
+                    <ModalFieldGrid>
+                      {formData.existing_attachments.map((attachmentUrl) => (
+                        <FilePreviewCard
+                          presentation="compact"
+                          key={attachmentUrl}
+                          url={attachmentUrl}
+                          href={attachmentUrl}
+                          name={getPreviewName(attachmentUrl)}
+                          subtitle={translate("agendaPage.openFile")}
+                          onRemove={() => removeExistingAttachment(attachmentUrl)}
+                        />
+                      ))}
+                    </ModalFieldGrid>
                   </div>
-                </div>
-              }
-            />
-            {isEditMode && formData.existing_attachments.length > 0 && (
-              <div className="space-y-2">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  {translate("agendaPage.existingAttachments")}
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {formData.existing_attachments.map((attachmentUrl) => (
-                    <FilePreviewCard
-                      key={attachmentUrl}
-                      url={attachmentUrl}
-                      href={attachmentUrl}
-                      name={getPreviewName(attachmentUrl)}
-                      subtitle={translate("agendaPage.openFile")}
-                      onRemove={() => removeExistingAttachment(attachmentUrl)}
-                    />
-                  ))}
-                </div>
+                )}
               </div>
-            )}
-          </div>
-          <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
-            <input
-              type="checkbox"
-              id="is_public"
-              className="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
-              checked={formData.is_public}
-              onChange={(e) =>
-                setFormData({ ...formData, is_public: e.target.checked })
-              }
-            />
-            <label
-              htmlFor="is_public"
-              className="text-xs font-bold text-slate-700 uppercase tracking-widest cursor-pointer"
-            >
-              {translate("agendaPage.publicEvent")}
-            </label>
-          </div>
-          <button
-            type="submit"
-            disabled={isCreatingEvent || isUpdatingEvent}
-            className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all mt-4 uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-          >
-            {isCreatingEvent || isUpdatingEvent ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                {translate("agendaPage.syncingToNexus")}
-              </>
-            ) : (
-              isEditMode ? translate("Edit") : translate("agendaPage.createEvent")
-            )}
-          </button>
+            </ModalFullWidth>
+            <ModalFullWidth>
+              <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                <input
+                  type="checkbox"
+                  id="is_public"
+                  className="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
+                  checked={formData.is_public}
+                  onChange={(e) =>
+                    setFormData({ ...formData, is_public: e.target.checked })
+                  }
+                />
+                <label
+                  htmlFor="is_public"
+                  className="text-xs font-bold text-slate-700 uppercase tracking-widest cursor-pointer"
+                >
+                  {translate("agendaPage.publicEvent")}
+                </label>
+              </div>
+            </ModalFullWidth>
+          </ModalFieldGrid>
         </form>
       </Modal>
-
       <ConfirmModal
+        presentation="compact"
         isOpen={isConfirmOpen}
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleDeleteEvent}
@@ -1448,19 +1369,86 @@ export default function Agenda() {
         isOpen={Boolean(agendaId && selectedEvent)}
         onClose={handleCloseDetails}
         title={translate("agendaPage.eventDetails")}
-        maxWidth="max-w-4xl"
+        layout="drawer"
+        className="batch-three-modal agenda-detail-drawer"
+        footer={selectedEvent ? (<div className="batch-three-actions">
+          <div className="batch-three-action-row">
+            {canEditEvent ? (
+              <button
+                onClick={() => openEditModal(selectedEvent)}
+                className="w-full py-3 sm:flex-1 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-50 transition-all uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Edit2 className="w-4 h-4" />
+                {translate("Edit")}
+              </button>
+            ) : null}
+            {canDeleteEventPermission ? (
+              <button
+                onClick={() => confirmDeleteEvent(selectedEvent.id)}
+                className="w-full py-3 sm:flex-1 bg-red-50 border border-red-100 text-red-600 rounded-xl font-bold text-xs hover:bg-red-100 transition-all uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                {translate("agendaPage.deleteEvent")}
+              </button>
+            ) : null}
+            {selectedEvent.is_registered ? (
+              <button
+                disabled={isUnregistering || isRegistering}
+                onClick={() =>
+                  handleToggleRegistration(selectedEvent.id, true)
+                }
+                className="w-full py-3 sm:flex-1 bg-red-50 text-red-600 rounded-xl font-bold text-xs hover:bg-red-100 transition-all uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+              >
+                {isUnregistering ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    {translate("agendaPage.unregistering")}
+                  </>
+                ) : (
+                  translate("agendaPage.unregisterFromEvent")
+                )}
+              </button>
+            ) : (
+              <button
+                disabled={
+                  isRegistering ||
+                  isUnregistering ||
+                  (selectedEvent.attendee_count >=
+                    selectedEvent.max_attendees &&
+                    !selectedEvent.is_registered)
+                }
+                onClick={() =>
+                  handleToggleRegistration(selectedEvent.id, false)
+                }
+                className="w-full py-3 sm:flex-1 bg-slate-900 text-white rounded-xl font-bold text-xs hover:bg-slate-800 transition-all uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-400 cursor-pointer"
+              >
+                {isRegistering ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    {translate("agendaPage.registering")}
+                  </>
+                ) : selectedEvent.attendee_count >=
+                  selectedEvent.max_attendees &&
+                  !selectedEvent.is_registered ? (
+                  translate("agendaPage.eventAtCapacity")
+                ) : (
+                  translate("agendaPage.registerForEvent")
+                )}
+              </button>
+            )}
+          </div>
+        </div>) : undefined}
       >
         {selectedEvent && (
-          <div className="space-y-6 text-slate-900 text-left">
+          <div className="space-y-4 text-slate-900 text-left">
             <div className="flex items-center justify-between border-b border-slate-100">
-              <div className="flex gap-6">
+              <div className="agenda-detail-tabs flex gap-6">
                 <button
                   onClick={() => setActiveTab("info")}
-                  className={`pb-3 text-sm font-bold uppercase tracking-widest transition-all relative cursor-pointer ${
-                    activeTab === "info"
+                  className={`pb-3 text-sm font-bold uppercase tracking-widest transition-all relative cursor-pointer ${activeTab === "info"
                       ? "text-primary-dark"
                       : "text-slate-400 hover:text-slate-600"
-                  }`}
+                    }`}
                 >
                   {translate("agendaPage.details")}
                   {activeTab === "info" && (
@@ -1472,14 +1460,13 @@ export default function Agenda() {
                 </button>
                 <button
                   onClick={() => setActiveTab("participants")}
-                  className={`pb-3 text-sm font-bold uppercase tracking-widest transition-all relative cursor-pointer ${
-                    activeTab === "participants"
+                  className={`pb-3 text-sm font-bold uppercase tracking-widest transition-all relative cursor-pointer ${activeTab === "participants"
                       ? "text-primary-dark"
                       : selectedEvent.attendee_count >=
-                          selectedEvent.max_attendees
+                        selectedEvent.max_attendees
                         ? "text-red-500 hover:text-red-600"
                         : "text-slate-400 hover:text-slate-600"
-                  }`}
+                    }`}
                 >
                   {translate("agendaPage.participants", {
                     count: selectedEvent.attendee_count,
@@ -1493,7 +1480,6 @@ export default function Agenda() {
                 </button>
               </div>
             </div>
-
             <AnimatePresence mode="wait">
               {activeTab === "info" ? (
                 <motion.div
@@ -1501,26 +1487,18 @@ export default function Agenda() {
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 10 }}
-                  className="space-y-6"
+                  className="space-y-4"
                 >
-	                  <div
-	                    style={getEventCategoryStyle(selectedEvent)}
-	                    className="w-fit px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest"
-	                  >
-	                    {getEventCategoryLabel(selectedEvent)}
-	                  </div>
-
+                  <div
+                    style={getEventCategoryStyle(selectedEvent)}
+                    className="w-fit px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest"
+                  >
+                    {getEventCategoryLabel(selectedEvent)}
+                  </div>
                   <h3 className="text-2xl font-bold leading-tight">
                     {selectedEvent.title}
                   </h3>
-
-                  <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex items-center gap-2 text-slate-400">
-                      <FileText className="w-4 h-4" />
-                      <p className="text-[11px] font-bold uppercase tracking-[0.2em]">
-                        {translate("agendaPage.descriptionLabel")}
-                      </p>
-                    </div>
+                  <ModalSection title={translate("agendaPage.descriptionLabel")}>
                     {selectedEventDescription.trim() ? (
                       <div
                         className="mt-4 text-sm leading-7 text-slate-700 prose prose-slate max-w-none prose-p:text-slate-700 prose-headings:text-slate-900 prose-strong:text-slate-900 prose-a:text-primary prose-a:break-all prose-ul:list-disc prose-ol:list-decimal prose-li:marker:text-slate-400 [&_.youtube-embed]:relative [&_.youtube-embed]:my-6 [&_.youtube-embed]:overflow-hidden [&_.youtube-embed]:rounded-[24px] [&_.youtube-embed]:border [&_.youtube-embed]:border-slate-200 [&_.youtube-embed]:bg-slate-950 [&_.youtube-embed]:pt-[56.25%] [&_.youtube-embed_iframe]:absolute [&_.youtube-embed_iframe]:left-0 [&_.youtube-embed_iframe]:top-0 [&_.youtube-embed_iframe]:h-full [&_.youtube-embed_iframe]:w-full"
@@ -1533,9 +1511,8 @@ export default function Agenda() {
                         -
                       </p>
                     )}
-                  </section>
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  </ModalSection>
+                  <ModalFieldGrid>
                     <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                       <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
                         {translate("agendaPage.maxAttendees")}
@@ -1570,18 +1547,16 @@ export default function Agenda() {
                           </p>
                         </div>
                         <div
-                          className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                            selectedEvent.is_public
+                          className={`flex h-10 w-10 items-center justify-center rounded-full ${selectedEvent.is_public
                               ? "bg-emerald-50 text-emerald-600"
                               : "bg-slate-100 text-slate-500"
-                          }`}
+                            }`}
                         >
                           <Globe className="w-4 h-4" />
                         </div>
                       </div>
                     </div>
-                  </div>
-
+                  </ModalFieldGrid>
                   <div className="space-y-4 pt-4 border-t border-slate-100">
                     <div className="flex items-center gap-4 text-slate-600">
                       <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-primary-dark">
@@ -1593,21 +1568,20 @@ export default function Agenda() {
                         </p>
                         <p className="font-bold">
                           {selectedEvent.end_date &&
-                          selectedEvent.end_date !== selectedEvent.event_date
+                            selectedEvent.end_date !== selectedEvent.event_date
                             ? `${format(parseISO(selectedEvent.event_date), "EEEE, MMMM d, yyyy", {
-                                locale: dateLocale,
-                              })} - ${format(parseISO(selectedEvent.end_date), "EEEE, MMMM d, yyyy", {
-                                locale: dateLocale,
-                              })}`
+                              locale: dateLocale,
+                            })} - ${format(parseISO(selectedEvent.end_date), "EEEE, MMMM d, yyyy", {
+                              locale: dateLocale,
+                            })}`
                             : format(
-                                parseISO(selectedEvent.event_date),
-                                "EEEE, MMMM d, yyyy",
-                                { locale: dateLocale },
-                              )}
+                              parseISO(selectedEvent.event_date),
+                              "EEEE, MMMM d, yyyy",
+                              { locale: dateLocale },
+                            )}
                         </p>
                       </div>
                     </div>
-
                     <div className="flex items-center gap-4 text-slate-600">
                       <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-primary-dark">
                         <Clock className="w-5 h-5" />
@@ -1619,7 +1593,6 @@ export default function Agenda() {
                         <p className="font-bold">{selectedEvent.event_time}</p>
                       </div>
                     </div>
-
                     <div className="flex items-center gap-4 text-slate-600">
                       <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-primary-dark">
                         <MapPin className="w-5 h-5" />
@@ -1632,23 +1605,15 @@ export default function Agenda() {
                       </div>
                     </div>
                   </div>
-
-                  <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex items-center gap-2 text-slate-400">
-                      <Paperclip className="w-4 h-4" />
-                      <p className="text-[11px] font-bold uppercase tracking-[0.2em]">
-                        {translate("agendaPage.attachments")}
-                      </p>
-                    </div>
+                  <ModalSection title={translate("agendaPage.attachments")}>
 
                     {selectedEvent.attachments?.length ? (
-                      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <ModalFieldGrid>
                         {selectedEvent.attachments.map((attachmentUrl, index) => {
                           const fileName = getAttachmentName(attachmentUrl);
                           const previewType = getAttachmentPreviewType(attachmentUrl);
                           const isMediaPreview =
                             previewType === "image" || previewType === "video";
-
                           return (
                             <div
                               key={`${attachmentUrl}-${index}`}
@@ -1683,7 +1648,6 @@ export default function Agenda() {
                                   </div>
                                 )}
                               </div>
-
                               <a
                                 href={attachmentUrl}
                                 target="_blank"
@@ -1705,13 +1669,13 @@ export default function Agenda() {
                             </div>
                           );
                         })}
-                      </div>
+                      </ModalFieldGrid>
                     ) : (
                       <p className="mt-4 text-sm italic leading-7 text-slate-400">
                         {translate("agendaPage.noAttachments")}
                       </p>
                     )}
-                  </section>
+                  </ModalSection>
                 </motion.div>
               ) : (
                 <motion.div
@@ -1728,8 +1692,7 @@ export default function Agenda() {
                         : translate("agendaPage.privacyRestrictedMessage")}
                     </p>
                   </div>
-
-                  <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar text-left">
+                  <div className="space-y-2 text-left">
                     {!canSeeParticipants ? (
                       <div className="py-12 text-center text-slate-400">
                         <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3 border border-slate-100">
@@ -1789,197 +1752,29 @@ export default function Agenda() {
                 </motion.div>
               )}
             </AnimatePresence>
-
-            <div className="pt-6 border-t border-slate-100">
-              <div className="flex flex-col gap-2 sm:flex-row">
-                {canEditEvent ? (
-                  <button
-                    onClick={() => openEditModal(selectedEvent)}
-                    className="w-full py-3 sm:flex-1 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-50 transition-all uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                    {translate("Edit")}
-                  </button>
-                ) : null}
-                {canDeleteEventPermission ? (
-                  <button
-                    onClick={() => confirmDeleteEvent(selectedEvent.id)}
-                    className="w-full py-3 sm:flex-1 bg-red-50 border border-red-100 text-red-600 rounded-xl font-bold text-xs hover:bg-red-100 transition-all uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    {translate("agendaPage.deleteEvent")}
-                  </button>
-                ) : null}
-                {selectedEvent.is_registered ? (
-                  <button
-                    disabled={isUnregistering || isRegistering}
-                    onClick={() =>
-                      handleToggleRegistration(selectedEvent.id, true)
-                    }
-                    className="w-full py-3 sm:flex-1 bg-red-50 text-red-600 rounded-xl font-bold text-xs hover:bg-red-100 transition-all uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-                  >
-                    {isUnregistering ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        {translate("agendaPage.unregistering")}
-                      </>
-                    ) : (
-                      translate("agendaPage.unregisterFromEvent")
-                    )}
-                  </button>
-                ) : (
-                  <button
-                    disabled={
-                      isRegistering ||
-                      isUnregistering ||
-                      (selectedEvent.attendee_count >=
-                        selectedEvent.max_attendees &&
-                        !selectedEvent.is_registered)
-                    }
-                    onClick={() =>
-                      handleToggleRegistration(selectedEvent.id, false)
-                    }
-                    className="w-full py-3 sm:flex-1 bg-slate-900 text-white rounded-xl font-bold text-xs hover:bg-slate-800 transition-all uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-400 cursor-pointer"
-                  >
-                    {isRegistering ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        {translate("agendaPage.registering")}
-                      </>
-                    ) : selectedEvent.attendee_count >=
-                        selectedEvent.max_attendees &&
-                      !selectedEvent.is_registered ? (
-                      translate("agendaPage.eventAtCapacity")
-                    ) : (
-                      translate("agendaPage.registerForEvent")
-                    )}
-                  </button>
-                )}
-               
-              </div>
-            </div>
           </div>
         )}
       </Modal>
-
-      <Modal
+      <CategoryManagerDialog
         isOpen={isCategoryModalOpen}
-        onClose={() => {
-          setIsCategoryModalOpen(false);
-          resetCategoryForm();
-        }}
-        title={translate("agendaPage.categories")}
-      >
-        <div className="space-y-5">
-          {canCreateEvent && (
-            <form noValidate onSubmit={handleSaveCategory} className="space-y-3">
-              <input
-                value={categoryForm.name}
-                onChange={(event) =>
-                  setCategoryForm((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))
-                }
-                placeholder={translate("articlesPage.categoryNamePlaceholder")}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none"
-              />
-              <textarea
-                value={categoryForm.description}
-                onChange={(event) =>
-                  setCategoryForm((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-                placeholder={translate("articlesPage.categoryDescriptionPlaceholder")}
-                className="min-h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none"
-              />
-              <input
-                type="color"
-                value={categoryForm.color_code}
-                onChange={(event) =>
-                  setCategoryForm((current) => ({
-                    ...current,
-                    color_code: event.target.value,
-                  }))
-                }
-                className="h-12 w-full rounded-xl border border-slate-200 bg-white p-1"
-              />
-              <button
-                type="submit"
-                disabled={
-                  !categoryForm.name.trim() ||
-                  isCreatingCategory ||
-                  isUpdatingCategory
-                }
-                className="w-full rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold uppercase tracking-widest text-white disabled:opacity-50"
-              >
-                {editingCategory
-                  ? translate("articlesPage.updateCategory")
-                  : translate("articlesPage.createCategory")}
-              </button>
-            </form>
-          )}
-
-          <div className="space-y-2">
-            {eventCategories.map((category) => (
-              <div
-                key={category.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3"
-              >
-                <div className="flex min-w-0 items-start gap-3 text-left">
-                  <span
-                    className="mt-1 h-4 w-4 shrink-0 rounded-full border border-white shadow-sm"
-                    style={{ backgroundColor: category.color_code || "#F2C41E" }}
-                  />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-slate-900">
-                      {category.name}
-                    </p>
-                    {category.description ? (
-                      <p className="line-clamp-2 text-xs font-medium text-slate-500">
-                        {category.description}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-                {canCreateEvent ? (
-                  <div className="flex gap-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingCategory(category);
-                        setCategoryForm({
-                          name: category.name,
-                          description: category.description || "",
-                          color_code: category.color_code || "#F2C41E",
-                        });
-                      }}
-                      className="rounded-lg p-2 text-slate-500 hover:bg-slate-200"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={
-                        categoryDeletingId === category.id || isDeletingCategory
-                      }
-                      onClick={() => handleDeleteCategory(category.id)}
-                      className="rounded-lg p-2 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </div>
-      </Modal>
-
+        onClose={() => setIsCategoryModalOpen(false)}
+        categories={eventCategories}
+        isLoading={isLoadingCategories}
+        error={categoriesError}
+        onRetry={() => { void refetchCategories(); }}
+        canCreate={canCreateEvent}
+        canEdit={canCreateEvent}
+        canDelete={canCreateEvent}
+        supportsColor
+        onCreate={handleCreateCategory}
+        onUpdate={handleUpdateCategory}
+        onDelete={handleDeleteCategory}
+      />
       {/* Day List View Modal */}
       <Modal
+        layout="drawer"
+        maxWidth="max-w-lg"
+        className="batch-three-modal"
         isOpen={dayViewModal.isOpen}
         onClose={() => setDayViewModal({ ...dayViewModal, isOpen: false })}
         title={
@@ -1988,29 +1783,30 @@ export default function Agenda() {
             : translate("agendaPage.dailyEvents")
         }
       >
-        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+        <div className="space-y-3">
           {dayViewModal.events.map((event) => (
-            <div
+            <button
+              type="button"
               key={event.id}
-	              onClick={() => {
-	                setDayViewModal({ ...dayViewModal, isOpen: false });
-	                handleEventClick(event);
-	              }}
-	              style={getEventCategoryStyle(event)}
-	              className="p-4 rounded-2xl border flex items-center justify-between group cursor-pointer transition-all hover:translate-x-1"
-	            >
-              <div className="flex flex-col text-left">
+              onClick={() => {
+                setDayViewModal({ ...dayViewModal, isOpen: false });
+                handleEventClick(event);
+              }}
+              style={getEventCategoryStyle(event)}
+              className="w-full min-w-0 p-3 rounded-2xl border flex items-center justify-between gap-3 group cursor-pointer transition-colors hover:brightness-95"
+            >
+              <div className="flex min-w-0 flex-1 flex-col break-words text-left [overflow-wrap:anywhere]">
                 <span className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-1">
-	                  {event.event_time} • {getEventCategoryLabel(event)}
+                  {event.event_time} • {getEventCategoryLabel(event)}
                 </span>
                 <span className="font-bold text-sm text-slate-900 group-hover:text-primary-dark transition-colors">
                   {event.title}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-primary-dark transition-all" />
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </Modal>
