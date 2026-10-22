@@ -1,6 +1,7 @@
 import { ModalFieldGrid, ModalFullWidth, ModalSection, ModalMediaSplit, ModalSubmitButton } from "../components/ui/ModalLayout";
 import "./MemberAdminModals.css";
 import { AdminPasswordField } from "./admin/AdminPasswordField";
+import { AdminPermissionsEditor } from "./admin/AdminPermissionsEditor";
 import { buildAdminForumCreatePayload, isUndisplayedAdminStatus } from "./admin/adminPresentation";
 import "./AdminPanel.css";
 import { useArticleAuthorization } from "../hooks/useArticleAuthorization";
@@ -400,10 +401,9 @@ export default function AdminPanel() {
   const canEditTrainings = hasPermission("training", "edit");
   const canDeleteTrainings = hasPermission("training", "delete");
   const canManageRolesPermissions = canEditMembers;
+  const [permissionMember, setPermissionMember] = useState<Pick<MemberUser, "id" | "email" | "first_name" | "last_name"> | null>(null);
+  const [isSavingMemberPermission, setIsSavingMemberPermission] = useState(false);
 
-  if (!canAccessAdminPanel) {
-    return <Navigate to="/" replace />;
-  }
 
   // --- COMPONENT STATE ---
   const [activeTab, setActiveTab] = useState<AdminTab>("members");
@@ -2104,6 +2104,10 @@ export default function AdminPanel() {
     }
   }, [activeTab, tabs]);
 
+  if (!canAccessAdminPanel) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     <div className="admin-page">
       <div className="admin-content">
@@ -2627,7 +2631,7 @@ export default function AdminPanel() {
             </div>
           </div>
         ) : activeTab === "rolesPermissions" ? (
-          <div className="admin-role-directory">
+          <div className="admin-role-directory grid grid-cols-1 gap-6 xl:grid-cols-2">
             <div className="space-y-4">
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
                 <h4 className="text-sm font-black uppercase tracking-widest text-slate-900">
@@ -2661,9 +2665,9 @@ export default function AdminPanel() {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-black uppercase tracking-wide">
+                          <button type="button" aria-pressed={selectedRoleId === role.id} onClick={(event) => { event.stopPropagation(); setSelectedRoleId(role.id); }} className="text-left text-sm font-black uppercase tracking-wide focus-visible:ring-2 focus-visible:ring-primary">
                             {role.name}
-                          </p>
+                          </button>
                           <p
                             className={`mt-1 text-[10px] font-black uppercase tracking-widest ${
                               selectedRoleId === role.id
@@ -2724,6 +2728,12 @@ export default function AdminPanel() {
               </div>
             </div>
 
+            {canManageRolesPermissions && selectedRoleId ? (
+              <section className="min-w-0 space-y-4" aria-label={translate("adminPanelPage.rolePermissions.permissionsFor")}>
+                <h4 className="text-sm font-bold">{translate("adminPanelPage.rolePermissions.permissionsFor")}: {userRolesData.find((role) => role.id === selectedRoleId)?.name}</h4>
+                <AdminPermissionsEditor key={selectedRoleId} kind="role" targetId={selectedRoleId} canManage={canManageRolesPermissions} />
+              </section>
+            ) : <p>{translate("adminPanelPage.rolePermissions.selectRolePrompt")}</p>}
           </div>
         ) : (
           <div className="grid min-w-0 grid-cols-1 lg:grid-cols-1 xl:grid-cols-4">
@@ -3001,6 +3011,10 @@ export default function AdminPanel() {
                             </span>
                           </td>
                           <td className={`${adminTableCellClass} text-right`}>
+                            {canEditMembers && <button type="button" onClick={() => setPermissionMember(member)} aria-label={`${translate("adminPanelPage.memberPermissions.title")}: ${member.email}`} title={translate("adminPanelPage.memberPermissions.title")} className="mb-2 inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold focus-visible:ring-2 focus-visible:ring-primary">
+                              <Shield className="h-4 w-4" aria-hidden="true" />
+                              {translate("adminPanelPage.memberPermissions.title")}
+                            </button>}
                             <Actions
                               onView={() => handleOpenDetails(member)}
                               onEdit={() => handleOpenModal(member)}
@@ -5609,6 +5623,12 @@ export default function AdminPanel() {
             </p>
           </div>
         )}
+      </Modal>
+      <Modal layout="sectioned" className="batch-four-modal" isOpen={Boolean(permissionMember && canEditMembers)} closeDisabled={isSavingMemberPermission} onClose={() => { if (!isSavingMemberPermission) setPermissionMember(null); }} title={translate("adminPanelPage.memberPermissions.title")}>
+        {permissionMember && canEditMembers ? <div className="space-y-4">
+          <p className="break-words font-bold">{[permissionMember.first_name, permissionMember.last_name].filter(Boolean).join(" ") || permissionMember.email}</p>
+          <AdminPermissionsEditor key={permissionMember.id} kind="member" targetId={permissionMember.id} canManage={canEditMembers} onBusyChange={setIsSavingMemberPermission} />
+        </div> : null}
       </Modal>
     </div>
   );

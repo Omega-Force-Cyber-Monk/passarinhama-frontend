@@ -139,8 +139,11 @@ test('pending status presentation is neutral and never changes stored values', (
   assert.equal(changed, false);
 });
 
-test('permission editor controls are absent while role CRUD and authorization remain', () => {
-  assert.doesNotMatch(source, /onManagePermissions|handleSaveRolePermission|handleSetForumPermission|handleSaveMemberPermission|handleSetTrainingPermission|setIsPermissionModalOpen|\.managePermissions"/);
+test('member and role permission editors are restored while unrelated permission editors remain absent', () => {
+  assert.match(source, /<AdminPermissionsEditor[^>]*kind="role"[^>]*canManage=\{canManageRolesPermissions\}/);
+  assert.match(source, /<AdminPermissionsEditor[^>]*kind="member"[^>]*canManage=\{canEditMembers\}/);
+  assert.match(source, /canEditMembers && <button[^\n]*setPermissionMember\(member\)/);
+  assert.doesNotMatch(source, /handleSetForumPermission|handleSetTrainingPermission|setIsPermissionModalOpen/);
   for (const name of ['handleSaveRole', 'handleEditRole', 'handleDeleteRole']) assert.ok(initializer(name));
   assert.match(source, /if \(!canAccessAdminPanel\)/);
   assert.match(source, /hasPermission\("user", "edit"\)/);

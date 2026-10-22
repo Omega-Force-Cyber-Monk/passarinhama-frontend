@@ -277,6 +277,7 @@ export const membersApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { role_id }) => [
         { type: 'User', id: `PERMISSIONS-${role_id}` },
+        { type: 'User', id: 'ME' },
       ],
     }),
     updateUserPermission: builder.mutation<
@@ -293,6 +294,7 @@ export const membersApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { role_id }) => [
         { type: 'User', id: `PERMISSIONS-${role_id}` },
+        { type: 'User', id: 'ME' },
       ],
     }),
     getMemberPermissions: builder.query<
