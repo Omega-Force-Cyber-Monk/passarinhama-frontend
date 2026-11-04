@@ -22,7 +22,7 @@ registerHooks({
         .replace('import.meta.env.VITE_API_BASE_URL', JSON.stringify('https://test.invalid'));
       return {
         format: 'module', shortCircuit: true,
-        source: ts.transpileModule(source, { compilerOptions: {
+        source: ts.transpileModule(source, { fileName: fileURLToPath(url), compilerOptions: {
           module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022,
           jsx: ts.JsxEmit.ReactJSX,
         } }).outputText,
@@ -31,4 +31,4 @@ registerHooks({
     return nextLoad(url, context);
   },
 });
-await import('../tests/article-authorization.test.ts');
+await import(new URL(process.argv[2] ?? '../tests/article-authorization.test.ts', import.meta.url).href);

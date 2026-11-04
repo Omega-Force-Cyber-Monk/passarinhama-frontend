@@ -158,9 +158,10 @@ export const documentsApi = apiSlice.injectEndpoints({
       },
       invalidatesTags: [{ type: 'Document' as const, id: 'LIST' }],
     }),
-    renameDocument: builder.mutation<Document, { id: string; body: RenameDocumentRequest }>({
-      query: ({ id, body }) => ({
+    renameDocument: builder.mutation<Document, { id: string; body: RenameDocumentRequest; folderId?: string }>({
+      query: ({ id, body, folderId }) => ({
         url: `/documents/documents/${id}`,
+        clientAuthorization: { folderId },
         method: 'PATCH',
         body,
       }),
@@ -169,9 +170,10 @@ export const documentsApi = apiSlice.injectEndpoints({
         { type: 'Document' as const, id: 'LIST' },
       ],
     }),
-    deleteDocument: builder.mutation<void, string>({
-      query: (id) => ({
-        url: `/documents/documents/${id}`,
+    deleteDocument: builder.mutation<void, string | { id: string; folderId: string }>({
+      query: (target) => ({
+        url: `/documents/documents/${typeof target === "string" ? target : target.id}`,
+        clientAuthorization: { folderId: typeof target === "string" ? undefined : target.folderId },
         method: 'DELETE',
       }),
       invalidatesTags: [{ type: 'Document' as const, id: 'LIST' }],

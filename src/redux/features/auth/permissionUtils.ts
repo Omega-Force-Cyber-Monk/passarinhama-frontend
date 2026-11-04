@@ -1,5 +1,4 @@
 import {
-  ROLE_SLUGS,
   normalizeRoleSlug,
   type UserProfile,
   type UserPermission,
@@ -27,6 +26,12 @@ export const PERMISSION_ACTIONS = [
 export type PermissionAction = (typeof PERMISSION_ACTIONS)[number];
 
 export type PermissionActionKey = 'view' | 'create' | 'edit' | 'delete';
+
+export const isActiveUser = (user: UserProfile | null | undefined): user is UserProfile =>
+  Boolean(typeof user?.id === 'string' && user.id.trim() && user.status === 'active' && user.is_deleted === false);
+
+export const isActiveSuperuser = (user: UserProfile | null | undefined): boolean =>
+  isActiveUser(user) && user.is_superuser === true;
 
 type PermissionMap = Record<PermissionFeature, UserPermission>;
 
@@ -61,7 +66,7 @@ const buildSuperuserPermission = (feature: PermissionFeature): UserPermission =>
 const normalizePermissions = (
   permissions: UserPermission[] | undefined,
 ): FeaturePermission[] =>
-  (permissions ?? []).filter(
+  (Array.isArray(permissions) ? permissions : []).filter(
     (permission): permission is FeaturePermission =>
       Boolean(permission?.feature) && isPermissionFeature(permission.feature),
   );
@@ -70,7 +75,7 @@ export const getMergedPermissions = (
   user: UserProfile | null | undefined,
 ): PermissionMap => {
   const basePermissions = PERMISSION_FEATURES.reduce((acc, feature) => {
-    acc[feature] = user?.is_superuser
+    acc[feature] = isActiveSuperuser(user)
       ? buildSuperuserPermission(feature)
       : buildEmptyPermission(feature);
     return acc;
@@ -120,14 +125,13 @@ export const hasPermission = (
   feature: PermissionFeature,
   action: PermissionAction | PermissionActionKey,
 ): boolean => {
-  if (!user) return false;
-  if (user.is_superuser) return true;
-  if (user.is_deleted || user.status !== 'active') return false;
+  if (!isActiveUser(user)) return false;
+  if (isActiveSuperuser(user)) return true;
 
   const permission = getPermissionForFeature(user, feature);
   const field = ACTION_FIELD_MAP[action as PermissionActionKey] ?? action;
 
-  return Boolean(permission[field as PermissionAction]);
+  return permission[field as PermissionAction] === true;
 };
 
 export const hasAnyPermission = (
@@ -147,21 +151,17 @@ export const canAccessFeature = (
 ): boolean => hasPermission(user, feature, 'view');
 
 export const canAccessAdminPanel = (user: UserProfile | null | undefined) =>
-  Boolean(user?.is_superuser);
+  isActiveSuperuser(user);
 
 export const canAccessModeration = (user: UserProfile | null | undefined) =>
-  Boolean(user?.is_superuser) ||
-  (!user?.is_deleted &&
-    user?.status === 'active' &&
-    normalizeRoleSlug(user?.role_details?.slug || user?.role) === ROLE_SLUGS.MODERATOR);
+  isActiveSuperuser(user);
 
 export const hasRole = (
   user: UserProfile | null | undefined,
   allowedRoleSlugs: string[],
 ): boolean => {
-  if (!user) return false;
-  if (user.is_superuser) return true;
-  if (user.is_deleted || user.status !== 'active') return false;
+  if (!isActiveUser(user)) return false;
+  if (isActiveSuperuser(user)) return true;
 
   const roleSlug = normalizeRoleSlug(user.role_details?.slug || user.role);
   return allowedRoleSlugs.map(normalizeRoleSlug).includes(roleSlug);

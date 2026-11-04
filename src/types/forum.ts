@@ -244,6 +244,7 @@ export interface Topic {
   viewCount: number;
   lastActivity: string;
   isPinned: boolean;
+  isLocked?: boolean;
   status: 'pending' | 'approved' | 'rejected' | 'flagged';
   attachments?: string[] | null;
 }

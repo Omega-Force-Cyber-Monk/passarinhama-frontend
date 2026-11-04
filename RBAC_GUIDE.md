@@ -1,89 +1,13 @@
-# Role-Based Access Control (RBAC) Guideline
+# Frontend authorization
 
-This document outlines the security architecture and permission management for the ARCHICOPRO Extranet.
+Protected operations require authentication and an active, non-deleted account, including superusers. Use independent feature grants: view to read, create to create, edit plus API ownership to edit/publish/change status, and delete plus API ownership to delete. Ownership alone grants nothing. Explicit individual denials override inherited grants. Only trusted active `is_superuser === true` bypasses feature grants and ownership; role names never do.
 
-## 1. Role Definitions
+Use `usePermissions` for controls and `canModify(feature, apiResource, action)` for resource actions. The hook requires a successful current-user query matching the session. Never authorize from local storage, display names, form owner fields, or caller-supplied owner IDs. `permissionUtils.ts` resolves grants, `resourceAuthorization.ts` checks ownership, and `mutationAuthorization.ts` applies final fresh-profile/target checks through the shared RTK base query. Client-only parent locators are stripped from requests.
 
-| Role | Key (`UserRole`) | Description |
-| :--- | :--- | :--- |
-| **Admin** | `admin` | Full system access. Manages members, configurations, and all high-level content. |
-| **Moderator** | `moderator` | Content oversight. Manages community discussions, article reviews, and reports. |
-| **Member** | `membre` | Standard user. Can interact with the community and access shared resources. |
+Shared categories, forum containers, existing folder modifications, roles/permissions, account administration, cross-owner moderation, exports, settings/logs/backups and standalone file deletion are active-superuser-only. Ordinary users can delete only empty forum topics until safe cascade authorization exists. Replies require create, explicit `can_post` and an explicitly unlocked topic. Document uploads and nested folder creation require create plus parent `can_upload`.
 
----
+Delegated `user.create` sends only ordinary fields, with no role, superuser, status, permissions or payment assignment. The server must choose a safe default account role; a required caller-selected `role_id` contract must be resolved server-side. Existing account administration requires superuser. Preserve self-profile changes through `/user/users/me`; password, photo, notifications, registration, signup and recovery use separate self-service policies.
 
-## 2. Permissions Matrix
+Missing permissions, ownership, capability data, inactive/deleted accounts or unresolved/mismatched identity fail closed. New writes must declare a final endpoint policy. Check current authorization on rendering, opening, submitting and confirming; hiding controls is insufficient.
 
-| Feature / Page | Member | Moderator | Admin |
-| :--- | :---: | :---: | :---: |
-| **Dashboard** | View | View | View |
-| **Members Directory** | - | - | Full Access |
-| **Forums: Read/Reply** | Yes | Yes | Yes |
-| **Forums: Create Topic** | - | Yes | Yes |
-| **Forums: Create Forum / Pin** | - | - | Yes |
-| **Articles: Read** | Yes | Yes | Yes |
-| **Articles: Write/Review** | - | Yes | Yes |
-| **Articles: Manage Categories** | - | - | Yes |
-| **Calendar: Create/Delete** | - | - | Yes |
-| **Certifications: Propose** | - | - | Yes |
-| **Moderation Center** | - | Yes | Yes |
-| **Admin Panel** | - | - | Yes |
-
----
-
-## 3. Implementation Patterns
-
-### A. Component-Level Logic
-To show or hide UI elements based on roles, use the `useSelector` hook from Redux.
-
-```tsx
-import { useSelector } from 'react-redux';
-import { RootState } from '../redux/store';
-import { UserRole } from '../types';
-
-export function MyComponent() {
-  const { user } = useSelector((state: RootState) => state.auth);
-  
-  const isAdmin = user?.role === UserRole.ADMIN;
-  const isModerator = user?.role === UserRole.MODERATOR;
-
-  return (
-    <div>
-      {/* Admin only button */}
-      {isAdmin && <button>Delete Content</button>}
-      
-      {/* Admin or Moderator button */}
-      {(isAdmin || isModerator) && <button>Edit Content</button>}
-    </div>
-  );
-}
-```
-
-### B. Navigation Guard (Sidebar)
-Navigation items are filtered dynamically in `DashboardLayout.tsx`.
-
-```tsx
-if (isAdmin) {
-  navItems.push({ name: 'Administration', path: '/admin', icon: Settings });
-}
-```
-
-### C. Page-Level Protection
-Sensitive pages include an internal check to prevent direct URL access.
-
-```tsx
-const isAuthorized = user?.role === UserRole.ADMIN || user?.role === UserRole.MODERATOR;
-
-if (!isAuthorized) {
-  return <Navigate to="/" replace />;
-}
-```
-
----
-
-## 4. Best Practices
-
-1. **Prioritize Redux State**: Always use the role from the `auth` slice as the source of truth.
-2. **Fail-Safe Design**: Default to the most restrictive access if a user's role is unknown or undefined.
-3. **Double Verification**: Remember that frontend RBAC is for **User Experience**. Critical actions must also be verified on the **Backend API**.
-4. **Consistency**: Use the `UserRole` enum instead of hardcoded strings to prevent typos.
+Frontend checks are UX safeguards and cannot secure the backend. See [implementation notes, changed files, tests and backend checklist](docs/frontend-authorization.md).

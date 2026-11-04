@@ -297,11 +297,11 @@ export default function DocumentLibrary() {
         : "documentLibraryPage.itemsLabel";
     return translate(key, { count: itemCount });
   };
-  const { hasPermission } = usePermissions();
+  const { hasPermission, canModify, canCreateIn, canAccessAdminPanel: isSuperuser } = usePermissions();
   const canViewDocument = hasPermission("document", "view");
   const canCreateDocument = hasPermission("document", "create");
-  const canEditDocument = hasPermission("document", "edit");
-  const canDeleteDocument = hasPermission("document", "delete");
+  const canEditDocument = isSuperuser;
+  const canDeleteDocument = isSuperuser;
   const navigate = useNavigate();
   const { folderId, fileId } = useParams<{
     folderId?: string;
@@ -405,7 +405,10 @@ export default function DocumentLibrary() {
         ? findFolderInTree(allFolders, currentFolder.id)?.children
         : []) || [];
 
-  const files = folderContent?.documents || [];
+  const files = folderContent?.folder.id === currentFolder.id ? folderContent.documents : [];
+  const canUploadHere = Boolean(currentFolder.id && canCreateIn("document", folderContent?.folder.id === currentFolder.id && folderContent.folder.can_upload));
+  const canCreateFolderHere = canCreateDocument && (!currentFolder.id || canUploadHere);
+  const canChangeTarget = (target: { id: string; type: "folder" | "file" } | null, action: "edit" | "delete") => Boolean(target && (target.type === "folder" ? isSuperuser : canModify("document", files.find((file) => file.id === target.id), action)));
   const selectedPreviewFile = files.find((file) => file.id === fileId) || null;
   const previewSourceUrl = selectedPreviewFile ? getDocumentPreviewUrl(selectedPreviewFile) : null;
   const previewMimeType = selectedPreviewFile?.mime_type;
@@ -498,7 +501,7 @@ export default function DocumentLibrary() {
 
   const handleAddFolder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canCreateDocument) return;
+    if (!canCreateFolderHere) return;
     if (!newFolderName.trim()) {
       notify(
         translate("common.requiredField", {
@@ -523,7 +526,7 @@ export default function DocumentLibrary() {
 
   const handleUploadFile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canCreateDocument) return;
+    if (!canUploadHere) return;
     if (!selectedFile) {
       notify(
         translate("common.requiredField", {
@@ -581,19 +584,19 @@ export default function DocumentLibrary() {
     type: "folder" | "file",
     e?: React.MouseEvent,
   ) => {
-    if (!canDeleteDocument) return;
+    if (!canChangeTarget({ id, type }, "delete")) return;
     if (e) e.stopPropagation();
     setDeletingInfo({ id, type });
     setIsConfirmOpen(true);
   };
 
   const handleDelete = async () => {
-    if (deletingInfo) {
+    if (deletingInfo && canChangeTarget(deletingInfo, "delete")) {
       try {
         if (deletingInfo.type === "folder") {
           await deleteFolderMutation(deletingInfo.id).unwrap();
         } else {
-          await deleteDocumentMutation(deletingInfo.id).unwrap();
+          await deleteDocumentMutation({ id: deletingInfo.id, folderId: currentFolder.id || "" }).unwrap();
         }
         setDeletingInfo(null);
         setIsConfirmOpen(false);
@@ -629,7 +632,7 @@ export default function DocumentLibrary() {
 
   const handleRename = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canEditDocument || !renameInfo) return;
+    if (!renameInfo || !canChangeTarget(renameInfo, "edit")) return;
     if (!renamingName.trim()) {
       notify(
         translate("common.requiredField", {
@@ -649,6 +652,7 @@ export default function DocumentLibrary() {
         await renameDocumentMutation({
           id: renameInfo.id,
           body: { original_name: renamingName.trim() },
+          folderId: currentFolder.id || "",
         }).unwrap();
       }
       setIsRenameModalOpen(false);
@@ -733,7 +737,7 @@ export default function DocumentLibrary() {
           </nav>
         </div>
         <div className="documents-header-actions">
-          {canCreateDocument && (
+          {canCreateFolderHere && (
             <button
               onClick={() => setIsFolderModalOpen(true)}
               className="content-page-button content-page-button-secondary"
@@ -742,7 +746,7 @@ export default function DocumentLibrary() {
               {translate("documentLibraryPage.newFolder")}
             </button>
           )}
-          {canCreateDocument && currentFolder.id && (
+          {canUploadHere && (
             <button
               onClick={() => setIsUploadModalOpen(true)}
               className="content-page-button content-page-button-primary"
@@ -842,6 +846,7 @@ export default function DocumentLibrary() {
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      if (!canChangeTarget({ id: folder.id, type: "folder" }, "edit")) return;
                                       setRenameInfo({
                                         id: folder.id,
                                         name: folder.name,
@@ -942,6 +947,7 @@ export default function DocumentLibrary() {
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      if (!canChangeTarget({ id: folder.id, type: "folder" }, "edit")) return;
                                       setRenameInfo({
                                         id: folder.id,
                                         name: folder.name,
@@ -1040,10 +1046,11 @@ export default function DocumentLibrary() {
                             >
                               <Download className="w-4 h-4" />
                             </button>
-                            {canEditDocument && (
+                            {canModify("document", file, "edit") && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  if (!canModify("document", file, "edit")) return;
                                   setRenameInfo({
                                     id: file.id,
                                     name: file.original_name,
@@ -1058,7 +1065,7 @@ export default function DocumentLibrary() {
                                 <MoreVertical className="w-4 h-4" />
                               </button>
                             )}
-                            {canDeleteDocument && (
+                            {canModify("document", file, "delete") && (
                               <button
                                 aria-label={translate("documentLibraryPage.delete")}
                                 onClick={(e) => confirmDelete(file.id, "file", e)}
@@ -1123,10 +1130,11 @@ export default function DocumentLibrary() {
                             </td>
                             <td role="cell" className="px-6 py-4 text-right">
                               <div className="flex justify-end gap-2">
-                                {canEditDocument && (
+                                {canModify("document", file, "edit") && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      if (!canModify("document", file, "edit")) return;
                                       setRenameInfo({
                                         id: file.id,
                                         name: file.original_name,
@@ -1154,7 +1162,7 @@ export default function DocumentLibrary() {
                                 >
                                   <Download className="w-4 h-4" />
                                 </button>
-                                {canDeleteDocument && (
+                                {canModify("document", file, "delete") && (
                                   <button
                                     aria-label={translate("documentLibraryPage.delete")}
                                     onClick={(e) => confirmDelete(file.id, "file", e)}
@@ -1182,7 +1190,7 @@ export default function DocumentLibrary() {
       </div>
 
       <Modal
-        isOpen={isFolderModalOpen}
+        isOpen={isFolderModalOpen && canCreateFolderHere}
         onClose={() => setIsFolderModalOpen(false)}
         title={translate("documentLibraryPage.newFolder")}
         layout="compact"
@@ -1215,7 +1223,7 @@ export default function DocumentLibrary() {
         </form>
       </Modal>
       <Modal
-        isOpen={isRenameModalOpen}
+        isOpen={isRenameModalOpen && canChangeTarget(renameInfo, "edit")}
         onClose={() => setIsRenameModalOpen(false)}
         title={
           renameInfo?.type === "folder"
@@ -1253,7 +1261,7 @@ export default function DocumentLibrary() {
       </Modal>
       {/* Upload Modal */}
       <Modal
-        isOpen={isUploadModalOpen}
+        isOpen={isUploadModalOpen && canUploadHere}
         onClose={closeUploadModal}
         title={translate("documentLibraryPage.uploadFileTitle")}
         layout="compact"
@@ -1318,7 +1326,7 @@ export default function DocumentLibrary() {
       </Modal>
       <ConfirmModal
         presentation="compact"
-        isOpen={isConfirmOpen}
+        isOpen={isConfirmOpen && canChangeTarget(deletingInfo, "delete")}
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleDelete}
         title={

@@ -37,6 +37,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { usePermissions } from '../hooks/usePermissions';
 import {
   useDeleteEventMutation,
+  useCreateEventMutation,
   useGetEventsQuery,
 } from '../redux/features/events/eventsApi';
 import type { Event as ApiEvent } from '../redux/features/events/eventTypes';
@@ -44,14 +45,12 @@ import type { Event as ApiEvent } from '../redux/features/events/eventTypes';
 
 export default function Events() {
   const toast = useAppToast();
-  const { user, hasPermission } = usePermissions();
+  const { hasPermission, canModify } = usePermissions();
   const canCreateEvent = hasPermission("event", "create");
-  const canDeleteEvent = hasPermission("event", "delete");
   const navigate = useNavigate();
   const { eventId } = useParams<{ eventId?: string }>();
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [localEvents, setLocalEvents] = useState<ApiEvent[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<ApiEvent | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -63,7 +62,8 @@ export default function Events() {
     month: currentMonth.getMonth() + 1,
   });
   const [deleteEvent] = useDeleteEventMutation();
-  const events = [...apiEvents, ...localEvents];
+  const [createEvent, { isLoading: isCreatingEvent }] = useCreateEventMutation();
+  const events = apiEvents;
 
 
   const notifySuccess = (msg: string = 'Operation successful!') => {
@@ -95,8 +95,9 @@ export default function Events() {
     navigate('/events', { replace: true });
   }, [eventId, events, isLoadingEvents, navigate]);
 
-  const handleAddEvent = (e: React.FormEvent) => {
+  const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canCreateEvent || isCreatingEvent) return;
 
     if (!formData.title.trim()) {
       toast.error("Event Title is required.");
@@ -139,33 +140,16 @@ export default function Events() {
       ),
       'yyyy-MM-dd',
     );
-    const newEvent: ApiEvent = {
-      id: Math.random().toString(36).substr(2, 9),
-      title: formData.title,
-      event_type: formData.type,
-      event_date: eventDate,
-      end_date: endDate,
-      day: parseInt(formData.day),
-      month: format(parseISO(eventDate), 'MMM', { locale: enUS }),
-      event_time: formData.time,
-      location: formData.location,
-      description: '',
-      max_attendees: 10,
-      attendee_count: 0,
-      spots_left: 10,
-      is_at_capacity: false,
-      is_registered: false,
-      is_public: true,
-      attachments: [],
-      created_at: new Date().toISOString(),
-      created_by: {
-        id: user?.id || 'local',
-        first_name: user?.firstName || 'Local',
-        last_name: user?.lastName || 'User',
-        email: user?.email,
-      },
-    };
-    setLocalEvents((current) => [...current, newEvent]);
+    try {
+      await createEvent({
+        title: formData.title.trim(), event_type: formData.type,
+        event_date: eventDate, end_date: endDate, event_time: formData.time,
+        location: formData.location, description: '', max_attendees: 10, is_public: true,
+      }).unwrap();
+    } catch (error) {
+      toast.error("Failed to create event.");
+      return;
+    }
     setIsModalOpen(false);
     setFormData({ title: '', type: 'general', day: '12', endDay: '12', time: '14:00', location: 'Zoom' });
     notifySuccess('Event created successfully!');
@@ -173,20 +157,15 @@ export default function Events() {
 
   const confirmDeleteEvent = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!canModify("event", events.find((event) => event.id === id), "delete")) return;
     setDeletingId(id);
     setIsConfirmOpen(true);
   };
 
   const handleDeleteEvent = async () => {
-    if (deletingId) {
+    if (deletingId && canModify("event", events.find((event) => event.id === deletingId), "delete")) {
       try {
-        const localEventExists = localEvents.some((event) => event.id === deletingId);
-
-        if (localEventExists) {
-          setLocalEvents((current) => current.filter((event) => event.id !== deletingId));
-        } else {
-          await deleteEvent(deletingId).unwrap();
-        }
+        await deleteEvent(deletingId).unwrap();
 
         if (selectedEvent?.id === deletingId) {
           setSelectedEvent(null);
@@ -282,7 +261,7 @@ export default function Events() {
                             }`}
                           >
                              <span className="truncate">{event.title}</span>
-                             {canDeleteEvent && (
+                             {canModify("event", event, "delete") && (
                                <button 
                                  onClick={(e) => confirmDeleteEvent(event.id, e)}
                                  className="opacity-0 group-hover/item:opacity-100 bg-white/50 rounded-sm"
@@ -343,7 +322,7 @@ export default function Events() {
         </div>
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create New Event">
+      <Modal isOpen={isModalOpen && canCreateEvent} onClose={() => setIsModalOpen(false)} title="Create New Event">
         <form noValidate onSubmit={handleAddEvent} className="space-y-4 text-slate-900">
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Event Title</label>
@@ -383,7 +362,7 @@ export default function Events() {
       </Modal>
 
       <ConfirmModal 
-        isOpen={isConfirmOpen}
+        isOpen={isConfirmOpen && canModify("event", events.find((event) => event.id === deletingId), "delete")}
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleDeleteEvent}
         title="Delete Event"

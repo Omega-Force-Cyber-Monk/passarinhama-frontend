@@ -24,7 +24,7 @@ function inspect(file) { const source = read(file), sf = ts.createSourceFile(fil
     const { sf, modals } = inspect(file), admin = file.includes('AdminPanel');
     const c = {
       React: { createElement: (type, props, ...children) => ({ type, props: { ...props, children } }), Fragment: 'Fragment' }, File,
-      adminFieldId: ':admin-model:', translate: (key) => key, useI18n: () => ({ translate: (key) => key }), calls: [], notices: [], activeTab: 'members',
+      isSuperuser: true, canAccessAdminPanel: true, adminFieldId: ':admin-model:', translate: (key) => key, useI18n: () => ({ translate: (key) => key }), calls: [], notices: [], activeTab: 'members',
       getTabLabel: (tab) => tab, getRoleDisplayName: (role) => role.name, canModify: () => true, canCreateArticles: true,
       isModalOpen: true, isRoleModalOpen: true, isSaving: false, editingMember: null, editingItem: null, editingRole: null, showPassword: false, showMemberPassword: false,
       avatarPreviewUrl: 'https://files.example/avatar.png', userRoles: [{ id: 'role', name: 'Role' }], userRolesData: [{ id: 'role', name: 'Role', slug: 'member' }],

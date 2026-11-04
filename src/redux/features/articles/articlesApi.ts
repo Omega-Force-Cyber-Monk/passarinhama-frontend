@@ -1,8 +1,5 @@
-import type { FetchBaseQueryError } from '@reduxjs/toolkit/query';
-import { normalizeUserProfile } from '../auth/authApi';
-import type { UserProfileApiResponse } from '../auth/authTypes';
-import { canModifyArticle } from './articleAuthorization';
 import { apiSlice } from '../api/apiSlice';
+import type { AuthorizationContext } from '../api/mutationAuthorization';
 import type { CategoryQueryParams, PaginatedResponse } from '../api/apiTypes';
 import {
   Article,
@@ -54,23 +51,6 @@ const buildArticleFormData = (body: Partial<CreateArticleRequest>) => {
   });
 
   return formData;
-};
-
-// Revalidate fresh server data even for mutations invoked outside the UI.
-const authorizeModification = async (
-  id: string,
-  action: 'edit' | 'delete',
-  fetchResource: (url: string) => Promise<{ data?: unknown; error?: FetchBaseQueryError }>,
-): Promise<FetchBaseQueryError | undefined> => {
-  const profile = await fetchResource('/user/users/me');
-  if (profile.error) return profile.error;
-  const article = await fetchResource('/articles/articles/' + id);
-  if (article.error) return article.error;
-  const user = profile.data ? normalizeUserProfile(profile.data as UserProfileApiResponse) : null;
-  const target = article.data as Article | undefined;
-  if (target?.id !== id || !canModifyArticle(user, target, action)) {
-    return { status: 403, data: { detail: 'You do not have permission to modify this article.' } };
-  }
 };
 
 export const articlesApi = apiSlice.injectEndpoints({
@@ -180,8 +160,6 @@ export const articlesApi = apiSlice.injectEndpoints({
     }),
     deleteArticle: builder.mutation<void, string>({
       async queryFn(id, _api, _options, baseQuery) {
-        const error = await authorizeModification(id, 'delete', async (url) => await baseQuery(url));
-        if (error) return { error };
         const result = await baseQuery({ url: '/articles/articles/' + id, method: 'DELETE' });
         return result.error ? { error: result.error } : { data: undefined };
       },
@@ -201,8 +179,6 @@ export const articlesApi = apiSlice.injectEndpoints({
     }),
     updateArticle: builder.mutation<Article, { id: string; data: Partial<CreateArticleRequest> }>({
       async queryFn({ id, data }, _api, _options, baseQuery) {
-        const error = await authorizeModification(id, 'edit', async (url) => await baseQuery(url));
-        if (error) return { error };
         const result = await baseQuery({
           url: '/articles/articles/' + id, method: 'PATCH', body: buildArticleFormData(data),
         });
@@ -243,11 +219,12 @@ export const articlesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Article'],
     }),
-    uploadFile: builder.mutation<FileUploadResponse, FormData>({
-      query: (formData) => ({
+    uploadFile: builder.mutation<FileUploadResponse, FormData | { formData: FormData; authorization: AuthorizationContext }>({
+      query: (input) => ({
         url: '/articles/file-upload',
         method: 'POST',
-        body: formData,
+        body: input instanceof FormData ? input : input.formData,
+        clientAuthorization: input instanceof FormData ? undefined : input.authorization,
       }),
     }),
     deleteFile: builder.mutation<FileDeleteResponse, string>({

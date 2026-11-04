@@ -33,6 +33,7 @@ function inspect(file) {
       React: { createElement: (type, props, ...children) => ({ type, props: { ...props, children } }), Fragment: 'Fragment' },
       motion: { div: 'motion.div' }, format, parse, parseISO, isBefore, dateLocale: undefined,
       translate: (key) => key, calls: [], notifications: [],
+      canModify: () => true, canChangeTarget: () => true, canUploadHere: true, canCreateFolderHere: true, isSuperuser: true, apiEvents: [], canViewEvent: true,
       navigate: (...args) => context.calls.push(['navigate', ...args]),
       notifySuccess: (...args) => context.notifications.push(['success', ...args]),
       notifyError: (...args) => context.notifications.push(['error', ...args]),
@@ -166,7 +167,7 @@ function inspect(file) {
     for (const name of ['createFolder', 'updateFolderMutation', 'renameDocumentMutation']) m.context[name] = (payload) => ({ unwrap: async () => calls.push([name, plain(payload)]) });
     await m.context.handleAddFolder({ preventDefault() {} }); assert.deepEqual(calls[0], ['createFolder', { name: 'Folder', parent_id: 'folder' }]);
     for (const type of ['folder', 'file']) { m.context.renameInfo = { type, id: type }; await m.context.handleRename({ preventDefault() {} }); }
-    assert.deepEqual(calls[1], ['updateFolderMutation', { id: 'folder', body: { name: 'Renamed' } }]); assert.deepEqual(calls[2], ['renameDocumentMutation', { id: 'file', body: { original_name: 'Renamed' } }]);
+    assert.deepEqual(calls[1], ['updateFolderMutation', { id: 'folder', body: { name: 'Renamed' } }]); assert.deepEqual(calls[2], ['renameDocumentMutation', { id: 'file', body: { original_name: 'Renamed' }, folderId: 'folder' }]);
     m.context.downloadTrigger = (id) => ({ unwrap: async () => ({ download_url: 'https://files.example/download', filename: 'Server.pdf' }) });
     m.context.downloadUrlAsFile = async (...args) => calls.push(['download', ...args]);
     await m.context.handleDownload('file', 'Fallback.pdf'); assert.deepEqual(calls.at(-1), ['download', 'https://files.example/download', 'Server.pdf']); assert.equal(m.context.downloadingIds.length, 0);
@@ -206,7 +207,7 @@ function inspect(file) {
     for (const type of ['folder', 'file']) {
       c.deletingInfo = { type, id: 'target' }; c.fileId = 'target';
       await docs.handler('handleDelete')();
-      assert.deepEqual(calls.at(-1), [type, 'target']);
+      assert.deepEqual(plain(calls.at(-1)), [type, type === 'file' ? { id: 'target', folderId: 'folder' } : 'target']);
       assert.deepEqual(c.calls.at(-1), ['navigate', type === 'folder' ? '/documents/folder/parent' : '/documents/folder/folder']);
     }
     const agenda = model(files[0]); agenda.context.deletingId = 'event'; agenda.context.deleteEvent = (id) => ({ unwrap: async () => calls.push(['event', id]) });

@@ -680,6 +680,7 @@ export default function AdminPanel() {
     id: string,
     action: "approve" | "reject",
   ) => {
+    if (!canAccessAdminPanel) return;
     try {
       await moderatePost({ postId: id, body: { action } }).unwrap();
       notifySuccess();
@@ -691,6 +692,7 @@ export default function AdminPanel() {
   };
 
   const confirmModAction = (id: string, type: "approve" | "reject") => {
+    if (!canAccessAdminPanel) return;
     if (type === "reject") {
       setPendingModAction({ id, type });
       setIsModConfirmOpen(true);
@@ -769,10 +771,11 @@ export default function AdminPanel() {
   const [removedFileUrls, setRemovedFileUrls] = useState<string[]>([]);
 
   const handleImageUpload = async (file: File): Promise<string> => {
+    if (!canAccessAdminPanel) throw new Error("Forbidden");
     try {
       const data = new FormData();
       data.append("file", file);
-      const result = await uploadFile(data).unwrap();
+      const result = await uploadFile({ formData: data, authorization: { feature: activeTab === "trainings" ? "training" : activeTab === "technicopro" ? "technicopro" : activeTab === "events" ? "event" : activeTab === "forums" ? "forum" : "article", resourceId: editingItem?.id } }).unwrap();
       return result.url;
     } catch (error) {
       notifyError(error);
@@ -781,6 +784,7 @@ export default function AdminPanel() {
   };
 
   const handleImageRemove = async (url: string) => {
+    if (!canAccessAdminPanel) return;
     try {
       if (url.startsWith("blob:")) {
         URL.revokeObjectURL(url);
@@ -1194,6 +1198,7 @@ export default function AdminPanel() {
   }, [selectedRoleId, userRolesData]);
 
   const handleOpenModal = (item?: any) => {
+    if (!canAccessAdminPanel) return;
     const canCreateForTab =
       activeTab === "members"
         ? canCreateMembers
@@ -1382,6 +1387,7 @@ export default function AdminPanel() {
   };
 
   const handleDelete = async () => {
+    if (!canAccessAdminPanel) return;
     if (!deletingId) return;
     if (activeTab === "articles" && !canModify(articlesData?.results.find((article) => article.id === deletingId), "delete")) return;
 
@@ -1417,6 +1423,7 @@ export default function AdminPanel() {
   };
 
   const handlePublishArticle = async (id: string) => {
+    if (!canAccessAdminPanel) return;
     try {
       await publishArticle(id).unwrap();
       notifySuccess();
@@ -1426,6 +1433,7 @@ export default function AdminPanel() {
   };
 
   const handlePublishTechnicoPro = async (id: string) => {
+    if (!canAccessAdminPanel) return;
     try {
       await publishTechnicoPro(id).unwrap();
       notifySuccess();
@@ -1435,6 +1443,7 @@ export default function AdminPanel() {
   };
 
   const handleExportUsers = async () => {
+    if (!canAccessAdminPanel) return;
     try {
       const response = await exportUsersCsv().unwrap();
       downloadFile(response.file, response.filename);
@@ -1445,6 +1454,7 @@ export default function AdminPanel() {
   };
 
   const handleSaveSmtpSettings = async (e: React.FormEvent) => {
+    if (!canAccessAdminPanel) return;
     e.preventDefault();
 
     try {
@@ -1459,6 +1469,7 @@ export default function AdminPanel() {
   };
 
   const handleSendSmtpTest = async (e: React.FormEvent) => {
+    if (!canAccessAdminPanel) return;
     e.preventDefault();
 
     try {
@@ -1472,6 +1483,7 @@ export default function AdminPanel() {
   };
 
   const handleDownloadSystemLogs = async () => {
+    if (!canAccessAdminPanel) return;
     try {
       const response = await downloadAdminSystemLogs().unwrap();
       downloadFile(response.file, response.filename);
@@ -1482,6 +1494,7 @@ export default function AdminPanel() {
   };
 
   const handleClearSystemLogs = async () => {
+    if (!canAccessAdminPanel) return;
     try {
       await clearAdminSystemLogs().unwrap();
       notifySuccess();
@@ -1491,6 +1504,7 @@ export default function AdminPanel() {
   };
 
   const handleSaveBackupConfiguration = async (e: React.FormEvent) => {
+    if (!canAccessAdminPanel) return;
     e.preventDefault();
 
     try {
@@ -1506,6 +1520,7 @@ export default function AdminPanel() {
   };
 
   const handleRunBackup = async () => {
+    if (!canAccessAdminPanel) return;
     try {
       await runAdminBackup().unwrap();
       notifySuccess();
@@ -1515,6 +1530,7 @@ export default function AdminPanel() {
   };
 
   const handleDownloadBackup = async (backupId: string) => {
+    if (!canAccessAdminPanel) return;
     try {
       const response = await downloadAdminBackup(backupId).unwrap();
       downloadFile(response.file, response.filename);
@@ -1525,6 +1541,7 @@ export default function AdminPanel() {
   };
 
   const handleDeleteBackup = async () => {
+    if (!canAccessAdminPanel) return;
     if (!backupToDelete) {
       return;
     }
@@ -1539,6 +1556,7 @@ export default function AdminPanel() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    if (!canAccessAdminPanel) return;
     e.preventDefault();
     const id = editingItem ? editingItem.id : null;
     if (activeTab === "articles" && (editingItem
@@ -1955,6 +1973,7 @@ export default function AdminPanel() {
   };
 
   const handleSaveRole = async (e: React.FormEvent) => {
+    if (!canAccessAdminPanel) return;
     e.preventDefault();
 
     if (!newRoleData.name.trim()) {
@@ -1986,6 +2005,7 @@ export default function AdminPanel() {
   };
 
   const handleEditRole = (role: UserRoleDetails) => {
+    if (!canAccessAdminPanel) return;
     setEditingRole(role);
     setNewRoleData({
       name: role.name,
@@ -2000,6 +2020,7 @@ export default function AdminPanel() {
   };
 
   const handleDeleteRole = async () => {
+    if (!canAccessAdminPanel) return;
     if (!roleToDelete) {
       return;
     }

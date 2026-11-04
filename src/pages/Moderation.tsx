@@ -61,9 +61,6 @@ export default function Moderation() {
   // Authorizations: Admin or Moderator
   const isAuthorized = canAccessModeration;
 
-  if (!isAuthorized) {
-    return <Navigate to="/" replace />;
-  }
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<{
@@ -107,6 +104,7 @@ export default function Moderation() {
   };
 
   const handleAction = async (id: string, action: "approve" | "reject") => {
+    if (!isAuthorized) return;
     try {
       await moderatePost({ postId: id, body: { action } }).unwrap();
       notifySuccess(
@@ -126,6 +124,8 @@ export default function Moderation() {
       );
     }
   };
+
+  if (!isAuthorized) return <Navigate to="/" replace />;
 
   return (
     <div className="space-y-8 p-4 sm:p-6 lg:p-8">

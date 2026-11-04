@@ -10,14 +10,12 @@ import {
   Trash2,
 } from "lucide-react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { useSelector } from "react-redux";
 import Modal from "../components/ui/Modal";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import { useAppToast } from "../components/ui/AppToastProvider";
 import { FilePreviewCard, SelectedFilesPreview } from "../components/ui/FileUploadPreview";
 import TiptapEditor from "../components/ui/TiptapEditor";
 import { useI18n } from "../i18n";
-import { RootState } from "../redux/store";
 import { usePermissions } from "../hooks/usePermissions";
 import { useUploadFileMutation } from "../redux/features/articles/articlesApi";
 import {
@@ -92,14 +90,12 @@ export default function Trainings() {
   const toast = useAppToast();
   const navigate = useNavigate();
   const { categoryId } = useParams<{ categoryId?: string }>();
-  const { user } = useSelector((state: RootState) => state.auth);
-  const { hasPermission } = usePermissions();
-  const isSuperuser = Boolean(user?.is_superuser);
+  const { hasPermission, canModify, canAccessAdminPanel: isSuperuser } = usePermissions();
   const canViewTraining = hasPermission("training", "view");
   const canCreateTraining = hasPermission("training", "create");
   const canEditTraining = hasPermission("training", "edit");
   const canDeleteTraining = hasPermission("training", "delete");
-  const canManageCategories = canCreateTraining || canEditTraining || isSuperuser;
+  const canManageCategories = isSuperuser;
   const canViewLifecycleContent =
     canCreateTraining || canEditTraining || canDeleteTraining || isSuperuser;
 
@@ -155,6 +151,7 @@ export default function Trainings() {
   );
 
   const openCreateForm = () => {
+    if (!canCreateTraining) return;
     setEditingTraining(null);
     setFormData(defaultFormState(defaultCategoryId));
     setSelectedFiles([]);
@@ -163,6 +160,7 @@ export default function Trainings() {
   };
 
   const openEditForm = (training: Training) => {
+    if (!canModify("training", training, "edit")) return;
     setEditingTraining(training);
     setFormData({
       title: training.title,
@@ -180,14 +178,16 @@ export default function Trainings() {
   };
 
   const handleImageUpload = async (file: File): Promise<string> => {
+    if (editingTraining ? !canModify("training", trainings.find((item) => item.id === editingTraining.id), "edit") : !canCreateTraining) throw new Error("Forbidden");
     const data = new FormData();
     data.append("file", file);
-    const response = await uploadFile(data).unwrap();
+    const response = await uploadFile({ formData: data, authorization: { feature: "training", resourceId: editingTraining?.id } }).unwrap();
     return response.url;
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (editingTraining ? !canModify("training", trainings.find((item) => item.id === editingTraining.id), "edit") : !canCreateTraining) return;
 
     if (!canSubmitForm) {
       toast.error(translate("common.requiredField", { field: translate("common.description") }));
@@ -227,7 +227,7 @@ export default function Trainings() {
   };
 
   const handleDelete = async () => {
-    if (!deletingId) return;
+    if (!deletingId || !canModify("training", trainings.find((item) => item.id === deletingId), "delete")) return;
     try {
       await deleteTraining(deletingId).unwrap();
       toast.success(translate("trainingsPage.success"));
@@ -238,16 +238,19 @@ export default function Trainings() {
   };
 
   const handleCreateCategory = async (values: CategoryValues) => {
+    if (!isSuperuser) return;
     await createCategory({ name: values.name, description: values.description }).unwrap();
     toast.success(translate("trainingsPage.success"));
   };
 
   const handleUpdateCategory = async (id: string, values: CategoryValues) => {
+    if (!isSuperuser) return;
     await updateCategory({ id, name: values.name, description: values.description }).unwrap();
     toast.success(translate("trainingsPage.success"));
   };
 
   const handleDeleteCategory = async (id: string) => {
+    if (!isSuperuser) return;
     await deleteCategory(id).unwrap();
     if (categoryId === id) navigate("/trainings");
     toast.success(translate("trainingsPage.success"));
@@ -290,8 +293,8 @@ export default function Trainings() {
               metadata={new Date(training.created_at).toLocaleDateString(localeCode)}
               onNavigate={() => navigate('/trainings/' + training.id)}
               actions={[
-                ...(canEditTraining ? [{ label: translate("trainingsPage.editTraining"), icon: <Edit2 className="h-4 w-4" />, onClick: () => openEditForm(training) }] : []),
-                ...(canDeleteTraining ? [{ label: translate("trainingsPage.deleteTraining"), icon: <Trash2 className="h-4 w-4" />, onClick: () => setDeletingId(training.id) }] : []),
+                ...(canModify("training", training, "edit") ? [{ label: translate("trainingsPage.editTraining"), icon: <Edit2 className="h-4 w-4" />, onClick: () => openEditForm(training) }] : []),
+                ...(canModify("training", training, "delete") ? [{ label: translate("trainingsPage.deleteTraining"), icon: <Trash2 className="h-4 w-4" />, onClick: () => { if (canModify("training", training, "delete")) setDeletingId(training.id); } }] : []),
               ]}
             />
           ))}
@@ -325,7 +328,7 @@ export default function Trainings() {
       </div>
 
       <Modal
-        isOpen={isFormOpen}
+        isOpen={isFormOpen && (editingTraining ? canModify("training", trainings.find((item) => item.id === editingTraining.id), "edit") : canCreateTraining)}
         onClose={() => setIsFormOpen(false)}
         title={editingTraining ? translate("trainingsPage.editTraining") : translate("trainingsPage.createTraining")}
         layout="sectioned"
@@ -489,7 +492,7 @@ export default function Trainings() {
       />
 
       <ConfirmModal presentation="compact"
-        isOpen={Boolean(deletingId)}
+        isOpen={Boolean(deletingId && canModify("training", trainings.find((item) => item.id === deletingId), "delete"))}
         onClose={() => setDeletingId(null)}
         onConfirm={handleDelete}
         title={translate("trainingsPage.deleteTraining")}

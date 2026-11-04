@@ -210,7 +210,7 @@ const DashboardLayout: React.FC = () => {
   const lastSyncedProfileRef = useRef<string>("");
   const { hasPermission, canAccessAdminPanel } =
     usePermissions();
-  const isSuperuser = Boolean(user?.is_superuser);
+  const isSuperuser = canAccessAdminPanel;
 
   const { data: profileData } = useGetUsersMeQuery(undefined, {
     skip: !isAuthenticated,

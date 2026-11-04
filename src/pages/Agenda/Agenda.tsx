@@ -51,8 +51,6 @@ import {
 } from "../../components/ui/FileUploadPreview";
 import { useI18n } from "../../i18n";
 
-import { useSelector } from "react-redux";
-import { RootState } from "../../redux/store";
 import { usePermissions } from "../../hooks/usePermissions";
 import {
   useGetEventsQuery,
@@ -221,16 +219,11 @@ const enhanceEventDescription = (content?: string | null) => {
 export default function Agenda() {
   const { dateLocale, translate } = useI18n();
   const toast = useAppToast();
-  const { user } = useSelector((state: RootState) => state.auth);
-  const { hasPermission } = usePermissions();
+  const { hasPermission, canModify, canAccessAdminPanel: isSuperuser } = usePermissions();
   const canViewEvent = hasPermission("event", "view");
   const canCreateEvent = hasPermission("event", "create");
-  const canEditEvent = hasPermission("event", "edit");
-  const canDeleteEventPermission = hasPermission("event", "delete");
   const navigate = useNavigate();
   const { agendaId } = useParams<{ agendaId?: string }>();
-  const canSeeParticipants =
-    canEditEvent || canDeleteEventPermission;
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const selectedYear = currentMonth.getFullYear();
@@ -269,10 +262,11 @@ export default function Agenda() {
   const [uploadFile] = useUploadFileMutation();
 
   const handleImageUpload = async (file: File): Promise<string> => {
+    if (isEditMode ? !canModify("event", (apiEvents || []).find((event) => event.id === editingEventId) || (selectedEvent?.id === editingEventId ? selectedEvent : undefined), "edit") : !canCreateEvent) throw new Error("Forbidden");
     try {
       const data = new FormData();
       data.append("file", file);
-      const response = await uploadFile(data).unwrap();
+      const response = await uploadFile({ formData: data, authorization: { feature: "event", resourceId: isEditMode ? editingEventId || undefined : undefined } }).unwrap();
       return response.url;
     } catch (error) {
       toast.error(getApiErrorDisplayMessage(error, translate, "apiErrors.default"));
@@ -283,11 +277,6 @@ export default function Agenda() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-
-  const { data: registrationsData, isLoading: isLoadingRegistrations } =
-    useGetEventRegistrationsQuery(selectedEventId || "", {
-      skip: !selectedEventId,
-    });
 
   const detailEventId = agendaId || selectedEventId || "";
   const selectedEventFromList = (apiEvents || []).find(
@@ -301,7 +290,10 @@ export default function Agenda() {
     useGetEventByIdQuery(detailEventId, {
       skip: !detailEventId || Boolean(selectedEventFromList),
     });
-  const selectedEvent = selectedEventFromList || selectedEventDetails;
+  const selectedEvent = selectedEventFromList || (selectedEventDetails?.id === detailEventId ? selectedEventDetails : undefined);
+  const canSeeParticipants = canModify("event", selectedEvent, "edit") || canModify("event", selectedEvent, "delete");
+  const { data: registrationsData, isLoading: isLoadingRegistrations } =
+    useGetEventRegistrationsQuery(selectedEventId || "", { skip: !selectedEventId || !canSeeParticipants });
   const selectedEventDescription = selectedEvent
     ? enhanceEventDescription(selectedEvent.description)
     : "";
@@ -423,7 +415,7 @@ export default function Agenda() {
   const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if ((isEditMode && !canEditEvent) || (!isEditMode && !canCreateEvent)) {
+    if ((isEditMode && !canModify("event", (apiEvents || []).find((event) => event.id === editingEventId) || (selectedEvent?.id === editingEventId ? selectedEvent : undefined), "edit")) || (!isEditMode && !canCreateEvent)) {
       return;
     }
 
@@ -571,7 +563,7 @@ export default function Agenda() {
   };
 
   const openEditModal = (event: APIEvent) => {
-    if (!canEditEvent) return;
+    if (!canModify("event", event, "edit")) return;
 
     setIsEditMode(true);
     setEditingEventId(event.id);
@@ -596,14 +588,14 @@ export default function Agenda() {
   };
 
   const confirmDeleteEvent = (id: string) => {
-    if (!canDeleteEventPermission) return;
+    if (!canModify("event", (apiEvents || []).find((event) => event.id === id) || (selectedEvent?.id === id ? selectedEvent : undefined), "delete")) return;
 
     setDeletingId(id);
     setIsConfirmOpen(true);
   };
 
   const handleDeleteEvent = async () => {
-    if (deletingId) {
+    if (deletingId && canModify("event", (apiEvents || []).find((event) => event.id === deletingId) || (selectedEvent?.id === deletingId ? selectedEvent : undefined), "delete")) {
       try {
         await deleteEvent(deletingId).unwrap();
         if (selectedEventId === deletingId) {
@@ -623,6 +615,7 @@ export default function Agenda() {
     id: string,
     isRegistered: boolean,
   ) => {
+    if (!canViewEvent) return;
     try {
       if (isRegistered) {
         await unregisterFromEvent(id).unwrap();
@@ -874,16 +867,19 @@ export default function Agenda() {
   };
 
   const handleCreateCategory = async (values: CategoryValues) => {
+    if (!isSuperuser) return;
     await createEventCategory(values).unwrap();
     notifySuccess();
   };
 
   const handleUpdateCategory = async (id: string, values: CategoryValues) => {
+    if (!isSuperuser) return;
     await updateEventCategory({ id, ...values }).unwrap();
     notifySuccess();
   };
 
   const handleDeleteCategory = async (id: string) => {
+    if (!isSuperuser) return;
     await deleteEventCategory(id).unwrap();
     if (formData.event_category_id === id) {
       setFormData((current) => ({ ...current, event_category_id: eventCategories.find((category) => category.id !== id)?.id || "" }));
@@ -907,13 +903,13 @@ export default function Agenda() {
           </p> */}
         </div>
         <div className="agenda-page-actions">
-          <button
-            onClick={() => setIsCategoryModalOpen(true)}
+          {isSuperuser && <button
+            onClick={() => { if (isSuperuser) setIsCategoryModalOpen(true); }}
             className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-2 text-sm font-bold text-slate-900 shadow-sm transition-all hover:bg-slate-50 cursor-pointer"
           >
             <Grid className="w-4 h-4 text-primary" />
             {translate("agendaPage.categories")}
-          </button>
+          </button>}
           {canCreateEvent && (
             <button
               onClick={openCreateModal}
@@ -1118,7 +1114,7 @@ export default function Agenda() {
       </div>
 
       <Modal
-        isOpen={isModalOpen}
+        isOpen={isModalOpen && (isEditMode ? canModify("event", (apiEvents || []).find((event) => event.id === editingEventId) || (selectedEvent?.id === editingEventId ? selectedEvent : undefined), "edit") : canCreateEvent)}
         onClose={() => {
           setIsModalOpen(false);
           setIsEditMode(false);
@@ -1358,7 +1354,7 @@ export default function Agenda() {
       </Modal>
       <ConfirmModal
         presentation="compact"
-        isOpen={isConfirmOpen}
+        isOpen={isConfirmOpen && canModify("event", (apiEvents || []).find((event) => event.id === deletingId) || (selectedEvent?.id === deletingId ? selectedEvent : undefined), "delete")}
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleDeleteEvent}
         title={translate("agendaPage.deleteEvent")}
@@ -1373,7 +1369,7 @@ export default function Agenda() {
         className="batch-three-modal agenda-detail-drawer"
         footer={selectedEvent ? (<div className="batch-three-actions">
           <div className="batch-three-action-row">
-            {canEditEvent ? (
+            {canModify("event", selectedEvent, "edit") ? (
               <button
                 onClick={() => openEditModal(selectedEvent)}
                 className="w-full py-3 sm:flex-1 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-50 transition-all uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer"
@@ -1382,7 +1378,7 @@ export default function Agenda() {
                 {translate("Edit")}
               </button>
             ) : null}
-            {canDeleteEventPermission ? (
+            {canModify("event", selectedEvent, "delete") ? (
               <button
                 onClick={() => confirmDeleteEvent(selectedEvent.id)}
                 className="w-full py-3 sm:flex-1 bg-red-50 border border-red-100 text-red-600 rounded-xl font-bold text-xs hover:bg-red-100 transition-all uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer"
@@ -1756,15 +1752,15 @@ export default function Agenda() {
         )}
       </Modal>
       <CategoryManagerDialog
-        isOpen={isCategoryModalOpen}
+        isOpen={isCategoryModalOpen && isSuperuser}
         onClose={() => setIsCategoryModalOpen(false)}
         categories={eventCategories}
         isLoading={isLoadingCategories}
         error={categoriesError}
         onRetry={() => { void refetchCategories(); }}
-        canCreate={canCreateEvent}
-        canEdit={canCreateEvent}
-        canDelete={canCreateEvent}
+        canCreate={isSuperuser}
+        canEdit={isSuperuser}
+        canDelete={isSuperuser}
         supportsColor
         onCreate={handleCreateCategory}
         onUpdate={handleUpdateCategory}

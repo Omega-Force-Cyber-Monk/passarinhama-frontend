@@ -235,8 +235,9 @@ export const forumApi = apiSlice.injectEndpoints({
       void,
       { topic_id: string; forum_id?: string }
     >({
-      query: ({ topic_id }) => ({
+      query: ({ topic_id, forum_id }) => ({
         url: `/forums/topics/${topic_id}/delete`,
+        clientAuthorization: { forumId: forum_id },
         method: "DELETE",
       }),
       invalidatesTags: (_result, _error, { topic_id, forum_id }) => [
@@ -247,7 +248,7 @@ export const forumApi = apiSlice.injectEndpoints({
       ],
     }),
     updateTopic: builder.mutation<ForumTopic, UpdateForumTopicRequest>({
-      query: ({ topic_id, title, content, files, delete_files }) => {
+      query: ({ topic_id, forum_id, title, content, files, delete_files }) => {
         const formData = new FormData();
         if (title !== undefined && title !== null) {
           formData.append("title", title);
@@ -266,6 +267,7 @@ export const forumApi = apiSlice.injectEndpoints({
 
         return {
           url: `/forums/topics/${topic_id}/update`,
+          clientAuthorization: { forumId: forum_id },
           method: "PATCH",
           body: formData,
         };
@@ -283,7 +285,7 @@ export const forumApi = apiSlice.injectEndpoints({
       ],
     }),
     createTopicPost: builder.mutation<unknown, CreateTopicPostRequest>({
-      query: ({ topic_id, content, files }) => {
+      query: ({ topic_id, forum_id, content, files }) => {
         const formData = new FormData();
         formData.append("content", content);
         files?.forEach((file) => {
@@ -292,6 +294,7 @@ export const forumApi = apiSlice.injectEndpoints({
 
         return {
           url: `/forums/topics/${topic_id}/posts`,
+          clientAuthorization: { forumId: forum_id },
           method: "POST",
           body: formData,
         };
@@ -305,8 +308,9 @@ export const forumApi = apiSlice.injectEndpoints({
       void,
       { post_id: string; topic_id: string; forum_id?: string }
     >({
-      query: ({ post_id }) => ({
+      query: ({ post_id, topic_id, forum_id }) => ({
         url: `/forums/posts/${post_id}`,
+        clientAuthorization: { forumId: forum_id, topicId: topic_id },
         method: "DELETE",
       }),
       invalidatesTags: (_result, _error, { topic_id, forum_id }) => [
@@ -315,7 +319,7 @@ export const forumApi = apiSlice.injectEndpoints({
       ],
     }),
     updatePost: builder.mutation<unknown, UpdateTopicPostRequest>({
-      query: ({ post_id, content, files }) => {
+      query: ({ post_id, topic_id, forum_id, content, files }) => {
         const formData = new FormData();
         formData.append("content", content);
         files?.forEach((file) => {
@@ -324,6 +328,7 @@ export const forumApi = apiSlice.injectEndpoints({
 
         return {
           url: `/forums/posts/${post_id}`,
+        clientAuthorization: { forumId: forum_id, topicId: topic_id },
           method: "PATCH",
           body: formData,
         };

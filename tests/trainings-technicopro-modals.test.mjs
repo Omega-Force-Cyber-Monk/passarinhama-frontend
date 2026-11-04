@@ -33,7 +33,7 @@ function inspect(file) {
     const { sf, modal } = inspect(file);
     const context = {
       React: { createElement: (type, props, ...children) => ({ type, props: { ...props, children } }) },
-      translate: (key) => key, isFormOpen: true, canSubmitForm: true, isCreating: false, isUpdating: false,
+      translate: (key) => key, canModify: () => true, canCreate: true, canCreateTraining: true, trainings: [], items: [], isSuperuser: true, isFormOpen: true, canSubmitForm: true, isCreating: false, isUpdating: false,
       editingTraining: null, editingItem: null, defaultCategoryId: 'fallback-category',
       categories: [{ id: 'category', name: 'Category' }], selectedFiles: [], removedFileUrls: [], removedAttachmentUrls: [],
       formData: { title: ' Title ', excerpt: ' Excerpt ', category_id: 'category', status: 'pending',

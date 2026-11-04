@@ -5,14 +5,12 @@ import CategoryManagerDialog, { type CategoryValues } from "../components/ui/Cat
 import React, { useEffect, useState } from "react";
 import { CheckCircle2, Edit2, Trash2, Wrench } from "lucide-react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { useSelector } from "react-redux";
 import Modal from "../components/ui/Modal";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import { useAppToast } from "../components/ui/AppToastProvider";
 import TiptapEditor from "../components/ui/TiptapEditor";
 import { FilePreviewCard, SelectedFilesPreview } from "../components/ui/FileUploadPreview";
 import { useI18n } from "../i18n";
-import { RootState } from "../redux/store";
 import { usePermissions } from "../hooks/usePermissions";
 import { useUploadFileMutation } from "../redux/features/articles/articlesApi";
 import {
@@ -87,14 +85,12 @@ export default function TechnicoProPage() {
   const toast = useAppToast();
   const navigate = useNavigate();
   const { categoryId } = useParams<{ categoryId?: string }>();
-  const { user } = useSelector((state: RootState) => state.auth);
-  const { hasPermission } = usePermissions();
-  const isSuperuser = Boolean(user?.is_superuser);
+  const { hasPermission, canModify, canAccessAdminPanel: isSuperuser } = usePermissions();
   const canView = hasPermission("technicopro", "view");
   const canCreate = hasPermission("technicopro", "create");
   const canEdit = hasPermission("technicopro", "edit");
   const canDelete = hasPermission("technicopro", "delete");
-  const canManageCategories = canCreate || canEdit || isSuperuser;
+  const canManageCategories = isSuperuser;
   const canViewLifecycleContent = canCreate || canEdit || canDelete || isSuperuser;
 
   const [page, setPage] = useState(1);
@@ -150,6 +146,7 @@ export default function TechnicoProPage() {
   );
 
   const openCreateForm = () => {
+    if (!canCreate) return;
     setEditingItem(null);
     setFormData(defaultFormState(defaultCategoryId));
     setSelectedFiles([]);
@@ -158,6 +155,7 @@ export default function TechnicoProPage() {
   };
 
   const openEditForm = (item: TechnicoPro) => {
+    if (!canModify("technicopro", item, "edit")) return;
     setEditingItem(item);
     setFormData({
       title: item.title,
@@ -175,14 +173,16 @@ export default function TechnicoProPage() {
   };
 
   const handleImageUpload = async (file: File): Promise<string> => {
+    if (editingItem ? !canModify("technicopro", items.find((item) => item.id === editingItem.id), "edit") : !canCreate) throw new Error("Forbidden");
     const data = new FormData();
     data.append("file", file);
-    const response = await uploadFile(data).unwrap();
+    const response = await uploadFile({ formData: data, authorization: { feature: "technicopro", resourceId: editingItem?.id } }).unwrap();
     return response.url;
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (editingItem ? !canModify("technicopro", items.find((item) => item.id === editingItem.id), "edit") : !canCreate) return;
 
     if (!canSubmitForm) {
       toast.error(translate("common.requiredField", { field: translate("common.description") }));
@@ -218,7 +218,7 @@ export default function TechnicoProPage() {
   };
 
   const handleDelete = async () => {
-    if (!deletingId) return;
+    if (!deletingId || !canModify("technicopro", items.find((item) => item.id === deletingId), "delete")) return;
     try {
       await deleteItem(deletingId).unwrap();
       toast.success(translate("technicoproPage.success"));
@@ -229,16 +229,19 @@ export default function TechnicoProPage() {
   };
 
   const handleCreateCategory = async (values: CategoryValues) => {
+    if (!isSuperuser) return;
     await createCategory({ name: values.name, description: values.description }).unwrap();
     toast.success(translate("technicoproPage.success"));
   };
 
   const handleUpdateCategory = async (id: string, values: CategoryValues) => {
+    if (!isSuperuser) return;
     await updateCategory({ id, name: values.name, description: values.description }).unwrap();
     toast.success(translate("technicoproPage.success"));
   };
 
   const handleDeleteCategory = async (id: string) => {
+    if (!isSuperuser) return;
     await deleteCategory(id).unwrap();
     if (categoryId === id) navigate("/technicopro");
     toast.success(translate("technicoproPage.success"));
@@ -281,8 +284,8 @@ export default function TechnicoProPage() {
               metadata={new Date(item.created_at).toLocaleDateString(localeCode)}
               onNavigate={() => navigate('/technicopro/' + item.id)}
               actions={[
-                ...(canEdit ? [{ label: translate("technicoproPage.edit"), icon: <Edit2 className="h-4 w-4" />, onClick: () => openEditForm(item) }] : []),
-                ...(canDelete ? [{ label: translate("technicoproPage.delete"), icon: <Trash2 className="h-4 w-4" />, onClick: () => setDeletingId(item.id) }] : []),
+                ...(canModify("technicopro", item, "edit") ? [{ label: translate("technicoproPage.edit"), icon: <Edit2 className="h-4 w-4" />, onClick: () => openEditForm(item) }] : []),
+                ...(canModify("technicopro", item, "delete") ? [{ label: translate("technicoproPage.delete"), icon: <Trash2 className="h-4 w-4" />, onClick: () => { if (canModify("technicopro", item, "delete")) setDeletingId(item.id); } }] : []),
               ]}
             />
           ))}
@@ -304,7 +307,7 @@ export default function TechnicoProPage() {
       </div>
 
       <Modal
-        isOpen={isFormOpen}
+        isOpen={isFormOpen && (editingItem ? canModify("technicopro", items.find((item) => item.id === editingItem.id), "edit") : canCreate)}
         onClose={() => setIsFormOpen(false)}
         title={editingItem ? translate("technicoproPage.edit") : translate("technicoproPage.create")}
         layout="sectioned"
@@ -433,7 +436,7 @@ export default function TechnicoProPage() {
         onDelete={handleDeleteCategory}
       />
 
-      <ConfirmModal presentation="compact" isOpen={Boolean(deletingId)} onClose={() => setDeletingId(null)} onConfirm={handleDelete} title={translate("technicoproPage.delete")} message={translate("technicoproPage.deleteConfirm")} isLoading={isDeleting} closeOnConfirm={false} />
+      <ConfirmModal presentation="compact" isOpen={Boolean(deletingId && canModify("technicopro", items.find((item) => item.id === deletingId), "delete"))} onClose={() => setDeletingId(null)} onConfirm={handleDelete} title={translate("technicoproPage.delete")} message={translate("technicoproPage.deleteConfirm")} isLoading={isDeleting} closeOnConfirm={false} />
     </div>
   );
 }

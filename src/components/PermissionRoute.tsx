@@ -24,7 +24,9 @@ const PermissionRoute: React.FC<PermissionRouteProps> = ({
   redirectTo = '/',
 }) => {
   const location = useLocation();
-  const { user, hasPermission } = usePermissions();
+  const { user, hasPermission, isLoading } = usePermissions();
+
+  if (isLoading) return <div role="status" className="flex min-h-[40vh] items-center justify-center"><div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
 
   const isAllowed = allow
     ? allow(user)

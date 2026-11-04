@@ -4,7 +4,7 @@ import { canModifyArticle } from '../src/redux/features/articles/articleAuthoriz
 import type { UserProfile } from '../src/redux/features/auth/authTypes';
 
 const user = (edit = false, remove = false, extra = {}): UserProfile => ({
-  id: 'owner', status: 'active', is_superuser: false, role: 'member',
+  id: 'owner', status: 'active', is_deleted: false, is_superuser: false, role: 'member',
   permissions: [{ feature: 'article', can_edit: edit, can_delete: remove }],
   user_permissions: [], ...extra,
 } as UserProfile);
@@ -39,7 +39,7 @@ test('RTK mutations revalidate server ownership/permissions and propagate 403 wi
   globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} } as unknown as Storage;
   const { store } = await import('../src/redux/store');
   const { articlesApi } = await import('../src/redux/features/articles/articlesApi');
-  const { setUser } = await import('../src/redux/features/auth/authSlice');
+  const { setUser, setCredentials } = await import('../src/redux/features/auth/authSlice');
   const originalFetch = globalThis.fetch;
   let freshUser = user(true, true);
   let freshArticle = own;
@@ -65,7 +65,7 @@ test('RTK mutations revalidate server ownership/permissions and propagate 403 wi
   };
   try {
     // Redux still contains grants when the backend has revoked them.
-    store.dispatch(setUser(user(true, true)));
+    store.dispatch(setCredentials({ access_token: 'test-token', user: user(true, true) }));
     for (const action of ['edit', 'delete'] as const) {
       freshUser = user(true, true);
       freshArticle = other;

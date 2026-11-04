@@ -7,6 +7,8 @@ import {
 } from "@reduxjs/toolkit/query/react";
 import { RootState } from "../../store";
 import { setCredentials, logout } from "../auth/authSlice";
+import { authorizeRequest, forbidden, needsAuthorization, type AuthorizedFetchArgs } from './mutationAuthorization';
+import type { UserProfile } from '../auth/authTypes';
 
 const baseQuery = fetchBaseQuery({
   baseUrl: import.meta.env.VITE_API_BASE_URL,
@@ -70,9 +72,28 @@ const baseQueryWithReauth: BaseQueryFn<
   return result;
 };
 
+const baseQueryWithAuthorization: BaseQueryFn<string | AuthorizedFetchArgs, unknown, FetchBaseQueryError> = async (args, api, options) => {
+  const request = typeof args === 'string' ? { url: args } : args;
+  if (!needsAuthorization(api.endpoint, request)) return baseQueryWithReauth(args, api, options);
+  const initial = (api.getState() as RootState).auth;
+  if (!initial.isAuthenticated || !initial.token || !initial.user?.id) return { error: forbidden() };
+  const profile = await baseQueryWithReauth('/user/users/me', api, options);
+  if (profile.error) return { error: profile.error };
+  const user = profile.data as UserProfile | undefined;
+  if (!user || user.id !== initial.user.id) return { error: forbidden() };
+  const token = (api.getState() as RootState).auth.token;
+  const authorized = await authorizeRequest(api.endpoint, request, user,
+    async (url) => baseQueryWithReauth(url, api, options));
+  if (authorized.error) return { error: authorized.error };
+  const current = (api.getState() as RootState).auth;
+  if (!current.isAuthenticated || !token || token !== current.token || current.user?.id !== user.id) return { error: forbidden() };
+  // These client checks are UX safeguards. The server must authorize atomically at the write.
+  return baseQueryWithReauth(authorized.request!, api, options);
+};
+
 export const apiSlice = createApi({
   reducerPath: "api",
-  baseQuery: baseQueryWithReauth,
+  baseQuery: baseQueryWithAuthorization,
   tagTypes: [
     "User",
     "Article",

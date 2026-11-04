@@ -42,8 +42,6 @@ import {
   Post,
   UpdateForumTopicRequest,
 } from "../types";
-import { useSelector } from "react-redux";
-import { RootState } from "../redux/store";
 import { ROLE_SLUGS } from "../redux/features/auth/authTypes";
 import {
   useCreateForumMutation,
@@ -557,10 +555,22 @@ export default function Forums() {
   const [uploadFile] = useUploadFileMutation();
 
   const handleImageUpload = async (file: File): Promise<string> => {
+    const editingPost = isEditPostModalOpen ? topicPosts.find((post) => post.id === editPostData.id) : undefined;
+    const editingTopic = isEditTopicModalOpen ? topics.find((topic) => topic.id === editTopicData.id) : undefined;
+    const allowed = isEditPostModalOpen ? Boolean(editingPost && canManagePost(editingPost, "edit"))
+      : isEditTopicModalOpen ? Boolean(editingTopic && canEditTopic(editingTopic))
+      : isNewForumModalOpen || isEditForumModalOpen ? isSuperuser
+      : isModalOpen ? canCreateTopic && canPostToForum(formData.forumId) : canPostMessage;
+    if (!allowed) throw new Error("Forbidden");
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const response = await uploadFile(formData).unwrap();
+      const data = new FormData();
+      data.append("file", file);
+      const response = await uploadFile({ formData: data, authorization: {
+        feature: "forum",
+        forumId: editingTopic?.forumId || (editingPost ? editPostData.forumId : isModalOpen ? formData.forumId : selectedForumId || undefined),
+        topicId: editingPost?.topicId || (!isModalOpen && !editingTopic ? selectedTopicId || undefined : undefined),
+        resourceId: editingPost?.id || editingTopic?.id,
+      } }).unwrap();
       return response.url;
     } catch (error) {
       toast.error(getApiErrorDisplayMessage(error, translate, "apiErrors.default"));
@@ -568,10 +578,7 @@ export default function Forums() {
     }
   };
 
-  const { user } = useSelector((state: RootState) => state.auth);
-  const { hasPermission } = usePermissions();
-  const isSuperuser = Boolean(user?.is_superuser);
-  const currentUserId = user?.id || "";
+  const { user, hasPermission, canModify, canReply, canCreateIn, canAccessAdminPanel: isSuperuser } = usePermissions();
   const view: ListView = topicId ? "posts" : forumId ? "topics" : "forums";
   const selectedForumId = forumId || null;
   const selectedTopicId = topicId || null;
@@ -729,6 +736,7 @@ export default function Forums() {
           viewCount: topic.view_count,
           lastActivity: formatTopicActivity(topic.last_activity_at, localeCode),
           isPinned: topic.is_pinned,
+          isLocked: topic.is_locked,
           status: "approved" as const,
           attachments: topic.attachment,
         };
@@ -829,7 +837,7 @@ export default function Forums() {
 
   const handleAddTopic = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canCreateTopic) return;
+    if (!canCreateTopic || !canPostToForum(formData.forumId)) return;
 
     if (!formData.title.trim()) {
       showRequiredFieldError(translate("forumsPage.discussionTitle"));
@@ -1279,7 +1287,7 @@ export default function Forums() {
   };
 
   const handleDeleteItem = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || !canDeleteTarget(deleteTarget)) return;
 
     try {
       if (deleteTarget.kind === "forum") {
@@ -1333,18 +1341,28 @@ export default function Forums() {
   };
 
   const canViewForum = hasPermission("forum", "view");
-  const canCreateForum = hasPermission("forum", "create");
-  const canCreateTopic = hasPermission("forum", "create");
-  const canPostMessage = canViewForum;
-  const canEditForum = hasPermission("forum", "edit");
-  const canDeleteForum = hasPermission("forum", "delete");
+  const canCreateForum = isSuperuser;
+  const canCreateTopic = hasPermission("forum", "create") &&
+    (isSuperuser || Boolean(forumData?.results.some((forum) => forum.can_post === true)));
+  const canPostToForum = (id: string) => canCreateIn("forum", forumData?.results.find((forum) => forum.id === id)?.can_post);
+  const canPostMessage = canViewForum && canReply(forumData?.results.find((forum) => forum.id === selectedForumId)?.can_post, selectedTopic?.isLocked);
+  const canEditForum = isSuperuser;
+  const canDeleteForum = isSuperuser;
   const canPinTopic = isSuperuser;
-  const canEditTopic = (topic: Topic) =>
-    isSuperuser || Boolean(topic.authorUserId && topic.authorUserId === currentUserId);
-  const canDeleteTopic = (topic: Topic) => canEditTopic(topic);
-  const canManagePost = (post: Post, _action: "edit" | "delete" = "edit") =>
-    isSuperuser ||
-    Boolean(post.authorUserId && post.authorUserId === currentUserId);
+  const canEditTopic = (topic: Topic) => canModify("forum", forumTopicsData?.results.find((item) => item.id === topic.id), "edit");
+  const canDeleteTopic = (topic: Topic) => canModify("forum", forumTopicsData?.results.find((item) => item.id === topic.id), "delete", topic.replyCount === 0);
+  const canManagePost = (post: Post, action: "edit" | "delete" = "edit") =>
+    canModify("forum", topicPostsData?.results.find((item) => item.id === post.id), action);
+  const canDeleteTarget = (target: DeleteTarget | null) => {
+    if (!target) return false;
+    if (target.kind === "forum") return canDeleteForum;
+    if (target.kind === "topic") {
+      const topic = topics.find((item) => item.id === target.id);
+      return Boolean(topic && canDeleteTopic(topic));
+    }
+    const post = topicPosts.find((item) => item.id === target.id);
+    return Boolean(post && canManagePost(post, "delete"));
+  };
   const showInitialForumsPageSkeleton =
     view === "forums" && isForumsLoading && !forums.length;
 
@@ -2078,7 +2096,7 @@ export default function Forums() {
       </div>
 
       <Modal
-        isOpen={isModalOpen}
+        isOpen={isModalOpen && canCreateTopic}
         onClose={() => setIsModalOpen(false)}
         title={translate("forumsPage.newDiscussionTopic")}
         layout="compact"
@@ -2173,7 +2191,7 @@ export default function Forums() {
         </form>
       </Modal>
       <Modal
-        isOpen={isNewForumModalOpen}
+        isOpen={isNewForumModalOpen && canCreateForum}
         onClose={() => setIsNewForumModalOpen(false)}
         title={translate("forumsPage.createNewForum")}
         layout="compact"
@@ -2295,7 +2313,7 @@ export default function Forums() {
         </form>
       </Modal>
       <Modal
-        isOpen={isEditForumModalOpen}
+        isOpen={isEditForumModalOpen && canEditForum}
         onClose={() => {
           setIsEditForumModalOpen(false);
           setEditForumData(getDefaultForumFormData());
@@ -2445,7 +2463,7 @@ export default function Forums() {
       </Modal>
       {/* EDIT TOPIC MODAL */}
       <Modal
-        isOpen={isEditTopicModalOpen}
+        isOpen={isEditTopicModalOpen && Boolean(topics.find((topic) => topic.id === editTopicData.id && canEditTopic(topic)))}
         onClose={() => {
           setIsEditTopicModalOpen(false);
           setEditTopicFiles([]);
@@ -2542,7 +2560,7 @@ export default function Forums() {
       </Modal>
       {/* EDIT REPLY MODAL */}
       <Modal
-        isOpen={isEditPostModalOpen}
+        isOpen={isEditPostModalOpen && Boolean(topicPosts.find((post) => post.id === editPostData.id && canManagePost(post, "edit")))}
         onClose={() => setIsEditPostModalOpen(false)}
         title={translate("forumsPage.editReply")}
         layout="compact"
@@ -2615,7 +2633,7 @@ export default function Forums() {
 
       <ConfirmModal
         presentation="compact"
-        isOpen={isConfirmOpen}
+        isOpen={isConfirmOpen && canDeleteTarget(deleteTarget)}
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleDeleteItem}
         title={

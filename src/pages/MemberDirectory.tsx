@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { usePermissions } from "../hooks/usePermissions";
+import { ordinaryAccountPayload } from '../redux/features/auth/resourceAuthorization';
 import Modal from "../components/ui/Modal";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import {
@@ -210,11 +211,11 @@ const buildFormData = (
 
 export default function MemberDirectory() {
   const { translate } = useI18n();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, canAccessAdminPanel: isSuperuser } = usePermissions();
   const canViewUsers = hasPermission("user", "view");
   const canCreateUser = hasPermission("user", "create");
-  const canEditUser = hasPermission("user", "edit");
-  const canDeleteUser = hasPermission("user", "delete");
+  const canEditUser = isSuperuser;
+  const canDeleteUser = isSuperuser;
   const showMemberActions = canEditUser || canDeleteUser;
 
   const [search, setSearch] = useState("");
@@ -244,7 +245,7 @@ export default function MemberDirectory() {
     role_id: roleFilter !== "all" ? roleFilter : undefined,
     status: statusFilter !== "all" ? statusFilter : undefined,
   });
-  const { data: userRoles = [] } = useGetUserRolesQuery();
+  const { data: userRoles = [] } = useGetUserRolesQuery(undefined, { skip: !isSuperuser });
 
   const [createUser, { isLoading: isCreatingMember }] = useCreateUserMutation();
   const [updateUser, { isLoading: isUpdatingMember }] = useUpdateUserMutation();
@@ -348,7 +349,7 @@ export default function MemberDirectory() {
       return;
     }
 
-    if (!formData.role_id) {
+    if (isSuperuser && !formData.role_id) {
       notifyRequiredField(translate("memberDirectory.role"));
       return;
     }
@@ -399,7 +400,7 @@ export default function MemberDirectory() {
             avatar: formData.avatar,
           };
 
-        await createUser(body).unwrap();
+        await createUser(isSuperuser ? body : ordinaryAccountPayload(body) as CreateUserRequest).unwrap();
       }
 
       setIsModalOpen(false);
@@ -423,7 +424,7 @@ export default function MemberDirectory() {
   };
 
   const handleMemberAction = async () => {
-    if (!memberActionTarget) return;
+    if (!isSuperuser || !memberActionTarget) return;
 
     try {
       if (memberActionTarget.status === "suspended") {
@@ -442,7 +443,7 @@ export default function MemberDirectory() {
   };
 
   const handleExportUsers = async () => {
-    if (!canViewUsers) return;
+    if (!isSuperuser) return;
 
     try {
       const response = await exportUsersCsv().unwrap();
@@ -466,7 +467,7 @@ export default function MemberDirectory() {
         </div>
         {(canCreateUser || canViewUsers) && (
           <div className="member-directory-header-actions">
-            {canViewUsers && (
+            {isSuperuser && (
               <button
                 onClick={handleExportUsers}
                 disabled={isExportingUsers}
@@ -737,7 +738,7 @@ export default function MemberDirectory() {
       {(canCreateUser || canEditUser) && (
         <>
           <Modal
-            isOpen={isModalOpen}
+            isOpen={isModalOpen && (editingMember ? canEditUser : canCreateUser)}
             onClose={handleCloseModal}
             title={
               editingMember
@@ -933,7 +934,7 @@ export default function MemberDirectory() {
                   </ModalFullWidth>
                 </ModalFieldGrid>
               </ModalSection>
-              <ModalSection title={translate("modalBatchFour.accountInformation")}>
+              {isSuperuser && <ModalSection title={translate("modalBatchFour.accountInformation")}>
                 <ModalFieldGrid>
                   <div className="space-y-2">
                     <label htmlFor="member-role_id" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -1008,7 +1009,7 @@ export default function MemberDirectory() {
                     {translate("memberDirectory.superuser")}
                   </label>
                 </ModalFieldGrid>
-              </ModalSection>
+              </ModalSection>}
               <ModalSection title={translate("memberDirectory.profilePhoto")}>
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -1075,7 +1076,7 @@ export default function MemberDirectory() {
 
           <ConfirmModal presentation="compact"
 
-            isOpen={isConfirmOpen}
+            isOpen={isConfirmOpen && isSuperuser}
             onClose={() => {
               if (!isDeletingMember && !isRestoringMember) {
                 setIsConfirmOpen(false);

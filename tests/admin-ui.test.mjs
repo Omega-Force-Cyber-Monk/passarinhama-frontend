@@ -66,7 +66,7 @@ test('password control preserves validation and toggles accessibly without submi
 
 function modalHarness(activeTab = 'members', allowed = true) {
   const state = { visible: true, open: false, form: null };
-  const context = { activeTab, canModify: () => allowed,
+  const context = { activeTab, canAccessAdminPanel: allowed, canModify: () => allowed,
     ROLE_SLUGS: { MEMBER: 'member' }, userRolesData: [{ slug: 'member', id: 'role' }],
     technicoproCategories: [], trainingCategories: [], eventCategories: [],
     setSelectedFiles() {}, setRemovedFileUrls() {}, setViewingId() {}, setEditingItem() {},

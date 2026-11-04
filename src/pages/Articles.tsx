@@ -178,15 +178,13 @@ export default function Articles() {
   const { localeCode, translate } = useI18n();
   const toast = useAppToast();
   const { user } = useSelector((state: RootState) => state.auth);
-  const { hasPermission } = usePermissions();
+  const { hasPermission, canAccessAdminPanel: isSuperuser } = usePermissions();
   const canModify = useArticleAuthorization();
-  const isSuperuser = Boolean(user?.is_superuser);
   const canCreateArticle = hasPermission("article", "create");
   const canEditArticle = hasPermission("article", "edit");
   const canDeleteArticle = hasPermission("article", "delete");
   const canViewArticle = hasPermission("article", "view");
   const canManageCategories = isSuperuser;
-  const canPublishArticle = canEditArticle;
   const canManageArticleContent =
     canCreateArticle || canEditArticle || canDeleteArticle;
   const defaultArticleAuthor = user?.firstName
@@ -420,10 +418,11 @@ export default function Articles() {
   };
 
   const handleImageUpload = async (file: File): Promise<string> => {
+    if (editingArticle ? !canModify(articleDetail, "edit") : !canCreateArticle) throw new Error("Forbidden");
     try {
       const data = new FormData();
       data.append("file", file);
-      const result = await uploadFile(data).unwrap();
+      const result = await uploadFile({ formData: data, authorization: { feature: "article", resourceId: editingArticle?.id } }).unwrap();
       return result.url;
     } catch (error) {
       toast.error(getApiErrorDisplayMessage(error, translate, "apiErrors.default"));
@@ -449,18 +448,21 @@ export default function Articles() {
   };
 
   const handleCreateCategory = async (values: CategoryValues) => {
+    if (!isSuperuser) return;
     await createCategory({ name: values.name, description: values.description }).unwrap();
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 3000);
   };
 
   const handleUpdateCategory = async (id: string, values: CategoryValues) => {
+    if (!isSuperuser) return;
     await updateCategory({ id, name: values.name, description: values.description }).unwrap();
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 3000);
   };
 
   const handleDeleteCategory = async (id: string) => {
+    if (!isSuperuser) return;
     await deleteCategory(id).unwrap();
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 3000);
@@ -487,7 +489,7 @@ export default function Articles() {
   };
 
   const handlePublish = async (id: string) => {
-    if (!canPublishArticle) return;
+    if (!canModify(availableArticles.find((article) => article.id === id), "edit")) return;
 
     try {
       await publishArticle(id).unwrap();
@@ -588,7 +590,7 @@ export default function Articles() {
                   metadata={[article.author?.name, new Date(article.created_at).toLocaleDateString(localeCode)].filter(Boolean).join(" / ")}
                   onNavigate={() => navigate(`/articles/${article.id}`)}
                   actions={[
-                    ...(canPublishArticle && article.status !== "published" ? [{ label: translate("articlesPage.publishArticle"), icon: <Globe className="h-4 w-4" />, onClick: () => { void handlePublish(article.id); } }] : []),
+                    ...(canModify(article, "edit") && article.status !== "published" ? [{ label: translate("articlesPage.publishArticle"), icon: <Globe className="h-4 w-4" />, onClick: () => { void handlePublish(article.id); } }] : []),
                     ...(canModify(article, "edit") ? [{ label: translate("articlesPage.editArticle"), icon: <Edit2 className="h-4 w-4" />, onClick: () => handleOpenModal(article) }] : []),
                     ...(canModify(article, "delete") ? [{ label: translate("articlesPage.deleteArticle"), icon: <Trash2 className="h-4 w-4" />, onClick: () => confirmDelete(article.id) }] : []),
                   ]}
