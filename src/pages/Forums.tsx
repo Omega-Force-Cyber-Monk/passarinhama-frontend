@@ -8,7 +8,6 @@ import {
   MessageCircle,
   Eye,
   Clock,
-  ArrowRight,
   Star,
   Plus,
   Trash2,
@@ -1490,9 +1489,6 @@ export default function Forums() {
                             )}
                           </div>
                         )}
-                        <div className="p-2 rounded-full bg-slate-50 text-slate-400 group-hover:bg-primary group-hover:text-slate-900 transition-colors">
-                          <ArrowRight className="w-6 h-6" />
-                        </div>
                       </div>
                     </motion.div>
                   ))
@@ -1599,9 +1595,6 @@ export default function Forums() {
                               </>
                             )}
                           </div>
-                        </div>
-                        <div className="hidden rounded-full bg-slate-50 p-2 text-slate-400 transition-colors group-hover:bg-primary group-hover:text-slate-900 sm:ml-4 sm:block">
-                          <ArrowRight className="w-5 h-5" />
                         </div>
                       </motion.div>
                     ))}

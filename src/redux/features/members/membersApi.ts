@@ -1,4 +1,6 @@
 import { apiSlice } from '../api/apiSlice';
+import { sessionResolved, sessionFailed } from '../auth/authSlice';
+import type { RootState } from '../../store';
 import type { FetchBaseQueryMeta } from '@reduxjs/toolkit/query';
 import {
   User,
@@ -347,6 +349,17 @@ export const membersApi = apiSlice.injectEndpoints({
       query: () => '/user/users/me',
       transformResponse: (response: UserApiResponse) => normalizeUser(response),
       providesTags: [{ type: 'User', id: 'ME' }],
+      async onQueryStarted(_, { dispatch, getState, queryFulfilled }) {
+        const { sessionVersion } = (getState() as RootState).auth;
+        try {
+          const { data } = await queryFulfilled;
+          if (!data?.id) throw new Error('Invalid current-user response');
+          dispatch(sessionResolved({ user: data, sessionVersion }));
+        } catch (failure) {
+          const error = (failure as { error?: { status?: number | string } }).error;
+          dispatch(sessionFailed({ error: error?.status ?? 'FETCH_ERROR', sessionVersion }));
+        }
+      },
     }),
     updateUsersMe: builder.mutation<User, UpdateUsersMeRequest>({
       query: (userData) => ({

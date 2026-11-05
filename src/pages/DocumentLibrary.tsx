@@ -301,7 +301,7 @@ export default function DocumentLibrary() {
   const canViewDocument = hasPermission("document", "view");
   const canCreateDocument = hasPermission("document", "create");
   const canEditDocument = isSuperuser;
-  const canDeleteDocument = isSuperuser;
+  const canDeleteDocument = hasPermission("document", "delete");
   const navigate = useNavigate();
   const { folderId, fileId } = useParams<{
     folderId?: string;
@@ -408,7 +408,9 @@ export default function DocumentLibrary() {
   const files = folderContent?.folder.id === currentFolder.id ? folderContent.documents : [];
   const canUploadHere = Boolean(currentFolder.id && canCreateIn("document", folderContent?.folder.id === currentFolder.id && folderContent.folder.can_upload));
   const canCreateFolderHere = canCreateDocument && (!currentFolder.id || canUploadHere);
-  const canChangeTarget = (target: { id: string; type: "folder" | "file" } | null, action: "edit" | "delete") => Boolean(target && (target.type === "folder" ? isSuperuser : canModify("document", files.find((file) => file.id === target.id), action)));
+  const canChangeTarget = (target: { id: string; type: "folder" | "file" } | null, action: "edit" | "delete") => Boolean(target && (target.type === "folder"
+    ? action === "delete" ? canDeleteDocument && allFolders && findFolderInTree(allFolders, target.id) : isSuperuser
+    : canModify("document", files.find((file) => file.id === target.id), action)));
   const selectedPreviewFile = files.find((file) => file.id === fileId) || null;
   const previewSourceUrl = selectedPreviewFile ? getDocumentPreviewUrl(selectedPreviewFile) : null;
   const previewMimeType = selectedPreviewFile?.mime_type;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useRouteError, useNavigate } from 'react-router-dom';
+import { useRouteError, useNavigate, useLocation } from 'react-router-dom';
 import { AlertCircle, RefreshCcw, Home, ChevronLeft } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useI18n } from '../i18n';
@@ -7,6 +7,7 @@ import { useI18n } from '../i18n';
 export default function RouteError() {
   const error = useRouteError() as any;
   const navigate = useNavigate();
+  const location = useLocation();
   const { translate } = useI18n();
 
   console.error('Route Error:', error);
@@ -29,7 +30,7 @@ export default function RouteError() {
         </h1>
         
         <p className="text-slate-500 mb-8 leading-relaxed">
-          {error?.message || translate("routeError.message")}
+          {error?.name === 'PageLoadTimeout' ? translate('routeError.loadTimeout') : error?.message || translate("routeError.message")}
         </p>
 
         {error?.statusText || error?.status ? (
@@ -45,7 +46,7 @@ export default function RouteError() {
 
         <div className="grid grid-cols-1 gap-3">
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => navigate(location.pathname + location.search + location.hash, { replace: true, state: location.state })}
             className="flex items-center justify-center gap-2 px-6 py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 active:scale-[0.98]"
           >
             <RefreshCcw className="w-4 h-4" />

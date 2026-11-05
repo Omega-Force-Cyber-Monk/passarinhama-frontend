@@ -19,7 +19,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { RootState } from "../redux/store";
-import { logout, setUser } from "../redux/features/auth/authSlice";
+import { logout } from "../redux/features/auth/authSlice";
 import { ROLE_SLUGS } from "../redux/features/auth/authTypes";
 import {
   useGetForumsQuery,
@@ -39,7 +39,6 @@ import {
 } from "../redux/features/technicopro/technicoproApi";
 import SidebarCategorySection from "./SidebarCategorySection";
 import {
-  useGetUsersMeQuery,
   useGetUsersOnlineQuery,
 } from "../redux/features/members/membersApi";
 import {
@@ -50,6 +49,7 @@ import {
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import { useI18n } from "../i18n";
 import { usePermissions } from "../hooks/usePermissions";
+import LoadingIndicator from "../components/ui/LoadingIndicator";
 
 type NavItem = {
   name: string;
@@ -176,18 +176,6 @@ const SEARCH_PERMISSION_FEATURES: Partial<
   document_folders: "document",
 };
 
-const OutletLoadingFallback = () => (
-  <div className="flex min-h-[40vh] items-center justify-center px-6">
-    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-semibold text-slate-600 shadow-sm">
-      <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      <span>Loading page...</span>
-    </div>
-  </div>
-);
-
-const getProfileSyncSignature = (value: unknown) =>
-  JSON.stringify(value ?? null);
-
 const DashboardLayout: React.FC = () => {
   const { isAuthenticated, user } = useSelector(
     (state: RootState) => state.auth,
@@ -207,14 +195,10 @@ const DashboardLayout: React.FC = () => {
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const lastSearchQueryRef = useRef("");
-  const lastSyncedProfileRef = useRef<string>("");
   const { hasPermission, canAccessAdminPanel } =
     usePermissions();
   const isSuperuser = canAccessAdminPanel;
 
-  const { data: profileData } = useGetUsersMeQuery(undefined, {
-    skip: !isAuthenticated,
-  });
   const { data: onlineUsersData } = useGetUsersOnlineQuery(undefined, {
     skip: !isAuthenticated,
   });
@@ -226,21 +210,6 @@ const DashboardLayout: React.FC = () => {
       isError: isSearchError,
     },
   ] = useLazyGetDashboardSearchQuery();
-
-  useEffect(() => {
-    if (!profileData) {
-      lastSyncedProfileRef.current = "";
-      return;
-    }
-
-    const nextSignature = getProfileSyncSignature(profileData);
-    if (lastSyncedProfileRef.current === nextSignature) {
-      return;
-    }
-
-    lastSyncedProfileRef.current = nextSignature;
-    dispatch(setUser(profileData));
-  }, [dispatch, profileData]);
 
   useEffect(() => {
     setArticlesDropdownOpen(location.pathname.startsWith("/articles"));
@@ -857,7 +826,7 @@ const DashboardLayout: React.FC = () => {
         </header>
 
         <main className="min-w-0 flex-1">
-          <Suspense fallback={<OutletLoadingFallback />}>
+          <Suspense fallback={<LoadingIndicator />}>
             <Outlet />
           </Suspense>
         </main>

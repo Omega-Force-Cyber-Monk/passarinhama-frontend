@@ -94,7 +94,7 @@ test('all Admin rich-editor names reference visible labels; checkbox, password a
 test('Tiptap opt-in naming reaches editorProps attributes without changing content/update bindings or legacy names', () => {
   const sf = parse('src/components/ui/TiptapEditor.tsx'); let options, changed;
   const extension = { configure: (config) => ({ config }) };
-  const context = { React, useEffect() {}, useEditor: (value) => { options = value; return null; }, cn: (...classes) => classes.filter(Boolean).join(' '), Toolbar: () => null, EditorContent: () => null };
+  const context = { React, useI18n: () => ({ translate: (key) => key }), useRef: (value) => ({ current: value }), useEffect() {}, useEditor: (value) => { options = value; return null; }, cn: (...classes) => classes.filter(Boolean).join(' '), Toolbar: () => null, EditorContent: () => null };
   for (const name of ['StarterKit', 'Underline', 'Link', 'Image', 'Table', 'TableRow', 'TableHeader', 'TableCell', 'Placeholder', 'YouTubeEmbed']) context[name] = extension;
   const Editor = evaluate(initializer(sf, 'TiptapEditor'), context);
   Editor({ content: '<p>Existing</p>', onChange: (value) => { changed = value; }, ariaLabelledBy: ':admin:-content' });

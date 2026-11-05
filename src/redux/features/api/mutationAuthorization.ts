@@ -1,7 +1,7 @@
 import type { FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import type { UserProfile } from '../auth/authTypes';
 import { hasPermission, isActiveSuperuser, isActiveUser, type PermissionFeature } from '../auth/permissionUtils';
-import { canCreateInResource, canModifyResource, canReplyToTopic, ORDINARY_ACCOUNT_FIELDS } from '../auth/resourceAuthorization';
+import { canCreateInResource, canModifyResource, canReplyToTopic, canDeleteFolder, findFolder, ORDINARY_ACCOUNT_FIELDS } from '../auth/resourceAuthorization';
 
 // Locators only: never accept an owner or a permission decision from mutation args.
 export interface AuthorizationContext {
@@ -18,7 +18,7 @@ type Read = (url: string) => Promise<Result>;
 export const forbidden = (): FetchBaseQueryError => ({ status: 403, data: { detail: 'You do not have permission to perform this action.' } });
 
 const administrative = new Set([
-  'createForum', 'updateForum', 'deleteForum', 'updateFolder', 'deleteFolder',
+  'createForum', 'updateForum', 'deleteForum', 'updateFolder',
   'createArticleCategory', 'updateArticleCategory', 'deleteArticleCategory',
   'createEventCategory', 'updateEventCategory', 'deleteEventCategory',
   'createTrainingCategory', 'updateTrainingCategory', 'deleteTrainingCategory',
@@ -123,6 +123,15 @@ export async function authorizeRequest(
   if (['updateUsersMe', 'resetPassword', 'updateNotificationPreference'].includes(endpoint)) return { request: args };
   if (['registerForEvent', 'unregisterFromEvent'].includes(endpoint)) {
     return hasPermission(user, 'event', 'view') ? { request: args } : { error: forbidden() };
+  }
+  if (endpoint === 'deleteFolder') {
+    if (!hasPermission(user, 'document', 'delete')) return { error: forbidden() };
+    if (isActiveSuperuser(user)) return { request: args };
+    const result = await read('/documents/documents/folders');
+    if (result.error) return { error: result.error };
+    const folders = Array.isArray(result.data) ? result.data : result.data?.folders;
+    const target = Array.isArray(folders) && findFolder(folders, path.split('/').at(-1)!);
+    return canDeleteFolder(user, target || undefined) ? { request: args } : { error: forbidden() };
   }
   if (endpoint === 'createFolder') {
     if (!hasPermission(user, 'document', 'create')) return { error: forbidden() };

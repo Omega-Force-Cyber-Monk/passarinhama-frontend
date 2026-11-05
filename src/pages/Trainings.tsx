@@ -178,11 +178,16 @@ export default function Trainings() {
   };
 
   const handleImageUpload = async (file: File): Promise<string> => {
-    if (editingTraining ? !canModify("training", trainings.find((item) => item.id === editingTraining.id), "edit") : !canCreateTraining) throw new Error("Forbidden");
-    const data = new FormData();
-    data.append("file", file);
-    const response = await uploadFile({ formData: data, authorization: { feature: "training", resourceId: editingTraining?.id } }).unwrap();
-    return response.url;
+    if (editingTraining ? !canModify("training", trainings.find((item) => item.id === editingTraining.id), "edit") : !canCreateTraining) throw new Error(translate("apiErrors.forbidden"));
+    try {
+      const data = new FormData();
+      data.append("file", file);
+      const response = await uploadFile({ formData: data, authorization: { feature: "training", resourceId: editingTraining?.id } }).unwrap();
+      return response.url;
+    } catch (error) {
+      toast.error(getApiErrorDisplayMessage(error, translate, "apiErrors.default"));
+      throw error;
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -190,7 +195,9 @@ export default function Trainings() {
     if (editingTraining ? !canModify("training", trainings.find((item) => item.id === editingTraining.id), "edit") : !canCreateTraining) return;
 
     if (!canSubmitForm) {
-      toast.error(translate("common.requiredField", { field: translate("common.description") }));
+      const field = !formData.title.trim() ? "trainingsPage.trainingTitle"
+        : !formData.category_id ? "articlesPage.category" : "trainingsPage.descriptionLabel";
+      toast.error(translate("common.requiredField", { field: translate(field) }));
       return;
     }
 
@@ -218,7 +225,7 @@ export default function Trainings() {
         await createTraining(payload).unwrap();
       }
 
-      toast.success(translate("trainingsPage.success"));
+      toast.success(translate(editingTraining ? "trainingsPage.trainingUpdated" : "trainingsPage.trainingProposed"));
       setIsFormOpen(false);
       setEditingTraining(null);
     } catch (error) {
@@ -230,7 +237,7 @@ export default function Trainings() {
     if (!deletingId || !canModify("training", trainings.find((item) => item.id === deletingId), "delete")) return;
     try {
       await deleteTraining(deletingId).unwrap();
-      toast.success(translate("trainingsPage.success"));
+      toast.success(translate("trainingsPage.trainingDeleted"));
       setDeletingId(null);
     } catch (error) {
       toast.error(getApiErrorDisplayMessage(error, translate, "apiErrors.default"));
@@ -339,7 +346,7 @@ export default function Trainings() {
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold uppercase tracking-widest text-white disabled:opacity-50"
         >
           <CheckCircle2 className="h-5 w-5 text-primary" />
-          {editingTraining ? translate("trainingsPage.trainingUpdated") : translate("trainingsPage.trainingProposed")}
+          {isCreating || isUpdating ? translate("trainingsPage.savingEllipsis") : editingTraining ? translate("trainingsPage.saveTraining") : translate("trainingsPage.createTraining")}
         </ModalSubmitButton>)}
       >
         <form
@@ -404,6 +411,8 @@ export default function Trainings() {
                 </span>
                 <TiptapEditor
                   content={formData.description}
+                  placeholder={translate("trainingsPage.descriptionPlaceholder")}
+                  ariaLabelledBy="training-content-label"
                   onChange={(description) => setFormData((current) => ({ ...current, description }))}
                   onImageUpload={handleImageUpload}
                 />
@@ -496,7 +505,7 @@ export default function Trainings() {
         onClose={() => setDeletingId(null)}
         onConfirm={handleDelete}
         title={translate("trainingsPage.deleteTraining")}
-        message={translate("trainingsPage.deleteConfirm")}
+        message={translate("trainingsPage.deleteTrainingMessage")}
         isLoading={isDeleting}
         closeOnConfirm={false}
       />

@@ -3,6 +3,20 @@ import { hasPermission, isActiveSuperuser, type PermissionFeature } from './perm
 
 type Resource = Record<string, any> | null | undefined;
 
+// Folder responses have no creator or delete-specific capability. Their delete
+// action uses the existing document.delete grant on a server-visible folder;
+// can_upload only controls creation/upload, never deletion.
+export const canDeleteFolder = (user: UserProfile | null | undefined, folder: Resource): boolean =>
+  Boolean(folder?.id && hasPermission(user, 'document', 'delete'));
+
+export const findFolder = <T extends { id: string; children?: T[] }>(folders: T[], id: string): T | undefined => {
+  for (const folder of folders) {
+    if (folder.id === id) return folder;
+    const child = folder.children && findFolder(folder.children, id);
+    if (child) return child;
+  }
+};
+
 // Only identity fields in existing API responses qualify. Display author text never does.
 export const getResourceOwnerId = (feature: PermissionFeature, resource: Resource): string | undefined => {
   let id: unknown;

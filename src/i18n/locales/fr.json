@@ -119,7 +119,8 @@
     "requiredField": "{field} est requis.",
     "selectAtLeastOne": "Sélectionnez au moins un(e) {field}.",
     "accessRestrictedTitle": "Acces restreint",
-    "accessRestrictedMessage": "Votre acces a cette section a ete restreint par l'autorite. Veuillez la contacter si vous pensez devoir y avoir acces."
+    "accessRestrictedMessage": "Votre acces a cette section a ete restreint par l'autorite. Veuillez la contacter si vous pensez devoir y avoir acces.",
+    "saving": "Enregistrement..."
   },
   "languageSwitcher": {
     "ariaLabel": "Sélecteur de langue"
@@ -157,6 +158,7 @@
     "extranet": "Extranet"
   },
   "routeError": {
+    "loadTimeout": "Le chargement de cette page a pris trop de temps. Réessayez ou ouvrez une autre page.",
     "title": "Oups ! Un problème est survenu",
     "message": "Une erreur inattendue est survenue lors du chargement de cette page. Ne vous inquiétez pas, cela ne vient pas de vous.",
     "details": "Détails de l'erreur",
@@ -182,7 +184,8 @@
     "500": "Le serveur a rencontré une erreur. Veuillez réessayer dans un instant.",
     "502": "Le service est temporairement indisponible. Veuillez réessayer dans un instant.",
     "503": "Le serveur est temporairement indisponible. Veuillez réessayer dans un instant.",
-    "504": "Le serveur a mis trop de temps à répondre. Veuillez réessayer."
+    "504": "Le serveur a mis trop de temps à répondre. Veuillez réessayer.",
+    "forbidden": "Vous n’avez pas l’autorisation d’effectuer cette action."
   },
   "login": {
     "pendingValidation": "Votre compte est en attente de validation. Veuillez contacter le support.",
@@ -438,6 +441,7 @@
     "confirmPublication": "Confirmer la publication"
   },
   "articlesPage": {
+    "excerpt": "Résumé",
     "success": "Opération effectuée avec succès !",
     "defaultAuthor": "ArchiCoPro",
     "general": "Général",
@@ -550,6 +554,8 @@
     "continueReading": "Poursuivre la lecture"
   },
   "agendaPage": {
+    "visibilityPublic": "Public",
+    "visibilityPrivate": "Privé",
     "month": "Mois",
     "year": "Année",
     "previousMonth": "Mois précédent",
@@ -635,7 +641,9 @@
     "eventAtCapacity": "Événement complet",
     "registerForEvent": "S'inscrire à cet événement",
     "close": "Fermer",
-    "dailyEvents": "Événements du jour"
+    "dailyEvents": "Événements du jour",
+    "editEvent": "Modifier l’événement",
+    "saveEvent": "Enregistrer les modifications"
   },
   "trainingsPage": {
     "defaultCreator": "ArchiCoPro",
@@ -733,7 +741,9 @@
     "accessSettings": "Paramètres d'accès",
     "canRead": "Lecture seule",
     "canWrite": "Écriture autorisée",
-    "selectTrainingPrompt": "Sélectionnez une formation pour consulter les autorisations"
+    "selectTrainingPrompt": "Sélectionnez une formation pour consulter les autorisations",
+    "descriptionPlaceholder": "Décrivez le contenu et les objectifs de la formation...",
+    "success": "Opération effectuée avec succès."
   },
   "documentLibraryPage": {
     "location": "Emplacement du dossier",
@@ -1610,5 +1620,29 @@
     "deleteConfirm": "Cet élément TechnicoPro sera supprimé définitivement.",
     "empty": "Aucun contenu TechnicoPro trouvé.",
     "success": "TechnicoPro mis à jour avec succès."
+  },
+  "sessionError": {
+    "title": "Impossible de charger votre session",
+    "message": "Nous n’avons pas pu vérifier votre session. Vérifiez votre connexion et réessayez.",
+    "forbidden": "Votre profil est actuellement indisponible pour ce compte. Réessayez ou contactez un administrateur."
+  },
+  "editor": {
+    "heading1": "Titre 1",
+    "heading2": "Titre 2",
+    "heading3": "Titre 3",
+    "paragraph": "Paragraphe",
+    "bold": "Gras",
+    "italic": "Italique",
+    "underline": "Souligné",
+    "insertLink": "Insérer un lien",
+    "bulletedList": "Liste à puces",
+    "numberedList": "Liste numérotée",
+    "blockquote": "Citation",
+    "uploadImage": "Importer une image",
+    "insertTable": "Insérer un tableau",
+    "undo": "Annuler",
+    "redo": "Rétablir",
+    "linkUrl": "Adresse du lien",
+    "placeholder": "Écrivez votre texte..."
   }
 }

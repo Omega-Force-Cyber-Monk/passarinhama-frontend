@@ -129,4 +129,8 @@ export interface AuthState {
   token: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  status: 'initializing' | 'authenticated' | 'unauthenticated' | 'error';
+  permissionsStatus: 'unknown' | 'loading' | 'ready' | 'error';
+  sessionVersion: number;
+  error: number | string | null;
 }

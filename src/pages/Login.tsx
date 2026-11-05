@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
-import { useNavigate, Link } from "react-router-dom";
-import { setCredentials, setUser } from "../redux/features/auth/authSlice";
+import { Link } from "react-router-dom";
+import { setCredentials } from "../redux/features/auth/authSlice";
 import { motion } from "motion/react";
 import { LogIn, Mail, Lock, Eye, EyeOff } from "lucide-react";
-import { authApi, useLoginMutation } from "../redux/features/auth/authApi";
+import { useLoginMutation } from "../redux/features/auth/authApi";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import { useAppToast } from "../components/ui/AppToastProvider";
 import { useI18n } from "../i18n";
@@ -16,7 +16,6 @@ export default function Login() {
   const [password, setPassword] = useState("admin");
   const [showPassword, setShowPassword] = useState(false);
   const dispatch = useDispatch<AppDispatch>();
-  const navigate = useNavigate();
   const [login, { isLoading }] = useLoginMutation();
   const { translate } = useI18n();
   const toast = useAppToast();
@@ -49,11 +48,6 @@ export default function Login() {
       }
 
       dispatch(setCredentials(response));
-      const currentUser = await dispatch(
-        authApi.endpoints.getMe.initiate(undefined, { forceRefetch: true }),
-      ).unwrap();
-      dispatch(setUser(currentUser));
-      navigate("/");
     } catch (err: any) {
       console.error("Login error:", err);
       const message = getApiErrorDisplayMessage(err, translate);

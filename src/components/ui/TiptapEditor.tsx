@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { useI18n } from "../../i18n";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -61,6 +62,7 @@ const MenuButton = ({
     onClick={onClick}
     disabled={disabled}
     title={title}
+    aria-label={title}
     className={cn(
       "p-2 rounded-lg transition-all duration-200 flex items-center justify-center",
       isActive 
@@ -75,8 +77,7 @@ const MenuButton = ({
 
 const Toolbar = ({ editor, onImageUpload }: { editor: any, onImageUpload?: (file: File) => Promise<string> }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  if (!editor) return null;
+  const { translate } = useI18n();
 
   const addImage = useCallback(() => {
     fileInputRef.current?.click();
@@ -103,7 +104,7 @@ const Toolbar = ({ editor, onImageUpload }: { editor: any, onImageUpload?: (file
 
   const setLink = useCallback(() => {
     const previousUrl = editor.getAttributes('link').href;
-    const url = window.prompt('URL', previousUrl);
+    const url = window.prompt(translate('editor.linkUrl'), previousUrl);
 
     if (url === null) return;
     if (url === '') {
@@ -112,35 +113,37 @@ const Toolbar = ({ editor, onImageUpload }: { editor: any, onImageUpload?: (file
     }
 
     editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-  }, [editor]);
+  }, [editor, translate]);
+
+  if (!editor) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-1 p-2 bg-slate-50/50 border-b border-slate-200 sticky top-0 z-10">
       <MenuButton
         onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
         isActive={editor.isActive('heading', { level: 1 })}
-        title="Heading 1"
+        title={translate("editor.heading1")}
       >
         <Heading1 size={18} />
       </MenuButton>
       <MenuButton
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
         isActive={editor.isActive('heading', { level: 2 })}
-        title="Heading 2"
+        title={translate("editor.heading2")}
       >
         <Heading2 size={18} />
       </MenuButton>
       <MenuButton
         onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
         isActive={editor.isActive('heading', { level: 3 })}
-        title="Heading 3"
+        title={translate("editor.heading3")}
       >
         <Heading3 size={18} />
       </MenuButton>
       <MenuButton
         onClick={() => editor.chain().focus().setParagraph().run()}
         isActive={editor.isActive('paragraph')}
-        title="Paragraph"
+        title={translate("editor.paragraph")}
       >
         <Type size={18} />
       </MenuButton>
@@ -150,21 +153,21 @@ const Toolbar = ({ editor, onImageUpload }: { editor: any, onImageUpload?: (file
       <MenuButton
         onClick={() => editor.chain().focus().toggleBold().run()}
         isActive={editor.isActive('bold')}
-        title="Bold"
+        title={translate("editor.bold")}
       >
         <Bold size={18} />
       </MenuButton>
       <MenuButton
         onClick={() => editor.chain().focus().toggleItalic().run()}
         isActive={editor.isActive('italic')}
-        title="Italic"
+        title={translate("editor.italic")}
       >
         <Italic size={18} />
       </MenuButton>
       <MenuButton
         onClick={() => editor.chain().focus().toggleUnderline().run()}
         isActive={editor.isActive('underline')}
-        title="Underline"
+        title={translate("editor.underline")}
       >
         <UnderlineIcon size={18} />
       </MenuButton>
@@ -174,28 +177,28 @@ const Toolbar = ({ editor, onImageUpload }: { editor: any, onImageUpload?: (file
       <MenuButton
         onClick={setLink}
         isActive={editor.isActive('link')}
-        title="Insert Link"
+        title={translate("editor.insertLink")}
       >
         <LinkIcon size={18} />
       </MenuButton>
       <MenuButton
         onClick={() => editor.chain().focus().toggleBulletList().run()}
         isActive={editor.isActive('bulletList')}
-        title="Bulleted List"
+        title={translate("editor.bulletedList")}
       >
         <List size={18} />
       </MenuButton>
       <MenuButton
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
         isActive={editor.isActive('orderedList')}
-        title="Numbered List"
+        title={translate("editor.numberedList")}
       >
         <ListOrdered size={18} />
       </MenuButton>
       <MenuButton
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
         isActive={editor.isActive('blockquote')}
-        title="Blockquote"
+        title={translate("editor.blockquote")}
       >
         <Quote size={18} />
       </MenuButton>
@@ -209,12 +212,12 @@ const Toolbar = ({ editor, onImageUpload }: { editor: any, onImageUpload?: (file
         accept="image/*"
         onChange={handleFileChange}
       />
-      <MenuButton onClick={addImage} title="Upload Image">
+      <MenuButton onClick={addImage} title={translate("editor.uploadImage")}>
         <ImageIcon size={18} />
       </MenuButton>
       <MenuButton
         onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-        title="Insert Table"
+        title={translate("editor.insertTable")}
       >
         <TableIcon size={18} />
       </MenuButton>
@@ -224,14 +227,14 @@ const Toolbar = ({ editor, onImageUpload }: { editor: any, onImageUpload?: (file
       <MenuButton
         onClick={() => editor.chain().focus().undo().run()}
         disabled={!editor.can().undo()}
-        title="Undo"
+        title={translate("editor.undo")}
       >
         <Undo size={18} />
       </MenuButton>
       <MenuButton
         onClick={() => editor.chain().focus().redo().run()}
         disabled={!editor.can().redo()}
-        title="Redo"
+        title={translate("editor.redo")}
       >
         <Redo size={18} />
       </MenuButton>
@@ -242,11 +245,15 @@ const Toolbar = ({ editor, onImageUpload }: { editor: any, onImageUpload?: (file
 const TiptapEditor: React.FC<TiptapEditorProps> = ({
   content,
   onChange,
-  placeholder = "Write something...",
+  placeholder,
   onImageUpload,
   variant = "default",
   ariaLabelledBy,
 }) => {
+  const { translate } = useI18n();
+  const resolvedPlaceholder = placeholder ?? translate("editor.placeholder");
+  const placeholderRef = useRef(resolvedPlaceholder);
+  placeholderRef.current = resolvedPlaceholder;
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -286,7 +293,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         },
       }),
       Placeholder.configure({
-        placeholder,
+        placeholder: () => placeholderRef.current,
         emptyEditorClass: 'is-editor-empty',
       }),
       YouTubeEmbed,
@@ -315,6 +322,11 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
 
     editor.commands.setContent(normalizedContent, { emitUpdate: false });
   }, [content, editor]);
+
+  useEffect(() => {
+    // Refresh decorations without recreating the editor or clearing unsaved content.
+    if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr);
+  }, [editor, resolvedPlaceholder]);
 
   const isCompact = variant === "compact";
 

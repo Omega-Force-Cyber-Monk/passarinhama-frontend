@@ -1,5 +1,7 @@
 import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import LoadingIndicator from './ui/LoadingIndicator';
+import AccessRestrictedNotice from './ui/AccessRestrictedNotice';
+import SessionError from './SessionError';
 import { usePermissions } from '../hooks/usePermissions';
 import type { UserProfile } from '../redux/features/auth/authTypes';
 import type {
@@ -13,7 +15,6 @@ interface PermissionRouteProps {
   feature?: PermissionFeature;
   action?: PermissionAction | PermissionActionKey;
   allow?: (user: UserProfile | null) => boolean;
-  redirectTo?: string;
 }
 
 const PermissionRoute: React.FC<PermissionRouteProps> = ({
@@ -21,12 +22,11 @@ const PermissionRoute: React.FC<PermissionRouteProps> = ({
   feature,
   action = 'view',
   allow,
-  redirectTo = '/',
 }) => {
-  const location = useLocation();
-  const { user, hasPermission, isLoading } = usePermissions();
+  const { user, hasPermission, isLoading, isError } = usePermissions();
 
-  if (isLoading) return <div role="status" className="flex min-h-[40vh] items-center justify-center"><div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
+  if (isLoading) return <LoadingIndicator />;
+  if (isError) return <SessionError />;
 
   const isAllowed = allow
     ? allow(user)
@@ -35,13 +35,7 @@ const PermissionRoute: React.FC<PermissionRouteProps> = ({
       : true;
 
   if (!isAllowed) {
-    return (
-      <Navigate
-        to={redirectTo}
-        replace
-        state={{ from: location }}
-      />
-    );
+    return <AccessRestrictedNotice />;
   }
 
   return <>{children}</>;

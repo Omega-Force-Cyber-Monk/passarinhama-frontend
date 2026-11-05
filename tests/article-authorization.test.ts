@@ -39,7 +39,7 @@ test('RTK mutations revalidate server ownership/permissions and propagate 403 wi
   globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} } as unknown as Storage;
   const { store } = await import('../src/redux/store');
   const { articlesApi } = await import('../src/redux/features/articles/articlesApi');
-  const { setUser, setCredentials } = await import('../src/redux/features/auth/authSlice');
+  const { setUser, setCredentials, sessionResolved } = await import('../src/redux/features/auth/authSlice');
   const originalFetch = globalThis.fetch;
   let freshUser = user(true, true);
   let freshArticle = own;
@@ -66,6 +66,7 @@ test('RTK mutations revalidate server ownership/permissions and propagate 403 wi
   try {
     // Redux still contains grants when the backend has revoked them.
     store.dispatch(setCredentials({ access_token: 'test-token', user: user(true, true) }));
+    store.dispatch(sessionResolved({ user: user(true, true), sessionVersion: store.getState().auth.sessionVersion }));
     for (const action of ['edit', 'delete'] as const) {
       freshUser = user(true, true);
       freshArticle = other;

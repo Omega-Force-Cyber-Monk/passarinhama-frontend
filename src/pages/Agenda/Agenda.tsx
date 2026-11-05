@@ -262,7 +262,7 @@ export default function Agenda() {
   const [uploadFile] = useUploadFileMutation();
 
   const handleImageUpload = async (file: File): Promise<string> => {
-    if (isEditMode ? !canModify("event", (apiEvents || []).find((event) => event.id === editingEventId) || (selectedEvent?.id === editingEventId ? selectedEvent : undefined), "edit") : !canCreateEvent) throw new Error("Forbidden");
+    if (isEditMode ? !canModify("event", (apiEvents || []).find((event) => event.id === editingEventId) || (selectedEvent?.id === editingEventId ? selectedEvent : undefined), "edit") : !canCreateEvent) throw new Error(translate("apiErrors.forbidden"));
     try {
       const data = new FormData();
       data.append("file", file);
@@ -686,6 +686,7 @@ export default function Agenda() {
                 e.stopPropagation();
                 setViewDate(subMonths(viewDate, 1));
               }}
+              aria-label={translate("agendaPage.previousMonth")}
               className="p-2 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -699,6 +700,7 @@ export default function Agenda() {
                 e.stopPropagation();
                 setViewDate(addMonths(viewDate, 1));
               }}
+              aria-label={translate("agendaPage.nextMonth")}
               className="p-2 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer"
             >
               <ChevronRight className="w-4 h-4" />
@@ -1123,7 +1125,7 @@ export default function Agenda() {
         }}
         title={
           isEditMode
-            ? translate("Edit")
+            ? translate("agendaPage.editEvent")
             : translate("agendaPage.createNewEvent")
         }
         layout="compact"
@@ -1136,10 +1138,10 @@ export default function Agenda() {
           {isCreatingEvent || isUpdatingEvent ? (
             <>
               <RefreshCw className="w-4 h-4 animate-spin" />
-              {translate("agendaPage.syncingToNexus")}
+              {translate("common.saving")}
             </>
           ) : (
-            isEditMode ? translate("Edit") : translate("agendaPage.createEvent")
+            isEditMode ? translate("agendaPage.saveEvent") : translate("agendaPage.createEvent")
           )}
         </ModalSubmitButton>)}>
         <form
@@ -1261,6 +1263,7 @@ export default function Agenda() {
                 </label>
                 <TiptapEditor
                   content={formData.description}
+                  ariaLabelledBy="agenda-event-description-label"
                   onChange={(content) =>
                     setFormData({ ...formData, description: content })
                   }
@@ -1375,7 +1378,7 @@ export default function Agenda() {
                 className="w-full py-3 sm:flex-1 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-50 transition-all uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Edit2 className="w-4 h-4" />
-                {translate("Edit")}
+                {translate("agendaPage.editEvent")}
               </button>
             ) : null}
             {canModify("event", selectedEvent, "delete") ? (
@@ -1533,8 +1536,8 @@ export default function Agenda() {
                         <div>
                           <p className="text-sm font-bold text-slate-900">
                             {selectedEvent.is_public
-                              ? translate("public")
-                              : translate("private")}
+                              ? translate("agendaPage.visibilityPublic")
+                              : translate("agendaPage.visibilityPrivate")}
                           </p>
                           <p className="text-xs text-slate-500">
                             {selectedEvent.is_public

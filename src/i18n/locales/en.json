@@ -119,7 +119,8 @@
     "requiredField": "{field} is required.",
     "selectAtLeastOne": "Select at least one {field}.",
     "accessRestrictedTitle": "Access Restricted",
-    "accessRestrictedMessage": "Your access to this section has been restricted by the authority. Please contact them if you believe you should have access."
+    "accessRestrictedMessage": "Your access to this section has been restricted by the authority. Please contact them if you believe you should have access.",
+    "saving": "Saving..."
   },
   "languageSwitcher": {
     "ariaLabel": "Language switcher"
@@ -157,6 +158,7 @@
     "extranet": "Extranet"
   },
   "routeError": {
+    "loadTimeout": "This page took too long to load. Try again or open another page.",
     "title": "Oops! Something went wrong",
     "message": "We encountered an unexpected error while trying to load this page. Don't worry, it's not your fault.",
     "details": "Error Details",
@@ -182,7 +184,8 @@
     "500": "The server encountered an error. Please try again in a moment.",
     "502": "The service is temporarily unavailable. Please try again shortly.",
     "503": "The server is temporarily unavailable. Please try again shortly.",
-    "504": "The server took too long to respond. Please try again."
+    "504": "The server took too long to respond. Please try again.",
+    "forbidden": "You do not have permission to perform this action."
   },
   "login": {
     "pendingValidation": "Your account is pending validation. Please contact support.",
@@ -438,6 +441,7 @@
     "confirmPublication": "Confirm Publication"
   },
   "articlesPage": {
+    "excerpt": "Excerpt",
     "success": "Operation completed successfully!",
     "defaultAuthor": "ArchiCoPro",
     "general": "General",
@@ -550,6 +554,8 @@
     "continueReading": "Continue Reading"
   },
   "agendaPage": {
+    "visibilityPublic": "Public",
+    "visibilityPrivate": "Private",
     "month": "Month",
     "year": "Year",
     "previousMonth": "Previous month",
@@ -635,9 +641,12 @@
     "eventAtCapacity": "Event at Capacity",
     "registerForEvent": "Register for this Event",
     "close": "Close",
-    "dailyEvents": "Daily Events"
+    "dailyEvents": "Daily Events",
+    "editEvent": "Edit Event",
+    "saveEvent": "Save Changes"
   },
   "trainingsPage": {
+    "success": "Operation successful.",
     "defaultCreator": "ArchicoPro",
     "completed": "Completed",
     "training": "Training",
@@ -733,7 +742,8 @@
     "accessSettings": "Access Settings",
     "canRead": "Can Read",
     "canWrite": "Can Write",
-    "selectTrainingPrompt": "Select a training to review permissions"
+    "selectTrainingPrompt": "Select a training to review permissions",
+    "descriptionPlaceholder": "Describe the training content and objectives..."
   },
   "documentLibraryPage": {
     "location": "Folder location",
@@ -1610,5 +1620,29 @@
     "deleteConfirm": "This TechnicoPro item will be permanently deleted.",
     "empty": "No TechnicoPro content found.",
     "success": "TechnicoPro updated successfully."
+  },
+  "sessionError": {
+    "title": "Unable to load your session",
+    "message": "We could not verify your session. Check your connection and try again.",
+    "forbidden": "Your profile is currently unavailable for this account. Please try again or contact an administrator."
+  },
+  "editor": {
+    "heading1": "Heading 1",
+    "heading2": "Heading 2",
+    "heading3": "Heading 3",
+    "paragraph": "Paragraph",
+    "bold": "Bold",
+    "italic": "Italic",
+    "underline": "Underline",
+    "insertLink": "Insert link",
+    "bulletedList": "Bulleted list",
+    "numberedList": "Numbered list",
+    "blockquote": "Blockquote",
+    "uploadImage": "Upload image",
+    "insertTable": "Insert table",
+    "undo": "Undo",
+    "redo": "Redo",
+    "linkUrl": "Link URL",
+    "placeholder": "Write something..."
   }
 }

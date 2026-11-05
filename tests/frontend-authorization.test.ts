@@ -60,7 +60,7 @@ test('reply creation requires create permission, explicit resource posting permi
 
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} } as unknown as Storage;
 const { store } = await import('../src/redux/store');
-const { setCredentials, setUser, logout } = await import('../src/redux/features/auth/authSlice');
+const { setCredentials, setUser, logout, sessionResolved } = await import('../src/redux/features/auth/authSlice');
 const { apiSlice } = await import('../src/redux/features/api/apiSlice');
 await Promise.all([
   import('../src/redux/features/articles/articlesApi'), import('../src/redux/features/events/eventsApi'),
@@ -80,7 +80,7 @@ function harness() {
     profile: user('edit'), owner: 'owner' as string | undefined, canPost: true, locked: false as boolean | undefined,
     replies: 0, canUpload: true, profileStatus: 200, writeStatus: 200, afterRead: undefined as (() => void) | undefined,
     writes: [] as Request[], requests: [] as string[],
-    signIn(actor: UserProfile = h.profile) { store.dispatch(setCredentials({ access_token: 'token', user: actor })); },
+    signIn(actor: UserProfile = h.profile) { store.dispatch(setCredentials({ access_token: 'token', user: actor })); store.dispatch(sessionResolved({ user: actor, sessionVersion: store.getState().auth.sessionVersion })); },
     async call(name: string, args: any) {
       h.writes.length = 0; h.requests.length = 0;
       const endpoint = (apiSlice.endpoints as any)[name];
@@ -171,6 +171,7 @@ test('anonymous, stale identities, failed profile reads, changed sessions and se
 test('expired tokens refresh before fresh authorization and the write uses the new token', async () => client(async (h) => {
   h.profile = user('delete'); h.profileStatus = 401;
   store.dispatch(setCredentials({ access_token: 'expired', refresh_token: 'refresh', user: h.profile }));
+  store.dispatch(sessionResolved({ user: h.profile, sessionVersion: store.getState().auth.sessionVersion }));
   assert.ok('data' in await h.call('deleteArticle', 'record'));
   assert.equal(h.writes.length, 1);
   assert.equal(h.writes[0].headers.get('Authorization'), 'Bearer refreshed-token');
@@ -210,7 +211,7 @@ test('categories, shared containers, moderation, permission changes and administ
       [`create${entity}Category`, { name: 'Category' }], [`update${entity}Category`, { id: 'record', name: 'Category' }], [`delete${entity}Category`, 'record'],
     ]),
     ['createForum', { name: 'Forum' }], ['updateForum', { forum_id: 'forum' }], ['deleteForum', 'forum'],
-    ['updateFolder', { id: 'folder', body: { name: 'Folder' } }], ['deleteFolder', 'folder'],
+    ['updateFolder', { id: 'folder', body: { name: 'Folder' } }],
     ['updateUser', { id: 'owner', body: { first_name: 'Changed', is_superuser: true } }], ['deleteUser', 'owner'],
     ['softDeleteUser', 'owner'], ['restoreUser', 'owner'], ['validateUser', 'owner'],
     ['createUserRole', { name: 'Role' }], ['updateUserRole', { id: 'role', name: 'Role' }], ['deleteUserRole', { id: 'role' }],
@@ -307,24 +308,20 @@ test('real final confirmation/submit handlers do not invoke mutations after auth
   }
 });
 
-test('authorization hook ignores local grants until current server identity resolves successfully', () => {
+test('authorization hook uses only a resolved session and does not initialize profile requests', () => {
   const sf = source('src/hooks/usePermissions.ts');
-  const declaration = sf.statements.find((n) => ts.isVariableStatement(n) && n.declarationList.declarations.some((d) => d.name.getText(sf) === 'usePermissions')) as ts.VariableStatement;
-  const expression = declaration.declarationList.declarations[0].initializer!.getText(sf);
-  for (const profile of [
-    { isSuccess: false, isLoading: true },
-    { isSuccess: true, currentData: user('edit', { id: 'other' }) },
-    { isSuccess: true, currentData: user('edit'), isFetching: true },
-    { isSuccess: true, currentData: user('edit'), isError: true },
-    { isSuccess: true, currentData: user('edit') },
-  ]) {
-    const auth = { isAuthenticated: true, token: 'token', user: user('edit', { is_superuser: true }) };
-    const context = { useSelector: (select: any) => select({ auth }), useGetUsersMeQuery: () => profile,
+  const expression = initializer(sf, 'usePermissions');
+  for (const [status, permissionsStatus, allowed] of [
+    ['initializing', 'loading', false], ['error', 'error', false],
+    ['unauthenticated', 'unknown', false], ['authenticated', 'ready', true],
+  ] as const) {
+    const auth = { status, permissionsStatus, isAuthenticated: allowed, token: 'token', user: user('edit') };
+    const context = { useSelector: (select: any) => select({ auth }),
       getMergedPermissions: () => ({}), hasPermission, canAccessAdminPanel, canAccessModeration, canModifyResource,
       canCreateInResource, canReplyToTopic };
     const hook = evaluate(expression, context)();
-    const ready = profile.isSuccess && !profile['isFetching'] && !profile['isError'] && profile['currentData']?.id === 'owner';
-    assert.equal(hook.hasPermission('article', 'edit'), Boolean(ready));
+    assert.equal(hook.hasPermission('article', 'edit'), allowed);
     assert.equal(hook.canAccessAdminPanel, false);
+    assert.equal(hook.isLoading, status === 'initializing');
   }
 });

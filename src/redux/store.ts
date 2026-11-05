@@ -1,12 +1,12 @@
 
-import { configureStore, createListenerMiddleware } from '@reduxjs/toolkit';
+import { configureStore, createListenerMiddleware, isAnyOf } from '@reduxjs/toolkit';
 import { apiSlice } from './features/api/apiSlice';
-import authReducer, { logout } from './features/auth/authSlice';
+import authReducer, { logout, setCredentials } from './features/auth/authSlice';
 
 const listenerMiddleware = createListenerMiddleware();
 
 listenerMiddleware.startListening({
-  actionCreator: logout,
+  matcher: isAnyOf(logout, setCredentials),
   effect: async (_, api) => {
     api.dispatch(apiSlice.util.resetApiState());
   },

@@ -1,37 +1,32 @@
-import React, { lazy, Suspense } from 'react';
+import React, { Suspense } from 'react';
+import { lazyPage } from '../utils/lazyPage';
+import LoadingIndicator from '../components/ui/LoadingIndicator';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import DashboardLayout from '../layouts/DashboardLayout';
 import RouteError from '../components/RouteError';
 
 
 // Lazy load pages
-const Home = lazy(() => import('../pages/Home'));
-const Login = lazy(() => import('../pages/Login'));
-const Signup = lazy(() => import('../pages/Signup'));
-const ForgotPassword = lazy(() => import('../pages/ForgotPassword'));
-const OTPVerification = lazy(() => import('../pages/OTPVerification'));
-const MemberDirectory = lazy(() => import('../pages/MemberDirectory'));
-const Forums = lazy(() => import('../pages/Forums'));
-const Articles = lazy(() => import('../pages/Articles'));
-const Agenda = lazy(() => import('../pages/Agenda/Agenda'));
-const Events = lazy(() => import('../pages/Events'));
-const Trainings = lazy(() => import('../pages/Trainings'));
-const TrainingDetail = lazy(() => import('../pages/TrainingDetail'));
-const TechnicoPro = lazy(() => import('../pages/TechnicoPro'));
-const TechnicoProDetail = lazy(() => import('../pages/TechnicoProDetail'));
-const DocumentLibrary = lazy(() => import('../pages/DocumentLibrary'));
-const AdminPanel = lazy(() => import('../pages/AdminPanel'));
-const Profile = lazy(() => import('../pages/Profile'));
-const ArticleDetail = lazy(() => import('../pages/ArticleDetail'));
+const Home = lazyPage(() => import('../pages/Home'));
+const Login = lazyPage(() => import('../pages/Login'));
+const Signup = lazyPage(() => import('../pages/Signup'));
+const ForgotPassword = lazyPage(() => import('../pages/ForgotPassword'));
+const OTPVerification = lazyPage(() => import('../pages/OTPVerification'));
+const MemberDirectory = lazyPage(() => import('../pages/MemberDirectory'));
+const Forums = lazyPage(() => import('../pages/Forums'));
+const Articles = lazyPage(() => import('../pages/Articles'));
+const Agenda = lazyPage(() => import('../pages/Agenda/Agenda'));
+const Events = lazyPage(() => import('../pages/Events'));
+const Trainings = lazyPage(() => import('../pages/Trainings'));
+const TrainingDetail = lazyPage(() => import('../pages/TrainingDetail'));
+const TechnicoPro = lazyPage(() => import('../pages/TechnicoPro'));
+const TechnicoProDetail = lazyPage(() => import('../pages/TechnicoProDetail'));
+const DocumentLibrary = lazyPage(() => import('../pages/DocumentLibrary'));
+const AdminPanel = lazyPage(() => import('../pages/AdminPanel'));
+const Profile = lazyPage(() => import('../pages/Profile'));
+const ArticleDetail = lazyPage(() => import('../pages/ArticleDetail'));
 
-const LoadingFallback = () => (
-  <div className="flex min-h-[40vh] items-center justify-center px-6">
-    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-semibold text-slate-600 shadow-sm">
-      <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      <span>Loading page...</span>
-    </div>
-  </div>
-);
+const LoadingFallback = LoadingIndicator;
 
 import ProtectedRoute from '../components/ProtectedRoute';
 import PublicRoute from '../components/PublicRoute';

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useGetUsersMeQuery } from '../redux/features/members/membersApi';
+import { usePermissions } from './usePermissions';
 import type { UserPermission } from '../redux/features/members/membersTypes';
 import type {
   PermissionAction,
@@ -28,7 +28,7 @@ const isPermissionFeature = (feature: string): feature is PermissionFeature =>
   ].includes(feature);
 
 export const useDirectUserPermissions = () => {
-  const { data: currentUser } = useGetUsersMeQuery();
+  const { user: currentUser } = usePermissions();
 
   const directPermissions = useMemo<DirectPermissionMap>(() => {
     const permissions = currentUser?.user_permissions ?? [];
