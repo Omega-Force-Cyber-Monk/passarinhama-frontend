@@ -385,6 +385,7 @@ export const membersApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, { id }) => [
         { type: 'User', id },
         { type: 'User', id: 'LIST' },
+        { type: 'User', id: 'ME' },
       ],
     }),
     deleteUser: builder.mutation<void, string>({

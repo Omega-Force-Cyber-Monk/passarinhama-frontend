@@ -25,10 +25,10 @@ export default function ArticleDetail() {
   const navigate = useNavigate();
   const { localeCode, translate } = useI18n();
   
-  const { data: article, isLoading, isError, error } = useGetArticleByIdQuery(slug || '');
+  const { currentData: article, isLoading, isFetching, isError, error } = useGetArticleByIdQuery(slug || '');
   const { data: relatedArticlesData } = useGetArticlesQuery({ page: 1, pageSize: 5 });
 
-  if (isLoading) {
+  if (isLoading || (isFetching && !article)) {
     return (
       <div className="content-detail-state">
         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />

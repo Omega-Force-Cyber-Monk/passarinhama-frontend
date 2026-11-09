@@ -84,11 +84,27 @@ for (const kind of ['role', 'member']) {
     assert.equal(all(row(h.render()), 'button')[0].props.disabled, true);
   });
 
-  test(`${kind}: existing row PATCH preserves every unchanged capability and target ID`, async () => {
+  test(`${kind}: existing row PATCH sends only changed capabilities and the target ID`, async () => {
     const permissions = [{ id: 'permission', feature: 'article', can_view: true, can_create: true, can_edit: false, can_delete: true }];
     const h = harness(kind, { permissions }); let tree = h.render(); toggle(tree, 2, true); tree = h.render(); save(tree); await flush();
-    assert.deepEqual(plain(h.calls[0]), [kind === 'role' ? 'updateRole' : 'updateMember', { id: 'permission', [kind === 'role' ? 'role_id' : 'user_id']: 'target', can_view: true, can_create: true, can_edit: true, can_delete: true }]);
+    assert.deepEqual(plain(h.calls[0]), [kind === 'role' ? 'updateRole' : 'updateMember', { id: 'permission', [kind === 'role' ? 'role_id' : 'user_id']: 'target', can_edit: true }]);
     assert.equal(permissions[0].can_edit, false);
+  });
+
+  test(`${kind}: editing one action preserves null inheritance and omitted actions`, async () => {
+    const h = harness(kind, { permissions: [{ id: 'permission', feature: 'article', can_view: null, can_create: true, can_delete: false }] });
+    let tree = h.render(); toggle(tree, 3, true); tree = h.render(); save(tree); await flush();
+    assert.deepEqual(plain(h.calls[0][1]), { id: 'permission', [kind === 'role' ? 'role_id' : 'user_id']: 'target', can_delete: true });
+    assert.equal(h.query.currentData[0].can_view, null);
+    assert.equal(h.query.currentData[0].can_edit, undefined);
+    assert.equal(h.query.currentData[0].can_create, true);
+  });
+
+  test(`${kind}: reverting all edits makes even a direct save handler a no-op`, async () => {
+    const h = harness(kind, { permissions: [{ id: 'permission', feature: 'article', can_view: true }] });
+    let tree = h.render(); toggle(tree, 0, false); tree = h.render(); toggle(tree, 0, true); tree = h.render();
+    assert.equal(all(row(tree), 'button')[0].props.disabled, true);
+    save(tree); await flush(); assert.equal(h.calls.length, 0);
   });
 }
 

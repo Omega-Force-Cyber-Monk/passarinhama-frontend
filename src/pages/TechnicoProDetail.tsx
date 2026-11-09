@@ -17,11 +17,11 @@ export default function TechnicoProDetail() {
   const { technicoproId } = useParams<{ technicoproId: string }>();
   const navigate = useNavigate();
   const { localeCode, translate } = useI18n();
-  const { data: item, isLoading, isError, error } = useGetTechnicoProByIdQuery(technicoproId || "", {
+  const { currentData: item, isLoading, isFetching, isError, error } = useGetTechnicoProByIdQuery(technicoproId || "", {
     skip: !technicoproId,
   });
 
-  if (isLoading) {
+  if (isLoading || (isFetching && !item)) {
     return (
       <div className="content-detail-state">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />

@@ -37,16 +37,21 @@ export function AdminPermissionsEditor({ kind, targetId, canManage, onBusyChange
   const savePermission = async (feature: string) => {
     if (!canManage || !targetId || pending.current || !permissions || query.isFetching || query.isError || !drafts[feature]) return;
     const original = permissions.find((row) => row.feature === feature);
+    // PATCH only explicit edits: null/omitted actions continue to inherit.
+    const changes = Object.fromEntries(PERMISSION_ACTIONS
+      .filter((field) => typeof drafts[feature]?.[field] === "boolean" && drafts[feature][field] !== original?.[field])
+      .map((field) => [field, drafts[feature][field]]));
+    if (!Object.keys(changes).length) return;
     const values = Object.fromEntries(PERMISSION_ACTIONS.map((field) => [field, Boolean(drafts[feature]?.[field] ?? original?.[field])])) as Record<PermissionAction, boolean>;
     pending.current = true;
     setSaving(true);
     onBusyChange?.(true);
     try {
       if (kind === "role") {
-        if (original?.id) await updateRole({ id: original.id, role_id: targetId, ...values }).unwrap();
+        if (original?.id) await updateRole({ id: original.id, role_id: targetId, ...changes }).unwrap();
         else await createRole({ role_id: targetId, feature, ...values }).unwrap();
       } else {
-        if (original?.id) await updateMember({ id: original.id, user_id: targetId, ...values }).unwrap();
+        if (original?.id) await updateMember({ id: original.id, user_id: targetId, ...changes }).unwrap();
         else await createMember({ user_id: targetId, feature, ...values }).unwrap();
       }
       await query.refetch().unwrap();
