@@ -2,18 +2,20 @@
 
 Implemented 4 November 2026 against the [pre-change audit](user-permissions-audit-2026-11-04.md). This repository contains the frontend. Backend authorization has not been inspected, modified or verified.
 
+Updated 14 November 2026: the [current RBAC guide](../RBAC_GUIDE.md) and [targeted fixes summary](authorization-fixes-2026-11-14.md) describe the final policy. Validation results in the original implementation section below are historical.
+
 ## Implemented behavior
 
 - Protected operations require authentication, a resolved matching current identity, active status and `is_deleted === false`. Inactive/deleted superusers are denied.
 - Existing inherited grants and individual overrides remain in use. Each action is independent; individual `false` overrides inherited `true`. Ownership alone grants nothing.
-- Articles, events, trainings, TechnicoPro, documents, forum topics and posts require the applicable action grant plus API ownership for ordinary edit/delete/status changes. Publishing uses edit plus ownership.
+- Articles, events, trainings, TechnicoPro, documents, forum topics and posts require the applicable action grant plus API ownership for ordinary edit/delete/status changes. Publishing an existing record uses edit plus ownership; initial Draft or Published creation uses create.
 - Ordinary replies/topics require create and explicit forum `can_post`; replies also require an explicitly unlocked topic. A role name grants no cross-owner moderation.
 - Shared categories, forum-container management, existing folder modification/deletion, pinning, moderation, roles/permissions, account administration, exports, admin settings/logs/backups, and standalone URL-based file deletion are active-superuser-only.
 - Ordinary topic deletion is limited to server `reply_count === 0`. Nonempty topics and folder/container deletion require a superuser until safe cascade authorization exists.
 - Document uploads and nested folder creation require `document.create` plus verified parent `can_upload`. Document rename/delete checks `uploaded_by.id`.
 - Member directory hides privileged controls from ordinary users. Delegated creation strips everything outside an ordinary-account field allowlist at both submission and final request. Existing account administration requires superuser; self editing stays through `/me`.
 - Shared uploads carry feature/target/parent locators, never caller-supplied authorization decisions. Server ownership is fetched; client-only metadata is stripped before sending requests.
-- Protected RTK requests fetch the current profile, check session identity/eligibility, and apply an explicit endpoint policy. Ordinary writes fetch canonical targets. Unknown writes are denied. Sensitive reads/exports and ordinary feature view grants are guarded. Existing token refresh/logout and error handling remain.
+- Protected RTK reads use the resolved session profile; writes fetch fresh `/me`, check session identity/eligibility, and apply an explicit endpoint policy. Ordinary writes fetch canonical targets. Unknown reads and writes deny. Dashboard/statistics and sensitive administrative reads/exports require an eligible superuser. Shared online-presence, notification-preference and global-search reads have explicit policies. Public auth and profile hydration have named exceptions, not URL-prefix bypasses. Existing token refresh/logout and error handling remain.
 - Controls and final handlers recheck authorization, including confirmations/forms after revocation.
 - `/events` now persists creation through the existing create API; temporary fabricated records/owners were removed. Success requires an API success.
 
@@ -55,7 +57,9 @@ Results: 4 article authorization tests, 11 cross-module authorization tests, and
 6. **Files:** standalone deletion takes only a URL, without trusted file/parent ownership metadata. It stays superuser-only. Attachment removal through parent updates still needs server validation that each URL belongs to that parent.
 7. **Canonical ownership:** articles use `author.id`; events/trainings use `created_by.id`; documents use `uploaded_by.id`; TechnicoPro uses `author.id` or `author_id` (conflicts deny); forum list rows use `author.id`. Missing data is never filled with viewer IDs or display author text.
 
-Fresh profile/target reads add requests and deny actions when reads fail or return insufficient data. The shared page profile query refetches on mounts when older than 30 seconds; final protected requests always fetch the profile independently. Unrecoverable 401 triggers existing logout/cache reset and may abort the pending RTK request.
+Fresh profile/target reads add requests and deny writes when reads fail or return insufficient data. The persistent profile subscription refreshes on focus/reconnect and relevant mutation invalidation; `usePermissions` observes resolved Redux state without starting queries. GET/HEAD use that resolved profile; protected writes independently fetch fresh `/me`. Unrecoverable 401 triggers existing logout/cache reset and may abort the pending RTK request.
+
+Personal override creation and reset-to-inherit remain a backend contract dependency. The known POST requires four booleans and PATCH permits optional booleans only. New member rows are blocked before dispatch; existing rows retain changed-boolean PATCH behavior and unchanged inherited actions. The editor shows inherited and effective values. No nullable writes or reset endpoints were invented.
 
 ## Required backend security checks
 

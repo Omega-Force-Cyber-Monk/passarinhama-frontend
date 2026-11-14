@@ -65,6 +65,8 @@
     "loadError": "Unable to load forum content. Please try again."
   },
   "contentListing": {
+    "creationPublicationPolicy": "Create permission lets you save a new Draft or Published record.",
+    "existingPublicationPolicy": "Changing or publishing existing content requires Edit permission and ownership, or an active superuser account.",
     "preserveStatus": "Current status: {status}. It stays unchanged unless you explicitly choose Published or Draft.",
     "keepStatus": "Keep current status",
     "loadError": "Unable to load content. Please try again.",
@@ -255,6 +257,8 @@
     "backToLogin": "Back to Login"
   },
   "homePage": {
+    "moduleLandingTitle": "Your available modules",
+    "moduleLandingDescription": "Your account has access to the modules below. Open one to get started.",
     "hero": {
       "welcome": "Welcome to ArchiCoPro Extranet",
       "title": "Your Professional Architecture Hub",
@@ -1212,6 +1216,13 @@
       }
     },
     "memberPermissions": {
+      "allow": "Allow",
+      "deny": "Deny",
+      "inherit": "Inherit",
+      "inheritedValue": "Inherited: {value}",
+      "effectiveValue": "Effective: {value}",
+      "inheritanceUnavailable": "Allow and Deny are explicit personal overrides. Inherit follows the role. Creating new overrides and resetting saved overrides to Inherit require server support and are currently unavailable. Effective access also respects account status and the superuser bypass.",
+      "newOverrideUnavailable": "This feature inherits its role permissions. New personal overrides cannot be saved safely with the current server contract.",
       "title": "Member Permissions",
       "permissionsFor": "Permissions for member",
       "permissionsHint": "Update feature access for this member and save each feature row."

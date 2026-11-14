@@ -347,7 +347,7 @@ export default function TechnicoProPage() {
                     <option key={category.id} value={category.id}>{category.name}</option>)}
                 </select>
               </label>
-              <ContentStatusField value={formData.status} onChange={(status) => setFormData((current) => ({ ...current, status }))} />
+              <ContentStatusField existing={Boolean(editingItem)} value={formData.status} onChange={(status) => setFormData((current) => ({ ...current, status }))} />
               <ModalFullWidth>
                 <label className="block space-y-2 text-left">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{translate("articlesPage.excerpt")}</span>

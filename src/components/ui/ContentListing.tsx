@@ -60,21 +60,23 @@ export function ContentStatusTabs({ value, onChange }: { value: ListingStatus; o
   </div>;
 }
 
-export function ContentStatusField({ value, onChange }: { value: string; onChange: (value: ListingStatus) => void }) {
+export function ContentStatusField({ value, onChange, existing = false }: { value: string; onChange: (value: ListingStatus) => void; existing?: boolean }) {
   const { translate } = useI18n();
   const id = useId();
   const noticeId = useId();
+  const policyId = useId();
   const selectable = value === "published" || value === "draft";
   return <div className="space-y-2 text-left">
     <label htmlFor={id} className="text-xs font-bold uppercase tracking-wider text-slate-500">{translate("articlesPage.status")}</label>
     {!selectable ? <p id={noticeId} className="rounded-lg bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">{translate("contentListing.preserveStatus", { status: translate(`articlesPage.status${value.charAt(0).toUpperCase()}${value.slice(1)}`) })}</p> : null}
-    <select id={id} value={selectable ? value : ""} aria-describedby={!selectable ? noticeId : undefined} onChange={(event) => {
+    <select id={id} value={selectable ? value : ""} aria-describedby={`${policyId}${!selectable ? ` ${noticeId}` : ""}`} onChange={(event) => {
       if (event.target.value === "published" || event.target.value === "draft") onChange(event.target.value);
     }} className="w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/30">
       {!selectable ? <option value="" disabled>{translate("contentListing.keepStatus")}</option> : null}
       <option value="published">{translate("articlesPage.statusPublished")}</option>
       <option value="draft">{translate("articlesPage.statusDraft")}</option>
     </select>
+    <p id={policyId} className="text-xs text-slate-500">{translate(existing ? "contentListing.existingPublicationPolicy" : "contentListing.creationPublicationPolicy")}</p>
   </div>;
 }
 

@@ -3,11 +3,10 @@ import { hasPermission, isActiveSuperuser, type PermissionFeature } from './perm
 
 type Resource = Record<string, any> | null | undefined;
 
-// Folder responses have no creator or delete-specific capability. Their delete
-// action uses the existing document.delete grant on a server-visible folder;
-// can_upload only controls creation/upload, never deletion.
+// No trusted delete/cascade capability exists for shared folders. Visibility and
+// can_upload cannot authorize removing other users' descendants.
 export const canDeleteFolder = (user: UserProfile | null | undefined, folder: Resource): boolean =>
-  Boolean(folder?.id && hasPermission(user, 'document', 'delete'));
+  Boolean(folder?.id && isActiveSuperuser(user));
 
 export const findFolder = <T extends { id: string; children?: T[] }>(folders: T[], id: string): T | undefined => {
   for (const folder of folders) {

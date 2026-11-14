@@ -728,7 +728,7 @@ export default function Articles() {
                     ))}
                   </select>
                 </div>
-                <ContentStatusField value={formData.status} onChange={(status) => setFormData((current) => ({ ...current, status }))} />
+                <ContentStatusField existing={Boolean(editingArticle)} value={formData.status} onChange={(status) => setFormData((current) => ({ ...current, status }))} />
               </ModalFieldGrid>
             </ModalSection>
             <ModalSection title={translate("modalBatchOne.articleContent")}>

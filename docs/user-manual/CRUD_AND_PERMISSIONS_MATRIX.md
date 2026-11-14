@@ -49,16 +49,9 @@ flowchart TD
 
 ---
 
-## 2. User Roles Hierarchy & Access Scopes
+## 2. Role names and effective access
 
-| Role Identifier | Role Name | Intended Role Purpose | UI Access Scope | Executable Code Behavior |
-| :--- | :--- | :--- | :--- | :--- |
-| `admin` (`is_superuser: true`) | **Administrator / Superuser** | Full organizational governance and extranet management | Unrestricted access to all 9 Admin Panel tabs, Member Directory, all content domains, settings, logs, and backups. | Granted full bypass across all features, containers, and actions. |
-| `moderator` | **Moderator** | Content review and forum moderation | Access to forum discussions, articles, directory, and the Moderation Desk. | *Notice*: In executable code, cross-owner moderation and `/moderation` actions require active superuser status. Role slug alone does not grant moderation overrides. |
-| `membre` | **Standard Member** | Registered architect of co-ownership | Community forums, published articles, agenda calendar, training registrations, allowed document folders. | Content creation permitted if granted; editing and deleting strictly constrained to self-authored content. |
-| `auditeur` | **Auditor** | Association inspection and record oversight | Read-only inspection of documents, training courses, and public association records. | Typically configured with `can_view: true` and all write actions set to `false`. |
-| `partenaires_technicopro` | **Technical Partner** | Specialized industrial or technical partners | TechnicoPro library, designated forum commissions, technical articles. | Scoped to permitted categories and technical publications. |
-| `comite_coproprietaire` | **Co-ownership Committee** | Advisory board and governance committee | Committee forums, assemblies, governance documents. | Scoped to committee folders and discussions. |
+The labels admin, moderator, membre, auditeur, partenaires_technicopro and comite_coproprietaire describe personas. They do not establish verified default permissions or resource scopes. All ordinary accounts, including admin-labelled and moderator-labelled accounts, use the supplied effective grants and server resource ACLs. Only an active, non-deleted account with the superuser flag receives administrative access and the existing bypass.
 
 ---
 
@@ -84,7 +77,7 @@ Legend:
 | **Document Folders** (`/documents`) | ✓ (`document.create` + Parent `can_upload`) | ✓ (`document.view`) | ✓ (Super) | ✓ (Super) | **Nested Folders**: Requires parent folder upload permission. | None (Folder type lacks creator ID) | `DocumentLibrary.tsx:504`<br>`mutationAuthorization.ts:127` | Folder renaming/deletion restricted to superusers because no creator ownership exists. |
 | **Document Files** | ✓ (`document.create` + Folder `can_upload`) | ✓ (`document.view`) | ✓ (Owner + `document.edit`) or ✓ (Super) | ✓ (Owner + `document.delete`) or ✓ (Super) | **Rename**: Updates `original_name`.<br>**Download**: Binary blob trigger via `useLazyDownloadDocumentQuery`.<br>**Inspect**: File preview drawer. | `uploaded_by.id` | `DocumentLibrary.tsx:587`<br>`mutationAuthorization.ts:177` | Document files must be validated against containing folder ID on server. |
 | **Folder Permissions (Bulk)** | ✗ | ✓ (Super) | ✓ (Super) | ✗ | Bulk update role grants per folder (`PATCH /documents/folder/permissions/bulk`). | N/A | `documentsApi.ts`<br>`mutationAuthorization.ts:26` | Superuser-only admin feature. |
-| **Forum Containers** (`/forums`) | ✓ (`forum.create`) | ✓ (`forum.view`) | ✓ (Super) | ✓ (Super) | Type default to `general`; existing non-general types preserved on edit. | None | `Forums.tsx:1330`<br>`mutationAuthorization.ts:20` | Container deletion cascades to all topics/posts; restricted to superusers. |
+| **Forum Containers** (`/forums`) | ✓ (Super) | ✓ (`forum.view`) | ✓ (Super) | ✓ (Super) | Type default to `general`; existing non-general types preserved on edit. | None | `Forums.tsx:1330`<br>`mutationAuthorization.ts:20` | Container deletion cascades to all topics/posts; restricted to superusers. |
 | **Forum Topics** | ✓ (`forum.create` + Forum `can_post`) | ✓ (`forum.view`) | ✓ (Owner + `forum.edit`) or ✓ (Super) | ✓ (Owner + `forum.delete` + Empty Topic) or ✓ (Super) | **Pin / Unpin**: Superuser only.<br>**Attachments**: Multi-file dropzone. | `author.id` / `author_id` | `Forums.tsx:1342`<br>`mutationAuthorization.ts:154` | Non-empty topics require superuser to delete until cascade authorization exists. |
 | **Forum Posts / Replies** | ✓ (`forum.create` + Forum `can_post` + Topic Unlocked) | ✓ (`forum.view`) | ✓ (Owner + `forum.edit`) or ✓ (Super) | ✓ (Owner + `forum.delete`) or ✓ (Super) | **Inline Reply**: Editor on thread view.<br>**Attachments**: Uploads supported. | `author.id` / `author_id` | `Forums.tsx:1055`<br>`resourceAuthorization.ts:46` | Replies require explicit forum `can_post` and unlocked topic. |
 | **Member Directory Accounts** (`/directory`) | ✓ (`user.create`) | ✓ (`user.view`) | ✓ (Super) | ✓ (Super) | **Payment Validation**: Superuser.<br>**Restore Account**: Superuser.<br>**CSV Export**: Superuser.<br>**Ordinary Creation**: Privileged fields stripped. | None | `MemberDirectory.tsx:311`<br>`mutationAuthorization.ts:109` | Ordinary users with `user.create` have all role, status, payment, and superuser fields stripped by allowlist. |
@@ -101,49 +94,18 @@ Legend:
 
 ## 4. Role vs. Feature vs. Action Permission Matrix
 
-The following table summarizes the baseline configuration and default behavior for system roles:
+No default role matrix has been verified against the backend. Use this effective-policy matrix instead:
 
-| Feature Domain | Action | Superuser (`admin` + flag) | Standard Member (`membre`) | Moderator (`moderator`) | Auditor (`auditeur`) | Partner (`partenaires_technicopro`) | Committee (`comite_coproprietaire`) |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Articles** | View | Yes | Yes | Yes | Yes | Scoped | Yes |
-| | Create | Yes | Yes (if granted) | Yes | No | Scoped | No |
-| | Edit | Yes (Any) | Owner Only | Owner Only | No | Owner Only | No |
-| | Delete | Yes (Any) | Owner Only | Owner Only | No | Owner Only | No |
-| **Forums** | View | Yes | Yes | Yes | Yes | Scoped | Yes |
-| | Create Container | Yes | No | No | No | No | No |
-| | Create Topic | Yes | Yes (if `can_post`) | Yes (if `can_post`) | No | Scoped | Scoped |
-| | Edit Topic/Post | Yes (Any) | Owner Only | Owner Only | No | Owner Only | Owner Only |
-| | Delete Topic | Yes (Any) | Owner (Empty only) | Owner (Empty only) | No | Owner (Empty only) | Owner (Empty only) |
-| | Pin Topic | Yes | No | No | No | No | No |
-| **Agenda / Events** | View | Yes | Yes | Yes | Yes | Yes | Yes |
-| | Create | Yes | Yes (if granted) | Yes | No | No | No |
-| | Edit | Yes (Any) | Owner Only | Owner Only | No | No | No |
-| | Delete | Yes (Any) | Owner Only | Owner Only | No | No | No |
-| | Register | Yes | Yes | Yes | Yes | Yes | Yes |
-| **Trainings** | View | Yes | Yes | Yes | Yes | Scoped | Yes |
-| | Create | Yes | Yes (if granted) | Yes | No | No | No |
-| | Edit | Yes (Any) | Owner Only | Owner Only | No | No | No |
-| | Delete | Yes (Any) | Owner Only | Owner Only | No | No | No |
-| **TechnicoPro** | View | Yes | Yes | Yes | Yes | Yes | Yes |
-| | Create | Yes | Yes (if granted) | Yes | No | Scoped | No |
-| | Edit | Yes (Any) | Owner Only | Owner Only | No | Owner Only | No |
-| | Delete | Yes (Any) | Owner Only | Owner Only | No | Owner Only | No |
-| **Documents** | View | Yes | Yes | Yes | Yes | Scoped | Scoped |
-| | Create Folder | Yes | Yes (if `can_upload`) | Yes (if `can_upload`) | No | No | No |
-| | Upload File | Yes | Yes (if `can_upload`) | Yes (if `can_upload`) | No | No | No |
-| | Edit File (Rename)| Yes (Any) | Owner Only | Owner Only | No | Owner Only | Owner Only |
-| | Delete File | Yes (Any) | Owner Only | Owner Only | No | Owner Only | Owner Only |
-| | Delete Folder | Yes | No | No | No | No | No |
-| **Directory / Users**| View | Yes | Yes (if granted) | Yes | Yes | No | No |
-| | Create Member | Yes (Full) | Delegated (Ordinary fields only) | Delegated | No | No | No |
-| | Edit Member | Yes | No | No | No | No | No |
-| | Delete Member | Yes | No | No | No | No | No |
-| | Export CSV | Yes | No | No | No | No | No |
-| **Admin Panel** | Access | Yes | No | No | No | No | No |
-| **Moderation Desk** | Review / Decision | Yes | No | No | No | No | No |
-| **SMTP / Settings** | Manage | Yes | No | No | No | No | No |
-| **System Logs** | View / Download / Clear | Yes | No | No | No | No | No |
-| **Backups** | Configure / Run / Download / Delete | Yes | No | No | No | No | No |
+| Account / scenario | Applied rule |
+| --- | --- |
+| Ordinary account, any role name | Explicit feature/action grants; no automatic persona permissions. |
+| Personal override false / true / null or omitted | Explicit Deny / Allow / inherited action. |
+| Active non-deleted superuser | Existing grant and ownership bypass; role label is irrelevant. |
+| Inactive or deleted account, including superuser | Protected operations denied. |
+| Existing content modification | Independent Edit/Delete plus canonical ownership for ordinary users. |
+| New Draft or Published content | Create permission; no separate publish grant. Existing publication uses Edit plus ownership. |
+| Categories, forum containers, folder rename/delete, existing account administration, moderation, dashboard, exports | Active superuser only. |
+| Root folder / nested folder | Create / Create plus parent upload capability. |
 
 ---
 
@@ -155,3 +117,5 @@ The following table summarizes the baseline configuration and default behavior f
 4. **Cascade Deletions**: Because there is no atomic backend cascade authorization guarantee, ordinary topic creators are restricted to deleting topics with `reply_count === 0`. Deletion of active discussions containing other members' posts is reserved for superusers.
 5. **Standalone File Deletion**: Standalone URL-based file deletion (`POST /articles/file-delete`) carries no parent or file-ownership metadata. The frontend restricts this operation strictly to superusers to prevent unauthorized removal of arbitrary server assets.
 
+
+Current implementation update (14 November 2026): personal override creation and saved reset-to-inherit are blocked pending an inheritance-safe backend contract; existing changed-boolean PATCH remains supported. Reads require explicit feature, shared or administrative endpoint policies; unknown reads deny. Dashboard/standalone Moderation routes remain unregistered. See [current RBAC guide](../../RBAC_GUIDE.md) and [implementation results](../authorization-fixes-2026-11-14.md).

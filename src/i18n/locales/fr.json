@@ -65,6 +65,8 @@
     "loadError": "Impossible de charger le contenu du forum. Veuillez réessayer."
   },
   "contentListing": {
+    "creationPublicationPolicy": "Le droit de création permet d’enregistrer un nouveau brouillon ou contenu publié.",
+    "existingPublicationPolicy": "Modifier ou publier un contenu existant nécessite le droit de modification et la qualité d’auteur, ou un compte superutilisateur actif.",
     "preserveStatus": "Statut actuel : {status}. Il reste inchangé sauf si vous choisissez explicitement Publié ou Brouillon.",
     "keepStatus": "Conserver le statut actuel",
     "loadError": "Impossible de charger le contenu. Veuillez réessayer.",
@@ -255,6 +257,8 @@
     "backToLogin": "Retour à la connexion"
   },
   "homePage": {
+    "moduleLandingTitle": "Vos modules disponibles",
+    "moduleLandingDescription": "Votre compte a accès aux modules ci-dessous. Ouvrez un module pour commencer.",
     "hero": {
       "welcome": "Bienvenue sur l'extranet ArchiCoPro",
       "title": "Votre espace professionnel dédié à l’architecture",
@@ -1212,6 +1216,13 @@
       }
     },
     "memberPermissions": {
+      "allow": "Autoriser",
+      "deny": "Refuser",
+      "inherit": "Hériter",
+      "inheritedValue": "Hérité : {value}",
+      "effectiveValue": "Effectif : {value}",
+      "inheritanceUnavailable": "Autoriser et Refuser remplacent explicitement les droits du rôle. Hériter suit le rôle. La création et le retour à l’héritage nécessitent une prise en charge du serveur et sont actuellement indisponibles. L’accès effectif tient aussi compte du statut du compte et des privilèges superutilisateur.",
+      "newOverrideUnavailable": "Cette fonctionnalité hérite des droits du rôle. Le contrat serveur actuel ne permet pas d’enregistrer de nouvelles exceptions personnelles en préservant l’héritage.",
       "title": "Permissions du membre",
       "permissionsFor": "Permissions du membre",
       "permissionsHint": "Mettez à jour l'accès par fonctionnalité pour ce membre puis enregistrez chaque ligne."

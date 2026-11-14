@@ -91,7 +91,7 @@ Access the web extranet through your designated organization domain (e.g. `https
 
 ## 4. User Roles
 
-The system evaluates capabilities through two layers: **System Role Slugs** and **Granular Feature Action Grants**.
+Roles describe account personas. Actual rights come from the effective feature grants returned by `/me.permissions`, overlaid by non-null `/me.user_permissions` actions. Role names grant nothing automatically; actual default assignments and resource ACLs must be verified on the backend. Only active, non-deleted accounts with `is_superuser === true` receive the superuser bypass. See [current authorization policy](../../RBAC_GUIDE.md).
 
 ```mermaid
 graph TD
@@ -103,10 +103,10 @@ graph TD
     B --> G[partenaires_technicopro - Partner]
     B --> H[comite_coproprietaire - Committee]
     
-    C --> I[Full Unrestricted Access]
-    D --> J[Forums, Articles, Directory + Moderation]
-    E --> K[Member Feed, Forums, Agenda, Trainings, Documents]
-    F --> L[Read-Only Inspection]
+    C --> I[Superuser access requires active non-deleted account and flag]
+    D --> J[Configured feature grants; moderation requires superuser]
+    E --> K[Configured feature grants and server resource ACLs]
+    F --> L[Configured grants; no hardcoded read-only default]
     G --> M[Scoped Technical Publications]
     H --> N[Committee Forums & Governance Folders]
 ```
@@ -119,19 +119,19 @@ graph TD
    - Authority to modify shared categories, forum containers, root folders, SMTP settings, logs, and system backups.
 2. **Moderator (`moderator`)**:
    - Focuses on content governance and discussion moderation.
-   - Access to member forums, publications, member directory, and the Moderation Desk.
+   - Access to forums, publications and directory only when granted. Cross-owner moderation and the Admin panel require the active superuser flag; the moderator name does not grant them.
 3. **Standard Member (`membre`)**:
    - Accredited architect member of the association.
-   - Access to member portal feed, discussions, articles, calendar event registrations, training courses, and permitted document folders.
+   - Access to each module requires its configured View grant and applicable server resource ACLs. No member-role default is assumed.
    - May create new content when permitted; may edit or delete **only their own** self-authored content.
 4. **Auditor (`auditeur`)**:
    - Inspects association records, minutes, documents, and training sessions.
-   - Typically holds read-only grants (`can_view: true`) across feature domains.
+   - A read-only setup must be configured through View grants and denied write actions; the auditor role label does not enforce it.
 5. **Technical Partner (`partenaires_technicopro`)**:
    - Industrial partner contributing technical expertise, product specifications, and regulatory standards.
-   - Access scoped to the TechnicoPro library and designated technical working group forums.
+   - TechnicoPro and forum access requires configured grants; any resource scope must be enforced by the server.
 6. **Co-ownership Committee (`comite_coproprietaire`)**:
-   - Board and advisory members accessing statutory assembly agendas, committee minutes, and private governance folders.
+   - Governance persona; agenda, forum and folder access still requires configured grants and server resource ACLs.
 
 ---
 
@@ -313,8 +313,8 @@ The **Member Home Portal** is your starting feed upon logging in.
   3. Optionally provide telephone, mobile, firm, city, and avatar image.
   4. *(Superusers only)*: Assign user role, status (`active`, `pending`, `suspended`), annual payment validation, and superuser flag.
   5. Click **Save Changes** (`memberDirectory.saveChanges`).
-- **Edit Member Profile** (`user.edit` / Superuser): Click the **Pencil icon** on any member card to update details.
-- **Archive / Soft Delete Member** (Superuser): Click the **Trash icon** to soft-delete an account.
+- **Edit Member Profile** (Active Superuser only): Click the **Pencil icon** on any member card to update details.
+- **Delete Member** (Superuser): The directory Trash control calls `DELETE /user/users/{id}`. Do not assume this archives the account; the Admin panel has a separate soft-delete action and backend deletion semantics must be verified.
 - **Restore Suspended Member** (Superuser): Click **Restore Member** on a suspended card to reactivate their account.
 - **Export Directory to CSV** (Superuser): Click **Export CSV** in the header to download the complete member directory roster.
 
@@ -339,7 +339,7 @@ The **Member Home Portal** is your starting feed upon logging in.
    - **Content Editor**: Write your full article using the Tiptap rich-text editor (supports formatting, headings, bullet lists, tables, links, YouTube embeds, and inline image uploads).
    - **Thumbnail**: Drag and drop a cover image (Enforced Required).
    - **Attachments**: Drag and drop supporting PDF guidelines, blueprints, or documents.
-3. Click **Create Article** (`articlesPage.createArticle`).
+3. Click **Create Article** (`articlesPage.createArticle`). Create permission allows either initial Draft or Published status. Editing or publishing an existing record requires Edit plus ownership, or an active superuser. The same policy applies to Trainings and TechnicoPro.
 
 #### Managing Your Articles:
 - **Edit Article**: Click the **Pencil icon** on any card you authored (or any article if Superuser).
@@ -490,7 +490,7 @@ The Admin Panel organizes association governance into **8 control tabs**:
 #### Tab 7: Roles & Permissions Matrix
 - **System Roles**: Create, edit, or delete system roles (`admin`, `moderator`, `membre`, etc.).
 - **Role Permissions Matrix**: Configure grants (`can_view`, `can_create`, `can_edit`, `can_delete`) across all 7 domain features.
-- **Member Direct Overrides**: Select individual members to grant or revoke specific privileges independently of their role.
+- **Member Direct Overrides**: Select a member to inspect inherited and effective access. Existing rows support explicit Allow or Deny while untouched null/omitted actions inherit. New override rows and resetting saved actions to Inherit are unavailable until a server contract can preserve inheritance.
 
 #### Tab 8: System Settings & Backups
 - **SMTP Email Configuration**: Host, Port, Username, Password, TLS/SSL Encryption, Default Sender Email, and live test email trigger.
@@ -500,7 +500,7 @@ The Admin Panel organizes association governance into **8 control tabs**:
 ---
 
 ### 7.11 Moderation Desk (`/admin` Moderation Tab)
-Moderators and administrators use the Moderation Desk to govern community discussions:
+Only active, non-deleted superusers can use the embedded Moderation Desk. A moderator role label alone is insufficient. The standalone `/moderation` route is unregistered. Available actions:
 - **Queue**: Displays pending and reported topics/replies with author details and post snippets.
 - **Approve**: Immediately validates the post, making it visible to all members.
 - **Reject**: Removes the post from public view. Requires entering an explanation note for audit logs.
@@ -526,7 +526,7 @@ For detailed step-by-step CRUD operations across every resource, refer to **[CRU
 2. **READ**: Available if the user holds `can_view` for that feature.
 3. **UPDATE**: Available if the user holds `can_edit` AND is the verified creator/author (or is an active Superuser).
 4. **DELETE**: Available if the user holds `can_delete` AND is the verified creator/author (or is an active Superuser). Forum topic deletion by ordinary owners is permitted only if `reply_count === 0`.
-5. **CATEGORIES & CONTAINERS**: Managing shared categories, document folders, and forum containers is restricted to **active Superusers**.
+5. **CATEGORIES & CONTAINERS**: Shared categories and forum-container creation/edit/deletion require an active Superuser. Folder rename/delete also require an active Superuser; document-file modifications retain action-plus-uploader rules. Root-folder creation needs document Create; nested-folder creation/upload additionally needs parent `can_upload`.
 
 ---
 

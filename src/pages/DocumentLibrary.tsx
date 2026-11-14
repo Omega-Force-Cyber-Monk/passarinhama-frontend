@@ -24,6 +24,7 @@ import FeedbackToast, {
   type FeedbackToastState,
 } from "../components/ui/FeedbackToast";
 import { useI18n } from "../i18n";
+import { canDeleteFolder } from "../redux/features/auth/resourceAuthorization";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   useGetDocumentFoldersQuery,
@@ -297,11 +298,11 @@ export default function DocumentLibrary() {
         : "documentLibraryPage.itemsLabel";
     return translate(key, { count: itemCount });
   };
-  const { hasPermission, canModify, canCreateIn, canAccessAdminPanel: isSuperuser } = usePermissions();
+  const { user, hasPermission, canModify, canCreateIn, canAccessAdminPanel: isSuperuser } = usePermissions();
   const canViewDocument = hasPermission("document", "view");
   const canCreateDocument = hasPermission("document", "create");
   const canEditDocument = isSuperuser;
-  const canDeleteDocument = hasPermission("document", "delete");
+  const canDeleteFolders = isSuperuser;
   const navigate = useNavigate();
   const { folderId, fileId } = useParams<{
     folderId?: string;
@@ -409,7 +410,7 @@ export default function DocumentLibrary() {
   const canUploadHere = Boolean(currentFolder.id && canCreateIn("document", folderContent?.folder.id === currentFolder.id && folderContent.folder.can_upload));
   const canCreateFolderHere = canCreateDocument && (!currentFolder.id || canUploadHere);
   const canChangeTarget = (target: { id: string; type: "folder" | "file" } | null, action: "edit" | "delete") => Boolean(target && (target.type === "folder"
-    ? action === "delete" ? canDeleteDocument && allFolders && findFolderInTree(allFolders, target.id) : isSuperuser
+    ? action === "delete" ? canDeleteFolder(user, allFolders && findFolderInTree(allFolders, target.id)) : isSuperuser
     : canModify("document", files.find((file) => file.id === target.id), action)));
   const selectedPreviewFile = files.find((file) => file.id === fileId) || null;
   const previewSourceUrl = selectedPreviewFile ? getDocumentPreviewUrl(selectedPreviewFile) : null;
@@ -842,7 +843,7 @@ export default function DocumentLibrary() {
                             <div className={`documents-folder-icon p-3 rounded-xl ${colorClass}`}>
                               <Folder className="w-6 h-6" />
                             </div>
-                            {(canEditDocument || canDeleteDocument) && (
+                            {(canEditDocument || canDeleteFolders) && (
                               <div className="flex gap-1">
                                 {canEditDocument && (
                                   <button
@@ -864,7 +865,7 @@ export default function DocumentLibrary() {
                                     <MoreVertical className="w-4 h-4" />
                                   </button>
                                 )}
-                                {canDeleteDocument && (
+                                {canDeleteFolders && (
                                   <button
                                     aria-label={translate("documentLibraryPage.delete")}
                                     onClick={(e) =>
@@ -943,7 +944,7 @@ export default function DocumentLibrary() {
                               : translate("documentLibraryPage.readOnly")}
                           </td>
                           <td role="cell" className="px-6 py-4 text-right">
-                            {(canEditDocument || canDeleteDocument) && (
+                            {(canEditDocument || canDeleteFolders) && (
                               <div className="flex justify-end gap-2">
                                 {canEditDocument && (
                                   <button
@@ -965,7 +966,7 @@ export default function DocumentLibrary() {
                                     <MoreVertical className="w-4 h-4" />
                                   </button>
                                 )}
-                                {canDeleteDocument && (
+                                {canDeleteFolders && (
                                   <button
                                     aria-label={translate("documentLibraryPage.delete")}
                                     onClick={(e) =>

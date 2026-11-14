@@ -10,7 +10,7 @@ Each page supplies its existing RTK Query callbacks and query state. Existing ta
 
 | Module | Existing hooks | Existing category permission gate retained |
 | --- | --- | --- |
-| Agenda | Event category query/create/update/delete | Event create permission for mutations; view-only list remains available |
+| Agenda | Event category query/create/update/delete | Active superuser for mutations; event view for category reads |
 | Articles | Article category query/create/update/delete | Superuser |
 | Trainings | Training category query/create/update/delete | Existing canManageCategories policy |
 | TechnicoPro | TechnicoPro category query/create/update/delete | Existing canManageCategories policy |

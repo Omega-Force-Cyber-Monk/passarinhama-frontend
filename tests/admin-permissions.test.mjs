@@ -17,12 +17,13 @@ function evaluate(code, context) {
 const sf = parse('src/pages/admin/AdminPermissionsEditor.tsx');
 const component = sf.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === 'AdminPermissionsEditor');
 const permissionSource = parse('src/redux/features/auth/permissionUtils.ts');
-const constants = ['PERMISSION_FEATURES', 'PERMISSION_ACTIONS'].map((name) => find(permissionSource, (n) => ts.isVariableDeclaration(n) && n.name.getText(permissionSource) === name)[0].getText(permissionSource));
+const policyCode = permissionSource.statements.filter((n) => !ts.isImportDeclaration(n)).map((n) => n.getText(permissionSource).replace(/\bexport /g, '')).join('\n');
 const en = JSON.parse(read('src/i18n/locales/en.json'));
-function harness(kind, { permissions = [], allowed = true, fetching = false, failedQuery = false, targetId = 'target', mutationError, deferred } = {}) {
+function harness(kind, { permissions = [], allowed = true, fetching = false, failedQuery = false, targetId = 'target', mutationError, deferred, profileFetching = false, profileError = false, profileId = targetId } = {}) {
   const state = [], calls = [], notices = [], queries = [], busy = [];
   let cursor = 0;
   const query = { currentData: permissions, isFetching: fetching, isError: failedQuery, error: new Error('load failed'), refetch: () => ({ unwrap: async () => { calls.push(['refetch']); return query.currentData; } }) };
+  const profileQuery = { currentData: { id: profileId, status: 'active', is_deleted: false, is_superuser: false, permissions: [{feature: 'article', can_view: true, can_create: false, can_edit: false, can_delete: false}], user_permissions: [] }, isFetching: profileFetching, isError: profileError, error: profileError ? new Error('profile failed') : undefined, refetch() {} };
   const mutation = (name) => () => [(payload) => ({ unwrap: async () => {
     calls.push([name, payload]);
     if (mutationError) throw mutationError;
@@ -39,18 +40,19 @@ function harness(kind, { permissions = [], allowed = true, fetching = false, fai
       return [state[index], (value) => { state[index] = typeof value === 'function' ? value(state[index]) : value; }];
     },
     useRef(initial) { const index = cursor++; if (!(index in state)) state[index] = { current: initial }; return state[index]; },
-    useI18n: () => ({ translate: (key) => {
+    useI18n: () => ({ translate: (key, variables = {}) => {
       const value = key.split('.').reduce((object, part) => object?.[part], en);
-      assert.equal(typeof value, 'string', `Missing translation ${key}`); return value;
+      assert.equal(typeof value, 'string', `Missing translation ${key}`); return Object.entries(variables).reduce((text, [name, replacement]) => text.replace(`{${name}}`, replacement), value);
     } }),
     useAppToast: () => ({ success: (message) => notices.push(['success', message]), error: (message) => notices.push(['error', message]) }),
     getApiErrorDisplayMessage: (error) => error.message,
     useGetUserPermissionsQuery: (args, options) => { queries.push(['role', args, options]); return query; },
     useGetMemberPermissionsQuery: (args, options) => { queries.push(['member', args, options]); return query; },
+    useGetUserByIdQuery: () => profileQuery,
     useCreateUserPermissionMutation: mutation('createRole'), useUpdateUserPermissionMutation: mutation('updateRole'),
     useCreateMemberPermissionMutation: mutation('createMember'), useUpdateMemberPermissionMutation: mutation('updateMember'),
   };
-  evaluate(constants.map((declaration) => `const ${declaration};`).join('\n') + '\n' + component.getText(sf).replace('export ', '') + '\nresult = AdminPermissionsEditor;', context);
+  evaluate(policyCode + '\n' + component.getText(sf).replace('export ', '') + '\nresult = AdminPermissionsEditor;', context);
   return { calls, notices, queries, busy, query, render() { cursor = 0; return context.result({ kind, targetId, canManage: allowed, onBusyChange: (value) => busy.push(value) }); } };
 }
 function all(tree, type) {
@@ -59,7 +61,11 @@ function all(tree, type) {
   visit(tree); return result;
 }
 const row = (tree) => all(tree, 'fieldset')[0];
-const toggle = (tree, index, checked) => all(row(tree), 'input')[index].props.onChange({ target: { checked } });
+const toggle = (tree, index, checked) => {
+  const input = all(row(tree), 'input')[index];
+  if (input) input.props.onChange({ target: { checked } });
+  else all(row(tree), 'select')[index].props.onChange({ target: { value: String(checked) } });
+};
 const save = (tree) => all(row(tree), 'button')[0].props.onClick();
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -67,15 +73,21 @@ const plain = (value) => JSON.parse(JSON.stringify(value));
 for (const kind of ['role', 'member']) {
   test(`${kind}: loads only its target endpoint; renders all seven features and four labelled actions`, () => {
     const h = harness(kind), tree = h.render();
-    assert.equal(all(tree, 'fieldset').length, 7); assert.equal(all(tree, 'input').length, 28);
+    assert.equal(all(tree, 'fieldset').length, 7); assert.equal(all(tree, kind === 'role' ? 'input' : 'select').length, 28);
     assert.equal(all(tree, 'label').length, 28); assert.ok(all(tree, 'input').every((n) => n.props.type === 'checkbox' && !n.props.checked));
+    if (kind === 'member') assert.ok(all(tree, 'select').every((n) => n.props.value === 'inherit'));
     assert.equal(h.queries.find(([name]) => name === kind)[2].skip, false);
     assert.equal(h.queries.find(([name]) => name !== kind)[2].skip, true);
     assert.ok(all(tree, 'button').every((button) => button.props.type === 'button' && button.props.disabled));
   });
 
-  test(`${kind}: missing row creates the correct target permission and refreshes persisted data`, async () => {
+  test(`${kind}: missing row ${kind === 'role' ? 'creates the correct target permission' : 'preserves inheritance and blocks unsafe creation'}`, async () => {
     const h = harness(kind); let tree = h.render(); toggle(tree, 0, true); tree = h.render();
+    if (kind === 'member') {
+      assert.equal(all(row(tree), 'button')[0].props.disabled, true); save(tree); await flush();
+      assert.equal(h.calls.length, 0); assert.match(JSON.stringify(tree), /Inherited: Allow/);
+      assert.match(JSON.stringify(tree), /cannot be saved safely/); return;
+    }
     assert.equal(all(row(tree), 'button')[0].props.disabled, false); save(tree); await flush();
     const owner = kind === 'role' ? { role_id: 'target' } : { user_id: 'target' };
     assert.deepEqual(plain(h.calls), [[kind === 'role' ? 'createRole' : 'createMember', { ...owner, feature: 'article', can_view: true, can_create: false, can_edit: false, can_delete: false }], ['refetch']]);
@@ -109,8 +121,8 @@ for (const kind of ['role', 'member']) {
 }
 
 test('failed saves preserve drafts and expose the original error without a success notification', async () => {
-  const h = harness('member', { mutationError: new Error('Forbidden') }); let tree = h.render(); toggle(tree, 3, true); tree = h.render(); save(tree); await flush();
-  assert.equal(all(row(h.render()), 'input')[3].props.checked, true);
+  const h = harness('member', { permissions: [{id: 'row', feature: 'article', can_delete: false}], mutationError: new Error('Forbidden') }); let tree = h.render(); toggle(tree, 3, true); tree = h.render(); save(tree); await flush();
+  assert.equal(all(row(h.render()), 'select')[3].props.value, 'true');
   assert.deepEqual(h.notices, [['error', 'Forbidden']]); assert.deepEqual(h.busy, [true, false]); assert.equal(h.calls.length, 1);
 });
 
@@ -173,4 +185,45 @@ test('profile permission refresh may revoke Admin access without changing hook o
   assert.ok(hooks.length > 0); assert.ok(hooks.every((hook) => hook.getStart(admin) < guard.getStart(admin)));
   const selectors = find(fn, (n) => ts.isJsxOpeningElement(n) && n.tagName.getText(admin) === 'button' && n.getText(admin).includes('setSelectedRoleId(role.id)'));
   assert.equal(selectors.length, 1); assert.match(selectors[0].getText(admin), /type="button"/);
+});
+
+test('member editor shows inheritance and effective denial/allowance without changing untouched actions', async () => {
+  const h = harness('member', {permissions: [{id: 'row', feature: 'article', can_view: null, can_create: null, can_edit: false, can_delete: false}]});
+  let tree = h.render();
+  assert.equal(all(row(tree), 'select')[0].props.value, 'inherit');
+  assert.match(JSON.stringify(all(row(tree), 'label')[0]), /Inherited: Allow.*Effective: Allow/);
+  toggle(tree, 0, false); tree = h.render();
+  assert.match(JSON.stringify(all(row(tree), 'label')[0]), /Inherited: Allow.*Effective: Deny/);
+  toggle(tree, 1, true); tree = h.render();
+  assert.match(JSON.stringify(all(row(tree), 'label')[1]), /Inherited: Deny.*Effective: Allow/);
+  save(tree); await flush();
+  assert.deepEqual(plain(h.calls[0][1]), {id: 'row', user_id: 'target', can_view: false, can_create: true});
+  assert.equal(h.query.currentData[0].can_edit, false);
+});
+
+test('unsupported persisted reset is disabled; reverting an unsaved inherited action sends no mutation', async () => {
+  const h = harness('member', {permissions: [{id: 'row', feature: 'article', can_view: true, can_create: null}]});
+  let tree = h.render();
+  const select = all(row(tree), 'select')[0];
+  assert.equal(all(select, 'option').find(option => option.props.value === 'inherit').props.disabled, true);
+  select.props.onChange({target: {value: 'inherit'}}); save(h.render()); await flush();
+  assert.equal(h.calls.length, 0);
+  toggle(tree, 1, true); tree = h.render();
+  all(row(tree), 'select')[1].props.onChange({target: {value: 'inherit'}});
+  tree = h.render(); assert.equal(all(row(tree), 'button')[0].props.disabled, true);
+  save(tree); await flush(); assert.equal(h.calls.length, 0);
+});
+
+test('member profile loading, mismatch, refresh and error fail closed for override saves', async () => {
+  for (const extra of [{profileId: null}, {profileId: 'different'}, {profileFetching: true}, {profileError: true}]) {
+    const h = harness('member', {permissions: [{id: 'row', feature: 'article', can_view: true}], ...extra});
+    const tree = h.render();
+    if (extra.profileError) assert.equal(tree.props.role, 'alert');
+    else if (extra.profileId === null || extra.profileId === 'different') assert.equal(tree.props.role, 'status');
+    else if (extra.profileFetching) {
+      assert.ok(all(tree, 'fieldset').every(field => field.props.disabled));
+      toggle(tree, 0, false); save(h.render()); await flush();
+    }
+    assert.equal(h.calls.length, 0);
+  }
 });

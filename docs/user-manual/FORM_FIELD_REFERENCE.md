@@ -452,12 +452,12 @@ Every field documented in this specification was audited directly against:
 ### Form 11.3: Direct Member Permission Overrides Editor
 - **File Reference**: `src/pages/admin/AdminPermissionsEditor.tsx` (Lines 22–94)
 - **Route**: `/admin` (Roles & Permissions tab, member overrides sub-view)
-- **Submission Endpoints**: `POST /user/user-permissions` / `PATCH /user/user-permissions/{id}`
+- **Submission Endpoint**: `PATCH /user/user-permissions/{id}` for changed booleans on existing rows. POST creation is blocked pending an inheritance-safe backend contract; saved reset-to-inherit is unsupported.
 - **Access**: Active Superuser only
 
 | Field Name / Label | Input Component Type | Required / Optional | Default Value | Validation & Format | Allowed Values / Options | Notes & Source Behavior |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Per-User Overrides per Domain** (7 Features x 4 Actions) | Checkboxes | Optional Booleans | Loaded from `useGetMemberPermissionsQuery` | Boolean flags | Checked (`true`) / Unchecked (`false`) | Explicit `false` override strips inherited role grant; explicit `true` grants privilege above role baseline. |
+| **Per-User Overrides per Domain** (7 Features x 4 Actions) | Select controls with inherited and effective summaries | Optional explicit booleans on existing rows | Persisted action or Inherit | Changed booleans only; target profile must be resolved | Allow / Deny / Inherit | Null/omitted actions inherit. New rows are disabled. Saved explicit booleans cannot reset to Inherit until supported by the backend; unsaved changes can revert to their original inherited state. |
 
 ---
 

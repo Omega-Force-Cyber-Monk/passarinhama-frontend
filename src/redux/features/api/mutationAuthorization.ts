@@ -1,7 +1,7 @@
 import type { FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import type { UserProfile } from '../auth/authTypes';
-import { hasPermission, isActiveSuperuser, isActiveUser, type PermissionFeature } from '../auth/permissionUtils';
-import { canCreateInResource, canModifyResource, canReplyToTopic, canDeleteFolder, findFolder, ORDINARY_ACCOUNT_FIELDS } from '../auth/resourceAuthorization';
+import { hasPermission, isActiveSuperuser, isActiveUser, PERMISSION_ACTIONS, type PermissionFeature } from '../auth/permissionUtils';
+import { canCreateInResource, canModifyResource, canReplyToTopic, ORDINARY_ACCOUNT_FIELDS } from '../auth/resourceAuthorization';
 
 // Locators only: never accept an owner or a permission decision from mutation args.
 export interface AuthorizationContext {
@@ -18,21 +18,30 @@ type Read = (url: string) => Promise<Result>;
 export const forbidden = (): FetchBaseQueryError => ({ status: 403, data: { detail: 'You do not have permission to perform this action.' } });
 
 const administrative = new Set([
-  'createForum', 'updateForum', 'deleteForum', 'updateFolder',
+  'createForum', 'updateForum', 'deleteForum', 'updateFolder', 'deleteFolder',
   'createArticleCategory', 'updateArticleCategory', 'deleteArticleCategory',
   'createEventCategory', 'updateEventCategory', 'deleteEventCategory',
   'createTrainingCategory', 'updateTrainingCategory', 'deleteTrainingCategory',
   'createTechnicoProCategory', 'updateTechnicoProCategory', 'deleteTechnicoProCategory',
   'setArticlePermission', 'setForumPermission', 'setTrainingPermission', 'setTechnicoProPermission', 'updateFolderPermissionsBulk',
   'createUserRole', 'updateUserRole', 'deleteUserRole', 'createUserPermission', 'updateUserPermission',
-  'createMemberPermission', 'updateMemberPermission', 'updateUser', 'deleteUser', 'softDeleteUser', 'restoreUser', 'validateUser',
+  'updateMemberPermission', 'updateUser', 'deleteUser', 'softDeleteUser', 'restoreUser', 'validateUser',
   'pinTopic', 'moderatePost', 'deleteFile',
+  'updateAdminSmtpSettings', 'testAdminSmtpSettings', 'clearAdminSystemLogs',
+  'updateAdminBackupConfiguration', 'runAdminBackup', 'testAdminBackupPermissions', 'deleteAdminBackup',
 ]);
 const sensitiveReads = new Set([
   'getUserRoles', 'getUserPermissions', 'getMemberPermissions', 'getFolderPermissions',
   'getArticlePermissions', 'getTrainingPermissions', 'getTechnicoProPermissions', 'getForumPermissions',
   'getModerationQueue', 'getModerationLogs', 'exportUsersCsv',
+  'getDashboardStats', 'getDashboardActivity', 'getDashboardUpcomingEvents', 'getStats',
+  'getActivityLogs', 'getAdminSmtpSettings', 'getAdminSystemLogs', 'downloadAdminSystemLogs',
+  'getAdminBackups', 'downloadAdminBackup',
 ]);
+// These reads are intentionally available to every eligible authenticated user.
+// Search/online presence still require server-side resource/field filtering.
+const sharedReads = new Set(['getUsersOnline', 'getNotificationPreferences', 'getDashboardSearch']);
+const publicEndpoints = new Set(['login', 'signup', 'sendOtp', 'verifyOtp', 'forgotPassword', 'refresh']);
 const readFeatures: Partial<Record<string, PermissionFeature>> = {
   getUsers: 'user', getUserById: 'user',
   getForums: 'forum', getForum: 'forum', getForumTopics: 'forum', getTopicPosts: 'forum', getPinnedTopics: 'forum',
@@ -42,10 +51,8 @@ const readFeatures: Partial<Record<string, PermissionFeature>> = {
   getTrainingsPaginated: 'training', getAllTrainings: 'training', getTrainingById: 'training', getTrainingCategories: 'training',
   getTechnicoPros: 'technicopro', getMyTechnicoPros: 'technicopro', getTechnicoProById: 'technicopro', getTechnicoProCategories: 'technicopro',
 };
-export const needsAuthorization = (endpoint: string, args: AuthorizedFetchArgs): boolean => {
-  const path = '/' + args.url.replace(/^\//, '').split('?')[0];
-  if (path.startsWith('/auth/') && endpoint !== 'resetPassword') return false;
-  return !['getUsersMe', 'getMe'].includes(endpoint);
+export const needsAuthorization = (endpoint: string, _args: AuthorizedFetchArgs): boolean => {
+  return !publicEndpoints.has(endpoint) && !['getUsersMe', 'getMe'].includes(endpoint);
 };
 
 // Pagination is bounded. An unresolved target is denied, never inferred from client state.
@@ -91,7 +98,14 @@ export async function authorizeRequest(
   const { clientAuthorization: context = {}, ...args } = request;
   if (!isActiveUser(user)) return { error: forbidden() };
   const path = '/' + args.url.replace(/^\//, '').split('?')[0];
-  if (administrative.has(endpoint) || sensitiveReads.has(endpoint) || path.startsWith('/settings/admin/') || path.startsWith('/admin&modarator/')) {
+  // Existing POST requires four non-null booleans: it cannot preserve inheritance.
+  // Do not allow direct RTK callers to bypass the editor's safe blocked state.
+  if (endpoint === 'createMemberPermission') return { error: forbidden() };
+  if (endpoint === 'updateMemberPermission' && (!args.body || !Object.keys(args.body).length ||
+    Object.entries(args.body).some(([key, value]) => !PERMISSION_ACTIONS.includes(key as typeof PERMISSION_ACTIONS[number]) || typeof value !== 'boolean'))) {
+    return { error: forbidden() };
+  }
+  if (administrative.has(endpoint) || sensitiveReads.has(endpoint)) {
     return isActiveSuperuser(user) ? { request: args } : { error: forbidden() };
   }
   if (endpoint === 'getEventRegistrations') {
@@ -104,7 +118,7 @@ export async function authorizeRequest(
   }
   if (['GET', 'HEAD'].includes((args.method || 'GET').toUpperCase())) {
     const feature = readFeatures[endpoint];
-    return !feature || hasPermission(user, feature, 'view') ? { request: args } : { error: forbidden() };
+    return (feature ? hasPermission(user, feature, 'view') : sharedReads.has(endpoint)) ? { request: args } : { error: forbidden() };
   }
   if (endpoint === 'createUser') {
     if (!hasPermission(user, 'user', 'create')) return { error: forbidden() };
@@ -123,15 +137,6 @@ export async function authorizeRequest(
   if (['updateUsersMe', 'resetPassword', 'updateNotificationPreference'].includes(endpoint)) return { request: args };
   if (['registerForEvent', 'unregisterFromEvent'].includes(endpoint)) {
     return hasPermission(user, 'event', 'view') ? { request: args } : { error: forbidden() };
-  }
-  if (endpoint === 'deleteFolder') {
-    if (!hasPermission(user, 'document', 'delete')) return { error: forbidden() };
-    if (isActiveSuperuser(user)) return { request: args };
-    const result = await read('/documents/documents/folders');
-    if (result.error) return { error: result.error };
-    const folders = Array.isArray(result.data) ? result.data : result.data?.folders;
-    const target = Array.isArray(folders) && findFolder(folders, path.split('/').at(-1)!);
-    return canDeleteFolder(user, target || undefined) ? { request: args } : { error: forbidden() };
   }
   if (endpoint === 'createFolder') {
     if (!hasPermission(user, 'document', 'create')) return { error: forbidden() };
@@ -229,6 +234,8 @@ export async function authorizeRequest(
   if (!contentWriteEndpoints.has(endpoint)) return { error: forbidden() };
   for (const [feature, base] of Object.entries(resourcePaths) as Array<[PermissionFeature, string]>) {
     if (path !== base && !path.startsWith(base + '/')) continue;
+    // Initial Draft and Published records both use Create. Changing an existing
+    // record's status (including publication) uses Edit plus canonical ownership.
     if (path === base && args.method === 'POST') return hasPermission(user, feature, 'create') ? { request: args } : { error: forbidden() };
     const action = args.method === 'DELETE' ? 'delete' : 'edit';
     if (!hasPermission(user, feature, action)) return { error: forbidden() };

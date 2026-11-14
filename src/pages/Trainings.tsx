@@ -385,7 +385,7 @@ export default function Trainings() {
                   ))}
                 </select>
               </label>
-              <ContentStatusField value={formData.status} onChange={(status) => setFormData((current) => ({ ...current, status }))} />
+              <ContentStatusField existing={Boolean(editingTraining)} value={formData.status} onChange={(status) => setFormData((current) => ({ ...current, status }))} />
               <ModalFullWidth>
                 <label className="block space-y-2 text-left">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-500">

@@ -342,15 +342,15 @@ const DashboardLayout: React.FC = () => {
   const onlineUsers = onlineUsersData?.users || [];
   const visibleSearchResults = useMemo(() => {
     const results = searchResults?.results ?? [];
-    if (!isAuthenticated) return results;
+    if (!isAuthenticated) return [];
 
     return results.filter((result) => {
       const feature = SEARCH_PERMISSION_FEATURES[result.type];
-      return feature ? hasPermission(feature, "view") : true;
+      return feature ? hasPermission(feature, "view") : false;
     });
   }, [hasPermission, isAuthenticated, searchResults?.results]);
   const hasSearchResults = visibleSearchResults.length > 0;
-  const searchResultCount = searchResults?.meta.total_results ?? 0;
+  const searchResultCount = visibleSearchResults.length;
   const trimmedSearchTerm = searchTerm.trim();
 
   const executeSearch = async (query: string, force = false) => {

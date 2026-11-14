@@ -5,7 +5,8 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import type { UserProfile } from '../src/redux/features/auth/authTypes';
 import { PERMISSION_FEATURES, hasPermission, canAccessAdminPanel, canAccessModeration } from '../src/redux/features/auth/permissionUtils';
-import { canModifyResource, canReplyToTopic, canCreateInResource, ordinaryAccountPayload } from '../src/redux/features/auth/resourceAuthorization';
+import { canModifyResource, canReplyToTopic, canCreateInResource, canDeleteFolder, ordinaryAccountPayload } from '../src/redux/features/auth/resourceAuthorization';
+import { authorizeRequest } from '../src/redux/features/api/mutationAuthorization';
 
 const user = (action?: string, extra = {}): UserProfile => ({
   id: 'owner', status: 'active', is_deleted: false, is_superuser: false,
@@ -67,6 +68,7 @@ await Promise.all([
   import('../src/redux/features/documents/documentsApi'), import('../src/redux/features/trainings/trainingsApi'),
   import('../src/redux/features/technicopro/technicoproApi'), import('../src/redux/features/forum/forumApi'),
   import('../src/redux/features/members/membersApi'), import('../src/redux/features/admin/adminApi'), import('../src/redux/features/moderation/moderationApi'),
+  import('../src/redux/features/dashboard/dashboardApi'), import('../src/redux/features/notifications/notificationsApi'),
 ]);
 
 async function client(run: (h: ReturnType<typeof harness>) => Promise<void>) {
@@ -216,7 +218,7 @@ test('categories, shared containers, moderation, permission changes and administ
     ['softDeleteUser', 'owner'], ['restoreUser', 'owner'], ['validateUser', 'owner'],
     ['createUserRole', { name: 'Role' }], ['updateUserRole', { id: 'role', name: 'Role' }], ['deleteUserRole', { id: 'role' }],
     ['createUserPermission', { role_id: 'role', feature: 'article' }], ['updateUserPermission', { id: 'permission', role_id: 'role', can_edit: true }],
-    ['createMemberPermission', { user_id: 'owner', feature: 'article' }], ['updateMemberPermission', { id: 'permission', user_id: 'owner', can_delete: true }],
+    ['updateMemberPermission', { id: 'permission', user_id: 'owner', can_delete: true }],
     ['setArticlePermission', { article_id: ['record'], role_id: ['role'], can_write: true }],
     ['setTrainingPermission', { training_id: ['record'], role_id: ['role'], can_write: true }],
     ['setTechnicoProPermission', { technicopro_id: ['record'], role_id: ['role'], can_write: true }],
@@ -325,3 +327,105 @@ test('authorization hook uses only a resolved session and does not initialize pr
     assert.equal(hook.isLoading, status === 'initializing');
   }
 });
+
+test('folder DELETE denies ordinary grants and forged superuser state, preserving file ownership rules', async () => client(async (h) => {
+  for (const count of [0, 3]) {
+    const folder = { id: 'folder', document_count: count, can_upload: true };
+    for (const actor of [user('delete'), user('delete', { role: 'admin' }), user(undefined, { user_permissions: [{ feature: 'document', can_delete: true }] }), user('delete', { is_superuser: true, status: 'suspended' })]) {
+      h.profile = actor; h.signIn();
+      assert.equal(canDeleteFolder(actor, folder), false);
+      assert.equal((await h.call('deleteFolder', folder.id)).error?.status, 403);
+      assert.equal(h.writes.length, 0);
+      assert.deepEqual(h.requests, ['GET /user/users/me']);
+    }
+    h.profile = user(undefined, { is_superuser: true }); h.signIn();
+    assert.equal(canDeleteFolder(h.profile, folder), true);
+    assert.ok('data' in await h.call('deleteFolder', folder.id)); assert.equal(h.writes.length, 1);
+  }
+  h.profile = user('delete'); h.signIn(user('delete', { is_superuser: true }));
+  assert.equal((await h.call('deleteFolder', 'folder')).error?.status, 403); assert.equal(h.writes.length, 0);
+  h.signIn(); h.owner = 'owner';
+  assert.ok('data' in await h.call('deleteDocument', { id: 'record', folderId: 'folder' }));
+  h.signIn(); h.owner = 'other';
+  assert.equal((await h.call('deleteDocument', { id: 'record', folderId: 'folder' })).error?.status, 403);
+}));
+
+test('document folder controls and target handler use the same superuser-only rule', () => {
+  const page = source('src/pages/DocumentLibrary.tsx');
+  const folders = [{id: 'folder', can_upload: true, document_count: 3}];
+  for (const actor of [user('delete'), user('delete', {role: 'admin'}), user(undefined, {is_superuser: true}), user('delete', {is_superuser: true, is_deleted: true})]) {
+    const expected = canAccessAdminPanel(actor);
+    const context = {user: actor, isSuperuser: expected, allFolders: folders, findFolderInTree: (rows: any[], id: string) => rows.find(row => row.id === id),
+      canDeleteFolder, files: [{id: 'record', uploaded_by: {id: 'owner'}}], canModify: (feature: any, target: any, action: any) => canModifyResource(actor, feature, target, action)};
+    assert.equal(evaluate(initializer(page, 'canDeleteFolders'), context), expected);
+    const canChange = evaluate(initializer(page, 'canChangeTarget'), context);
+    assert.equal(canChange({id: 'folder', type: 'folder'}, 'delete'), expected);
+    assert.equal(canChange({id: 'missing', type: 'folder'}, 'delete'), false);
+    assert.equal(canChange({id: 'record', type: 'file'}, 'delete'), hasPermission(actor, 'document', 'delete'));
+  }
+});
+
+test('all dashboard RTK reads require eligible superuser, independent of encoded or decoded paths', async () => client(async (h) => {
+  for (const name of ['getDashboardStats', 'getDashboardActivity', 'getDashboardUpcomingEvents']) {
+    for (const actor of [user('view'), user('view', {role: 'admin'}), user('view', {role: 'moderator'}), user('view', {is_superuser: true, status: 'pending'}), user('view', {is_superuser: true, is_deleted: true})]) {
+      h.profile = actor; h.signIn();
+      assert.equal((await h.call(name, undefined)).error?.status, 403);
+      assert.equal(h.requests.length, 0, 'denied read must not reach fetch');
+    }
+    h.profile = user(undefined, {is_superuser: true}); h.signIn();
+    assert.ok('data' in await h.call(name, undefined)); assert.equal(h.requests.length, 1);
+    for (const path of ['/admin%26modarator/dashboard/stats', '/admin&modarator/dashboard/stats']) {
+      assert.equal((await authorizeRequest(name, {url: path}, user('view'), async () => ({}))).error?.status, 403);
+    }
+  }
+}));
+
+test('unknown protected reads deny even superusers while explicit shared and feature reads still work', async () => client(async (h) => {
+  apiSlice.injectEndpoints({ endpoints: (builder) => ({
+    auditUnknownRead: builder.query<unknown, string>({query: (url) => url}),
+  }) });
+  for (const actor of [user('view'), user(undefined, {is_superuser: true})]) {
+    h.profile = actor;
+    for (const path of ['/unmapped/private', '/auth/unmapped', '/settings/admin/unmapped', '/admin%26modarator/unmapped']) {
+      h.signIn(); assert.equal((await h.call('auditUnknownRead', path)).error?.status, 403); assert.equal(h.requests.length, 0);
+    }
+  }
+  for (const [name, args] of [['getUsersOnline', undefined], ['getNotificationPreferences', undefined], ['getDashboardSearch', {q: 'example'}], ['getArticleById', 'record']] as const) {
+    h.profile = user('view'); h.signIn(); assert.ok('data' in await h.call(name, args), name);
+  }
+}));
+
+test('personal override creation and undocumented null resets deny at final RTK boundary', async () => client(async (h) => {
+  for (const actor of [user('edit'), user(undefined, {is_superuser: true})]) {
+    h.profile = actor; h.signIn();
+    assert.equal((await h.call('createMemberPermission', {user_id: 'owner', feature: 'article', can_view: true, can_create: true, can_edit: false, can_delete: false})).error?.status, 403);
+    assert.equal(h.writes.length, 0);
+    assert.equal((await h.call('updateMemberPermission', {id: 'permission', user_id: 'owner', can_view: null})).error?.status, 403);
+    assert.equal(h.writes.length, 0);
+  }
+  h.profile = user(undefined, {is_superuser: true}); h.signIn();
+  assert.ok('data' in await h.call('updateMemberPermission', {id: 'permission', user_id: 'owner', can_edit: true}));
+  assert.deepEqual(await h.writes[0].json(), {can_edit: true});
+}));
+
+test('Draft and Published creation use Create independently of View; existing transitions use Edit and owner', async () => client(async (h) => {
+  for (const [create, update, publish] of [['createArticle', 'updateArticle', 'publishArticle'], ['createTraining', 'updateTraining', undefined], ['createTechnicoPro', 'updateTechnicoPro', 'publishTechnicoPro']] as const) {
+    for (const status of ['draft', 'published']) {
+      h.profile = user('create'); h.signIn();
+      assert.ok('data' in await h.call(create, {title: 'New', status}));
+      assert.equal((await h.writes[0].formData()).get('status'), status);
+      assert.equal((await h.call(update, {id: 'record', data: {status}})).error?.status, 403); assert.equal(h.writes.length, 0);
+      h.profile = user('edit'); h.signIn(); h.owner = 'other';
+      assert.equal((await h.call(update, {id: 'record', data: {status}})).error?.status, 403); assert.equal(h.writes.length, 0);
+      h.signIn(); h.owner = 'owner';
+      assert.ok('data' in await h.call(update, {id: 'record', data: {status}}));
+    }
+    if (publish) {
+      h.profile = user('create'); h.signIn(); assert.equal((await h.call(publish, 'record')).error?.status, 403);
+      h.profile = user('edit'); h.signIn(); h.owner = 'owner'; assert.ok('data' in await h.call(publish, 'record'));
+    }
+    h.profile = user(undefined, {is_superuser: true}); h.signIn(); h.owner = 'other';
+    assert.ok('data' in await h.call(create, {title: 'New', status: 'published'}));
+    assert.ok('data' in await h.call(update, {id: 'record', data: {status: 'published'}}));
+  }
+}));

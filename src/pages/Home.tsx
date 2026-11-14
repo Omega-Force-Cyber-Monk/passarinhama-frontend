@@ -104,15 +104,22 @@ export default function Home() {
   const canViewEvent = hasPermission("event", "view");
   const canViewTraining = hasPermission("training", "view");
   const canViewDocument = hasPermission("document", "view");
+  const canViewTechnicoPro = hasPermission("technicopro", "view");
+  const canViewDirectory = hasPermission("user", "view");
   const canViewAnyHomeSection =
     canViewForum ||
     canViewArticle ||
     canViewEvent ||
-    canViewTraining ||
-    canViewDocument;
+    canViewTraining;
+  const moduleLinks = [
+    { allowed: canViewTechnicoPro, path: "/technicopro", label: "common.technicopro" },
+    { allowed: canViewDirectory, path: "/directory", label: "common.members" },
+    { allowed: canViewDocument, path: "/documents", label: "common.documents" },
+  ].filter((link) => link.allowed);
+  const canAccessPortal = canViewAnyHomeSection || moduleLinks.length > 0;
   const showRestrictedNotice =
     Boolean((location.state as { accessRestricted?: boolean } | null)?.accessRestricted) ||
-    !canViewAnyHomeSection;
+    !canAccessPortal;
 
   const { data: forumsData, isLoading: isForumsLoading } = useGetForumsQuery(
     { pageSize: MAX_SECTION_CARDS },
@@ -160,7 +167,7 @@ export default function Home() {
   const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
     typeof value === "string" ? value : value?.url || null;
 
-  if (!canViewAnyHomeSection) {
+  if (!canAccessPortal) {
     return (
       <main className="home-page bg-[var(--archi-bg)]">
         <AccessRestrictedNotice />
@@ -175,6 +182,15 @@ export default function Home() {
           <AccessRestrictedNotice />
         </section>
       )}
+      {!canViewAnyHomeSection && <section className="rounded-2xl border border-slate-200 bg-white p-6">
+        <h2 className="text-xl font-bold text-slate-900">{translate("homePage.moduleLandingTitle")}</h2>
+        <p className="mt-2 text-sm text-slate-500">{translate("homePage.moduleLandingDescription")}</p>
+        <nav aria-label={translate("homePage.moduleLandingTitle")} className="mt-4 flex flex-wrap gap-3">
+          {moduleLinks.map((link) => <button key={link.path} type="button" onClick={() => navigate(link.path)} className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white focus-visible:ring-2 focus-visible:ring-primary">
+            {translate(link.label)}
+          </button>)}
+        </nav>
+      </section>}
 
       {canViewForum && <section className="mb-10">
         <div className="mb-5">

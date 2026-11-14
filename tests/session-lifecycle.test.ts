@@ -6,7 +6,7 @@ const { store } = await import('../src/redux/store');
 const { setCredentials, sessionResolved, sessionFailed, tokenRefreshed, logout, retrySession } = await import('../src/redux/features/auth/authSlice');
 const { membersApi } = await import('../src/redux/features/members/membersApi');
 const { authApi } = await import('../src/redux/features/auth/authApi');
-const { apiSlice } = await import('../src/redux/features/api/apiSlice');
+const { documentsApi } = await import('../src/redux/features/documents/documentsApi');
 const { canDeleteFolder } = await import('../src/redux/features/auth/resourceAuthorization');
 const { authorizeRequest } = await import('../src/redux/features/api/mutationAuthorization');
 const { authDestination } = await import('../src/utils/authDestination');
@@ -139,9 +139,6 @@ test('late login response cannot sign in again after logout', async () => {
   });
 });
 
-const testApi = apiSlice.injectEndpoints({ endpoints: (builder) => ({
-  sessionProbe: builder.query<any, string>({ query: (id) => `/probe/${id}` }),
-}) });
 test('concurrent expired reads share recovery and keep resolved permissions during recovery', async () => {
   let refreshes = 0, profiles = 0;
   await mock(async (input) => {
@@ -152,7 +149,7 @@ test('concurrent expired reads share recovery and keep resolved permissions duri
   }, async () => {
     store.dispatch(setCredentials({ access_token: 'old', refresh_token: 'refresh' }));
     store.dispatch(sessionResolved({ user: actor(), sessionVersion: store.getState().auth.sessionVersion }));
-    const results = await Promise.all(['a', 'b'].map((id) => store.dispatch(testApi.endpoints.sessionProbe.initiate(id, { subscribe: false }))));
+    const results = await Promise.all(['a', 'b'].map((id) => store.dispatch(documentsApi.endpoints.downloadDocument.initiate(id, { subscribe: false }))));
     assert.ok(results.every((result) => result.isSuccess));
     assert.equal(refreshes, 1); assert.equal(profiles, 0);
     assert.equal(store.getState().auth.permissionsStatus, 'ready');
@@ -178,22 +175,22 @@ test('failed recovery preserves non-401 errors; repeated 401 settles without a l
   }
 });
 
-test('folder deletion uses only delete grants, explicit overrides, eligibility and canonical visible targets', async () => {
-  const folder = { id: 'child', parent_id: 'parent', can_upload: false };
-  for (const user of [actor(), actor({ is_superuser: true }), actor({ permissions: [], user_permissions: [{ feature: 'document', can_delete: true }] })]) {
+test('shared folder deletion is superuser-only regardless of upload capability, contents or personal delete grant', async () => {
+  const folder = { id: 'child', parent_id: 'parent', can_upload: false, document_count: 3 };
+  for (const user of [actor({ is_superuser: true }), actor({ is_superuser: true, permissions: [], user_permissions: [{ feature: 'document', can_delete: false }] })]) {
     assert.equal(canDeleteFolder(user, folder), true);
     const result = await authorizeRequest('deleteFolder', { url: '/documents/documents/folders/child', method: 'DELETE' }, user,
       async () => ({ data: [{ id: 'parent', children: [folder] }] }));
     assert.ok(result.request);
   }
-  for (const user of [null, actor({ permissions: [{ feature: 'document', can_view: true, can_create: true, can_edit: true }] }),
+  for (const user of [null, actor(), actor({ permissions: [], user_permissions: [{ feature: 'document', can_delete: true }] }), actor({ permissions: [{ feature: 'document', can_view: true, can_create: true, can_edit: true }] }),
     actor({ user_permissions: [{ feature: 'document', can_delete: false }] }), actor({ status: 'suspended' }), actor({ is_superuser: true, is_deleted: true })]) {
     assert.equal(canDeleteFolder(user, folder), false);
   }
   const missing = await authorizeRequest('deleteFolder', { url: '/documents/documents/folders/hidden', method: 'DELETE' }, actor(), async () => ({ data: [folder] }));
   assert.equal(missing.error?.status, 403);
   const failed = await authorizeRequest('deleteFolder', { url: '/documents/documents/folders/child', method: 'DELETE' }, actor(), async () => ({ error: { status: 500, data: {} } }));
-  assert.equal(failed.error?.status, 500);
+  assert.equal(failed.error?.status, 403);
 });
 
 test('reauthentication destinations preserve path, query and fragment and reject external/auth loops', () => {

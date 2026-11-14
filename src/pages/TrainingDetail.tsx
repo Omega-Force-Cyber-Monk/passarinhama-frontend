@@ -17,11 +17,11 @@ export default function TrainingDetail() {
   const { trainingId } = useParams<{ trainingId: string }>();
   const navigate = useNavigate();
   const { localeCode, translate } = useI18n();
-  const { data: training, isLoading, isError, error } = useGetTrainingByIdQuery(trainingId || "", {
+  const { currentData: training, isLoading, isFetching, isError, error } = useGetTrainingByIdQuery(trainingId || "", {
     skip: !trainingId,
   });
 
-  if (isLoading) {
+  if (isLoading || (isFetching && !training)) {
     return (
       <div className="content-detail-state">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
