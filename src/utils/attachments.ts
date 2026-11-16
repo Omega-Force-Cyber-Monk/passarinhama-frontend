@@ -1,4 +1,7 @@
 import type { ArticleAttachment } from "../redux/features/articles/articleTypes";
+import { store } from '../redux/store';
+import { synchronizeSession } from '../redux/features/auth/sessionSync';
+import { isActiveUser } from '../redux/features/auth/permissionUtils';
 import type { Document } from "../redux/features/documents/documentsTypes";
 import type { TechnicoProAttachment } from "../redux/features/technicopro/technicoproTypes";
 import type { TrainingAttachment } from "../redux/features/trainings/trainingTypes";
@@ -191,13 +194,16 @@ export const usesAuthenticatedFileRequest = (url: string) => {
 };
 
 const getAuthHeaders = (url: string) => {
-  const token =
-    typeof window !== "undefined" ? window.localStorage.getItem("token") : null;
-
-  return token && usesAuthenticatedFileRequest(url) ? { Authorization: `Bearer ${token}` } : undefined;
+  if (!usesAuthenticatedFileRequest(url)) return undefined;
+  synchronizeSession(store);
+  const { token, isAuthenticated, user } = store.getState().auth;
+  if (!token || !isAuthenticated || !isActiveUser(user)) throw new Error('Session is not ready for a file request');
+  return { Authorization: `Bearer ${token}` };
 };
 
 export const fetchUrlAsObjectUrl = async (url: string, fallbackType?: string | null) => {
+  synchronizeSession(store);
+  const version = store.getState().auth.sessionVersion;
   const resolved = resolveAttachmentUrl(url);
   if (!resolved) throw new Error("Invalid file URL");
   const response = await fetch(resolved, {
@@ -209,6 +215,8 @@ export const fetchUrlAsObjectUrl = async (url: string, fallbackType?: string | n
   }
 
   const blob = await response.blob();
+  synchronizeSession(store);
+  if (store.getState().auth.sessionVersion !== version) throw new Error('Session changed during file request');
   const typedBlob =
     blob.type || !fallbackType ? blob : new Blob([blob], { type: fallbackType });
 

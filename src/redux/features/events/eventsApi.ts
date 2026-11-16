@@ -1,3 +1,4 @@
+import { projectionTags, statsTag, mutationChanged } from '../api/cacheTags';
 import { apiSlice as baseApi } from '../api/apiSlice';
 import type { CategoryQueryParams, PaginatedResponse } from '../api/apiTypes';
 import {
@@ -53,12 +54,12 @@ export const eventsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getUpcomingEvents: builder.query<Event[], { limit?: number }>({
       query: ({ limit = 6 }) => `/events/events/upcoming?limit=${limit}`,
-      providesTags: ['Event'],
+      providesTags: result => [{type:'Event',id:'LIST'},...(result?.flatMap(item=>[{type:'Event' as const,id:item.id},...(item.event_category?.id?[{type:'EventCategory' as const,id:item.event_category.id}]:[])])||[])],
     }),
 
     getCalendarStats: builder.query<CalendarStats, void>({
       query: () => '/events/events/calendar-stats',
-      providesTags: ['Event'],
+      providesTags: [{type:'Event',id:'STATS'}],
     }),
 
     getEvents: builder.query<Event[], GetEventsQueryParams>({
@@ -74,7 +75,7 @@ export const eventsApi = baseApi.injectEndpoints({
 
         return `/events/events?${params.toString()}`;
       },
-      providesTags: ['Event'],
+      providesTags: result => [{type:'Event',id:'LIST'},...(result?.flatMap(item=>[{type:'Event' as const,id:item.id},...(item.event_category?.id?[{type:'EventCategory' as const,id:item.event_category.id}]:[])])||[])],
     }),
 
     getEventCategories: builder.query<
@@ -97,7 +98,7 @@ export const eventsApi = baseApi.injectEndpoints({
         const queryString = searchParams.toString();
         return `/events/event-categories${queryString ? `?${queryString}` : ''}`;
       },
-      providesTags: ['EventCategory'],
+      providesTags: result => [{type:'EventCategory',id:'LIST'},...(result?.results.map(item=>({type:'EventCategory' as const,id:item.id}))||[])],
     }),
 
     createEventCategory: builder.mutation<EventCategory, CreateEventCategoryRequest>({
@@ -109,7 +110,7 @@ export const eventsApi = baseApi.injectEndpoints({
           'Content-Type': 'application/json',
         },
       }),
-      invalidatesTags: ['EventCategory', 'Event'],
+      invalidatesTags: (result,error) => mutationChanged(error) ? [{type:'EventCategory',id:'LIST'}] : [],
     }),
 
     updateEventCategory: builder.mutation<EventCategory, UpdateEventCategoryRequest>({
@@ -121,7 +122,7 @@ export const eventsApi = baseApi.injectEndpoints({
           'Content-Type': 'application/json',
         },
       }),
-      invalidatesTags: ['EventCategory', 'Event'],
+      invalidatesTags: (result,error,arg) => mutationChanged(error) ? ([{type:'EventCategory',id:typeof arg==='string'?arg:arg.id},{type:'EventCategory',id:'LIST'},...projectionTags]) : [],
     }),
 
     deleteEventCategory: builder.mutation<void, string>({
@@ -129,12 +130,12 @@ export const eventsApi = baseApi.injectEndpoints({
         url: `/events/event-categories/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['EventCategory', 'Event'],
+      invalidatesTags: (result,error,arg) => mutationChanged(error) ? ([{type:'EventCategory',id:arg},{type:'EventCategory',id:'LIST'},...projectionTags,{type:'Event',id:'LIST'},{type:'Event',id:'STATS'},statsTag]) : [],
     }),
 
     getEventById: builder.query<Event, string>({
       query: (id) => `/events/events/${id}`,
-      providesTags: (result, error, id) => [{ type: 'Event', id }],
+      providesTags: (result,error,id)=>[{type:'Event',id},...(result?.event_category?.id?[{type:'EventCategory' as const,id:result.event_category.id}]:[])],
     }),
 
     createEvent: builder.mutation<Event, CreateEventRequest>({
@@ -143,7 +144,7 @@ export const eventsApi = baseApi.injectEndpoints({
         method: 'POST',
         body: buildEventFormData(data),
       }),
-      invalidatesTags: ['Event'],
+      invalidatesTags: (result,error) => mutationChanged(error) ? [{type:'Event',id:'LIST'},{type:'Event',id:'STATS'},...projectionTags,statsTag] : [],
     }),
 
     updateEvent: builder.mutation<Event, { id: string; data: UpdateEventRequest }>({
@@ -152,7 +153,7 @@ export const eventsApi = baseApi.injectEndpoints({
         method: 'PATCH',
         body: buildEventFormData(data),
       }),
-      invalidatesTags: (result, error, { id }) => ['Event', { type: 'Event', id }],
+      invalidatesTags: (result,error,arg) => mutationChanged(error) ? ([{type:'Event',id:typeof arg==='string'?arg:arg.id},{type:'Event',id:'LIST'},{type:'Event',id:'STATS'},...projectionTags,statsTag]) : [],
     }),
 
     deleteEvent: builder.mutation<void, string>({
@@ -160,7 +161,7 @@ export const eventsApi = baseApi.injectEndpoints({
         url: `/events/events/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Event'],
+      invalidatesTags: (result,error,arg) => mutationChanged(error) ? ([{type:'Event',id:arg},{type:'Event',id:'LIST'},{type:'Event',id:'STATS'},...projectionTags,statsTag]) : [],
     }),
 
     registerForEvent: builder.mutation<EventRegistrationResponse, string>({
@@ -169,7 +170,7 @@ export const eventsApi = baseApi.injectEndpoints({
         method: 'POST',
         body: {},
       }),
-      invalidatesTags: (result, error, id) => ['Event', { type: 'Event', id }],
+      invalidatesTags: (result,error,id) => mutationChanged(error) ? ([{type:'Event',id},...projectionTags]) : [],
     }),
 
     unregisterFromEvent: builder.mutation<void, string>({
@@ -177,7 +178,7 @@ export const eventsApi = baseApi.injectEndpoints({
         url: `/events/events/${id}/register`,
         method: 'DELETE',
       }),
-      invalidatesTags: (result, error, id) => ['Event', { type: 'Event', id }],
+      invalidatesTags: (result,error,id) => mutationChanged(error) ? ([{type:'Event',id},...projectionTags]) : [],
     }),
 
     getEventRegistrations: builder.query<EventRegistrationsList, string>({

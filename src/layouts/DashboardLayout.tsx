@@ -42,7 +42,7 @@ import {
   useGetUsersOnlineQuery,
 } from "../redux/features/members/membersApi";
 import {
-  useLazyGetDashboardSearchQuery,
+  useGetDashboardSearchQuery,
   type GlobalSearchResult,
   type GlobalSearchResultType,
 } from "../redux/features/dashboard/dashboardApi";
@@ -194,7 +194,8 @@ const DashboardLayout: React.FC = () => {
   const { translate } = useI18n();
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const lastSearchQueryRef = useRef("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const normalizedSearchTerm = searchTerm.trim();
   const { hasPermission, canAccessAdminPanel } =
     usePermissions();
   const isSuperuser = canAccessAdminPanel;
@@ -202,14 +203,18 @@ const DashboardLayout: React.FC = () => {
   const { data: onlineUsersData } = useGetUsersOnlineQuery(undefined, {
     skip: !isAuthenticated,
   });
-  const [
-    triggerDashboardSearch,
-    {
-      data: searchResults,
+  const {
+      currentData: searchResults,
       isFetching: isSearchFetching,
       isError: isSearchError,
-    },
-  ] = useLazyGetDashboardSearchQuery();
+      refetch: refetchSearch,
+  } = useGetDashboardSearchQuery({q: debouncedSearchTerm, limit: 10}, {
+    skip: !isAuthenticated || !debouncedSearchTerm || !searchOpen,
+  });
+  useEffect(() => {
+    // Reopening a failed search retries once; error changes alone must not loop.
+    if (searchOpen && debouncedSearchTerm && isSearchError && !isSearchFetching) void refetchSearch();
+  }, [searchOpen, debouncedSearchTerm]);
 
   useEffect(() => {
     setArticlesDropdownOpen(location.pathname.startsWith("/articles"));
@@ -342,13 +347,13 @@ const DashboardLayout: React.FC = () => {
   const onlineUsers = onlineUsersData?.users || [];
   const visibleSearchResults = useMemo(() => {
     const results = searchResults?.results ?? [];
-    if (!isAuthenticated) return [];
+    if (!isAuthenticated || debouncedSearchTerm !== normalizedSearchTerm) return [];
 
     return results.filter((result) => {
       const feature = SEARCH_PERMISSION_FEATURES[result.type];
       return feature ? hasPermission(feature, "view") : false;
     });
-  }, [hasPermission, isAuthenticated, searchResults?.results]);
+  }, [hasPermission, isAuthenticated, searchResults?.results, debouncedSearchTerm, normalizedSearchTerm]);
   const hasSearchResults = visibleSearchResults.length > 0;
   const searchResultCount = visibleSearchResults.length;
   const trimmedSearchTerm = searchTerm.trim();
@@ -357,28 +362,20 @@ const DashboardLayout: React.FC = () => {
     const trimmedQuery = query.trim();
     if (!trimmedQuery) {
       setSearchOpen(false);
-      lastSearchQueryRef.current = "";
+      setDebouncedSearchTerm('');
       return;
     }
 
     setSearchOpen(true);
-    if (!force && trimmedQuery === lastSearchQueryRef.current) {
-      return;
-    }
-
-    try {
-      lastSearchQueryRef.current = trimmedQuery;
-      await triggerDashboardSearch({ q: trimmedQuery, limit: 10 }).unwrap();
-    } catch {
-      setSearchOpen(true);
-    }
+    if (trimmedQuery !== debouncedSearchTerm) setDebouncedSearchTerm(trimmedQuery);
+    else if (force && searchOpen && !isSearchFetching) void refetchSearch();
   };
 
   useEffect(() => {
     const trimmedQuery = searchTerm.trim();
     if (!trimmedQuery) {
       setSearchOpen(false);
-      lastSearchQueryRef.current = "";
+      setDebouncedSearchTerm('');
       return;
     }
 
@@ -777,7 +774,10 @@ const DashboardLayout: React.FC = () => {
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 onFocus={() => {
-                  if (trimmedSearchTerm && (searchResults || isSearchError)) setSearchOpen(true);
+                  if (trimmedSearchTerm) {
+                    setSearchOpen(true);
+                    if (searchOpen && isSearchError && !isSearchFetching) void refetchSearch();
+                  }
                 }}
                 onKeyDown={handleSearchKeyDown}
                 className="block w-full min-w-0 rounded-[10px] border-0 bg-transparent py-2 pl-3 pr-20 text-[13px] outline-none placeholder:text-[var(--archi-muted)]"
@@ -789,7 +789,7 @@ const DashboardLayout: React.FC = () => {
                   onClick={() => {
                     setSearchTerm("");
                     setSearchOpen(false);
-                    lastSearchQueryRef.current = "";
+                    setDebouncedSearchTerm('');
                     searchInputRef.current?.focus();
                   }}
                   className="absolute inset-y-0 right-10 flex w-8 items-center justify-center text-[var(--archi-muted)] hover:text-[var(--archi-text)]"

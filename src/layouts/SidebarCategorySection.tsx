@@ -26,6 +26,7 @@ export interface SidebarCategorySectionProps<T extends SidebarCategoryItem> {
     isLoading: boolean;
     isFetching: boolean;
     isError: boolean;
+    fulfilledTimeStamp?: number;
   };
   // RTK Query lazy query hook (triggers subsequent pages on scroll)
   useLazyQuery: () => [
@@ -66,6 +67,7 @@ export function SidebarCategorySection<T extends SidebarCategoryItem>({
   // Page 1 query actively subscribes to RTK Query cache and tag invalidations
   const {
     data: page1Data,
+    fulfilledTimeStamp,
     isLoading: isPage1Loading,
     isError: isPage1Error,
   } = useGetQuery(
@@ -85,9 +87,18 @@ export function SidebarCategorySection<T extends SidebarCategoryItem>({
   const currentPageRef = useRef(1);
   const totalPagesRef = useRef(1);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const generationRef = useRef(0);
+  const pageVersionRef = useRef({data: page1Data, stamp: fulfilledTimeStamp, skip});
+  if (pageVersionRef.current.data !== page1Data || pageVersionRef.current.stamp !== fulfilledTimeStamp || pageVersionRef.current.skip !== skip) {
+    generationRef.current += 1;
+    pageVersionRef.current = {data: page1Data, stamp: fulfilledTimeStamp, skip};
+  }
 
   // Sync state when page 1 data arrives or refetches from server invalidation
   useEffect(() => {
+    generationRef.current += 1;
+    isFetchingNextPageRef.current = false;
+    setIsFetchingNextPage(false);
     if (page1Data) {
       const serverTotalPages = Math.max(1, page1Data.total_pages || 1);
       totalPagesRef.current = serverTotalPages;
@@ -99,7 +110,7 @@ export function SidebarCategorySection<T extends SidebarCategoryItem>({
       currentPageRef.current = 1;
       setCurrentPage(1);
     }
-  }, [page1Data]);
+  }, [page1Data, fulfilledTimeStamp, skip]);
 
   // Combined deduplicated displayed items
   const displayedItems = useMemo(() => {
@@ -113,10 +124,12 @@ export function SidebarCategorySection<T extends SidebarCategoryItem>({
 
   // Infinite scroll: fetch next page
   const fetchNextPage = useCallback(async () => {
+    if (skip) return;
     if (isFetchingNextPageRef.current) return;
     if (currentPageRef.current >= totalPagesRef.current) return;
 
     const nextPage = currentPageRef.current + 1;
+    const generation = generationRef.current;
     isFetchingNextPageRef.current = true;
     setIsFetchingNextPage(true);
 
@@ -125,6 +138,7 @@ export function SidebarCategorySection<T extends SidebarCategoryItem>({
         page: nextPage,
         pageSize,
       }).unwrap();
+      if (generation !== generationRef.current) return;
 
       if (res && Array.isArray(res.results)) {
         setAdditionalItems((prev) => {
@@ -148,10 +162,12 @@ export function SidebarCategorySection<T extends SidebarCategoryItem>({
     } catch (err) {
       console.error(`Failed to load page ${nextPage} for ${name}`, err);
     } finally {
-      isFetchingNextPageRef.current = false;
-      setIsFetchingNextPage(false);
+      if (generation === generationRef.current) {
+        isFetchingNextPageRef.current = false;
+        setIsFetchingNextPage(false);
+      }
     }
-  }, [triggerLazyQuery, pageSize, page1Data?.results, name]);
+  }, [triggerLazyQuery, pageSize, page1Data?.results, name, skip]);
 
   // Internal scroll handler for category list
   const handleScroll = useCallback(

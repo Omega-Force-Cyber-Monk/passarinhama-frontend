@@ -1,5 +1,7 @@
+import { profileTags, projectionTags, statsTag, mutationChanged } from '../api/cacheTags';
 import { apiSlice } from '../api/apiSlice';
-import { sessionResolved, sessionFailed } from '../auth/authSlice';
+import { sessionFailed, logout } from '../auth/authSlice';
+import { normalizeUserProfile } from '../auth/normalizeProfile';
 import type { RootState } from '../../store';
 import type { FetchBaseQueryMeta } from '@reduxjs/toolkit/query';
 import {
@@ -61,32 +63,14 @@ type UsersApiResponse = Omit<UsersResponse, 'results'> & {
   results: UserApiResponse[];
 };
 
-const normalizeRole = (role: string | UserRoleDetails | null | undefined) => {
-  if (!role) return '';
-  return typeof role === 'string' ? role : role.slug || role.name;
-};
+
 
 const normalizeUser = (user: UserApiResponse): User => ({
-  ...user,
+  ...normalizeUserProfile(user),
   membership_category: user.membership_category ?? null,
-  permissions: user.permissions ?? [],
-  user_permissions: user.user_permissions ?? [],
-  role: normalizeRole(user.role),
-  role_details: typeof user.role === 'string' ? null : user.role,
 });
 
-const withAvatarCacheBust = <T extends { avatar_url: string | null }>(
-  user: T,
-): T => {
-  if (!user.avatar_url) return user;
 
-  const separator = user.avatar_url.includes('?') ? '&' : '?';
-
-  return {
-    ...user,
-    avatar_url: `${user.avatar_url}${separator}t=${Date.now()}`,
-  };
-};
 
 const appendIfDefined = (
   formData: FormData,
@@ -202,13 +186,7 @@ export const membersApi = apiSlice.injectEndpoints({
         ...response,
         results: response.results.map(normalizeUser),
       }),
-      providesTags: (result) =>
-        result
-          ? [
-              ...result.results.map(({ id }) => ({ type: 'User' as const, id })),
-              { type: 'User', id: 'LIST' },
-            ]
-          : [{ type: 'User', id: 'LIST' }],
+      providesTags: result => [{type:'User',id:'LIST'},...(result?.results.flatMap(profileTags)||[])],
     }),
     createUser: builder.mutation<User, CreateUserRequest>({
       query: (userData) => ({
@@ -217,7 +195,7 @@ export const membersApi = apiSlice.injectEndpoints({
         body: buildCreateUserFormData(userData),
       }),
       transformResponse: (response: UserApiResponse) => normalizeUser(response),
-      invalidatesTags: [{ type: 'User', id: 'LIST' }],
+      invalidatesTags: (result,error) => mutationChanged(error) ? [{ type: 'User', id: 'LIST' },...projectionTags,statsTag] : [],
     }),
     getUsersOnline: builder.query<UsersOnlineResponse, void>({
       query: () => '/user/users/online',
@@ -225,7 +203,7 @@ export const membersApi = apiSlice.injectEndpoints({
     }),
     getUserRoles: builder.query<UserRolesResponse, void>({
       query: () => '/user/roles',
-      providesTags: ['User'],
+      providesTags: [{type:'UserRole',id:'LIST'}],
     }),
     createUserRole: builder.mutation<UserRoleDetails, CreateUserRoleRequest>({
       query: (body) => ({
@@ -236,7 +214,7 @@ export const membersApi = apiSlice.injectEndpoints({
           'Content-Type': 'application/json',
         },
       }),
-      invalidatesTags: ['User'],
+      invalidatesTags: (result,error) => mutationChanged(error) ? [{type:'UserRole',id:'LIST'}] : [],
     }),
     updateUserRole: builder.mutation<UserRoleDetails, UpdateUserRoleRequest>({
       query: ({ id, ...body }) => ({
@@ -247,14 +225,14 @@ export const membersApi = apiSlice.injectEndpoints({
           'Content-Type': 'application/json',
         },
       }),
-      invalidatesTags: ['User'],
+      invalidatesTags: (result,error,arg) => mutationChanged(error) ? ([{type:'UserRole',id:'LIST'},{type:'RoleMembers',id:arg.id},{type:'RoleMembers',id:'UNKNOWN'},...projectionTags]) : [],
     }),
     deleteUserRole: builder.mutation<void, DeleteUserRoleRequest>({
       query: ({ id }) => ({
         url: `/user/roles/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['User'],
+      invalidatesTags: (result,error,arg) => mutationChanged(error) ? ([{type:'UserRole',id:'LIST'},{type:'RoleMembers',id:arg.id},{type:'RoleMembers',id:'UNKNOWN'},...projectionTags]) : [],
     }),
     getUserPermissions: builder.query<
       UserPermissionsResponse,
@@ -277,10 +255,7 @@ export const membersApi = apiSlice.injectEndpoints({
           'Content-Type': 'application/json',
         },
       }),
-      invalidatesTags: (_result, _error, { role_id }) => [
-        { type: 'User', id: `PERMISSIONS-${role_id}` },
-        { type: 'User', id: 'ME' },
-      ],
+      invalidatesTags: (result,error,{role_id}) => mutationChanged(error) ? ([{type:'User',id:'PERMISSIONS-'+role_id},{type:'RoleMembers',id:role_id},{type:'RoleMembers',id:'UNKNOWN'},...projectionTags]) : [],
     }),
     updateUserPermission: builder.mutation<
       UserPermission,
@@ -294,10 +269,7 @@ export const membersApi = apiSlice.injectEndpoints({
           'Content-Type': 'application/json',
         },
       }),
-      invalidatesTags: (_result, _error, { role_id }) => [
-        { type: 'User', id: `PERMISSIONS-${role_id}` },
-        { type: 'User', id: 'ME' },
-      ],
+      invalidatesTags: (result,error,{role_id}) => mutationChanged(error) ? ([{type:'User',id:'PERMISSIONS-'+role_id},{type:'RoleMembers',id:role_id},{type:'RoleMembers',id:'UNKNOWN'},...projectionTags]) : [],
     }),
     getMemberPermissions: builder.query<
       MemberPermissionsResponse,
@@ -321,11 +293,7 @@ export const membersApi = apiSlice.injectEndpoints({
           'Content-Type': 'application/json',
         },
       }),
-      invalidatesTags: (_result, _error, { user_id }) => [
-        { type: 'User', id: `USER-PERMISSIONS-${user_id}` },
-        { type: 'User', id: user_id },
-        { type: 'User', id: 'ME' },
-      ],
+      invalidatesTags: (result,error,{user_id}) => mutationChanged(error) ? ([{type:'User',id:'USER-PERMISSIONS-'+user_id},{type:'User',id:user_id},...projectionTags]) : [],
     }),
     createMemberPermission: builder.mutation<
       MemberPermission,
@@ -339,22 +307,17 @@ export const membersApi = apiSlice.injectEndpoints({
           'Content-Type': 'application/json',
         },
       }),
-      invalidatesTags: (_result, _error, { user_id }) => [
-        { type: 'User', id: `USER-PERMISSIONS-${user_id}` },
-        { type: 'User', id: user_id },
-        { type: 'User', id: 'ME' },
-      ],
+      invalidatesTags: (result,error,{user_id}) => mutationChanged(error) ? ([{type:'User',id:'USER-PERMISSIONS-'+user_id},{type:'User',id:user_id},...projectionTags]) : [],
     }),
     getUsersMe: builder.query<User, void>({
       query: () => '/user/users/me',
       transformResponse: (response: UserApiResponse) => normalizeUser(response),
-      providesTags: [{ type: 'User', id: 'ME' }],
+      providesTags: result => [{type:'User',id:'ME'},...profileTags(result)],
       async onQueryStarted(_, { dispatch, getState, queryFulfilled }) {
         const { sessionVersion } = (getState() as RootState).auth;
         try {
           const { data } = await queryFulfilled;
           if (!data?.id) throw new Error('Invalid current-user response');
-          dispatch(sessionResolved({ user: data, sessionVersion }));
         } catch (failure) {
           const error = (failure as { error?: { status?: number | string } }).error;
           dispatch(sessionFailed({ error: error?.status ?? 'FETCH_ERROR', sessionVersion }));
@@ -362,18 +325,28 @@ export const membersApi = apiSlice.injectEndpoints({
       },
     }),
     updateUsersMe: builder.mutation<User, UpdateUsersMeRequest>({
+      async onQueryStarted(_, { dispatch, getState, queryFulfilled }) {
+        const version = (getState() as RootState).auth.sessionVersion;
+        try {
+          const {data} = await queryFulfilled;
+          const current = (getState() as RootState).auth;
+          if (current.sessionVersion === version && current.user?.id === data.id) {
+            dispatch(membersApi.util.updateQueryData('getUserById', data.id, draft => { Object.assign(draft, data, current.user); }));
+          }
+        } catch { /* Failed updates retain the existing profile. */ }
+      },
       query: (userData) => ({
         url: '/user/users/me',
         method: 'PATCH',
         body: buildUpdateUsersMeFormData(userData),
       }),
       transformResponse: (response: UserApiResponse) => normalizeUser(response),
-      invalidatesTags: [{ type: 'User', id: 'ME' }, { type: 'User', id: 'LIST' }],
+      invalidatesTags: (result,error) => mutationChanged(error) ? ([{type:'User',id:'LIST'},...projectionTags]) : [],
     }),
     getUserById: builder.query<User, string>({
       query: (id) => `/user/users/${id}`,
       transformResponse: (response: UserApiResponse) => normalizeUser(response),
-      providesTags: (result, error, id) => [{ type: 'User', id }],
+      providesTags: (result,error,id) => [{type:'User',id},...profileTags(result)],
     }),
     updateUser: builder.mutation<User, { id: string; body: UpdateUserRequest }>({
       query: ({ id, body }) => ({
@@ -382,28 +355,32 @@ export const membersApi = apiSlice.injectEndpoints({
         body: buildUpdateUserFormData(body),
       }),
       transformResponse: (response: UserApiResponse) => normalizeUser(response),
-      invalidatesTags: (result, error, { id }) => [
-        { type: 'User', id },
-        { type: 'User', id: 'LIST' },
-        { type: 'User', id: 'ME' },
-      ],
+      invalidatesTags: (result,error,{id}) => mutationChanged(error) ? ([{type:'User',id},{type:'User',id:'LIST'},...projectionTags,statsTag]) : [],
     }),
     deleteUser: builder.mutation<void, string>({
+      async onQueryStarted(id, { dispatch, getState, queryFulfilled }) {
+        const initial = (getState() as RootState).auth;
+        try { await queryFulfilled; if (initial.user?.id === id && (getState() as RootState).auth.sessionVersion === initial.sessionVersion) dispatch(logout()); } catch { /* Keep the session on failure. */ }
+      },
       query: (id) => ({
         url: `/user/users/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: [{ type: 'User', id: 'LIST' }],
+      invalidatesTags: (result,error,id) => mutationChanged(error) ? ([{type:'User',id},{type:'User',id:'LIST'},...projectionTags,statsTag]) : [],
     }),
     softDeleteUser: builder.mutation<void, string>({
+      async onQueryStarted(id, { dispatch, getState, queryFulfilled }) {
+        const initial = (getState() as RootState).auth;
+        try { await queryFulfilled; if (initial.user?.id === id && (getState() as RootState).auth.sessionVersion === initial.sessionVersion) dispatch(logout()); } catch { /* Keep the session on failure. */ }
+      },
       query: (id) => ({
         url: `/user/users/${id}/soft`,
         method: 'DELETE',
       }),
-      invalidatesTags: (result, error, id) => [
+      invalidatesTags: (result,error,id) => mutationChanged(error) ? ([
         { type: 'User', id },
         { type: 'User', id: 'LIST' },
-      ],
+        ...projectionTags,statsTag]) : [],
     }),
     restoreUser: builder.mutation<RestoreUserResponse, string>({
       query: (id) => ({
@@ -411,10 +388,10 @@ export const membersApi = apiSlice.injectEndpoints({
         method: 'PATCH',
       }),
       transformResponse: (response: UserApiResponse) => normalizeUser(response),
-      invalidatesTags: (result, error, id) => [
+      invalidatesTags: (result,error,id) => mutationChanged(error) ? ([
         { type: 'User', id },
         { type: 'User', id: 'LIST' },
-      ],
+        ...projectionTags,statsTag]) : [],
     }),
     validateUser: builder.mutation<User, string>({
       query: (id) => ({
@@ -422,10 +399,10 @@ export const membersApi = apiSlice.injectEndpoints({
         method: 'PATCH',
       }),
       transformResponse: (response: UserApiResponse) => normalizeUser(response),
-      invalidatesTags: (result, error, id) => [
+      invalidatesTags: (result,error,id) => mutationChanged(error) ? ([
         { type: 'User', id },
         { type: 'User', id: 'LIST' },
-      ],
+        ...projectionTags,statsTag]) : [],
     }),
     uploadUserPhoto: builder.mutation<User, UploadUserPhotoRequest>({
       query: ({ userId, photo }) => {
@@ -437,21 +414,17 @@ export const membersApi = apiSlice.injectEndpoints({
           body: formData,
         };
       },
-      transformResponse: (response: UserApiResponse) =>
-        withAvatarCacheBust(normalizeUser(response)),
-      async onQueryStarted({ userId }, { dispatch, queryFulfilled }) {
+      transformResponse: (response: UserApiResponse) => normalizeUser(response),
+      async onQueryStarted({ userId }, { dispatch, getState, queryFulfilled }) {
+        const version = (getState() as RootState).auth.sessionVersion;
         try {
           const { data: updatedUser } = await queryFulfilled;
 
-          dispatch(
-            membersApi.util.updateQueryData('getUsersMe', undefined, (draft) => {
-              Object.assign(draft, updatedUser);
-            }),
-          );
+          if ((getState() as RootState).auth.sessionVersion !== version) return;
 
           dispatch(
             membersApi.util.updateQueryData('getUserById', userId, (draft) => {
-              Object.assign(draft, updatedUser);
+              draft.avatar_url = updatedUser.avatar_url;
             }),
           );
 
@@ -479,10 +452,10 @@ export const membersApi = apiSlice.injectEndpoints({
           // Let the component handle the failed upload state.
         }
       },
-      invalidatesTags: [
+      invalidatesTags: (result,error) => mutationChanged(error) ? [
         { type: 'User', id: 'LIST' },
         { type: 'User', id: 'ONLINE' },
-      ],
+      ] : [],
     }),
     exportUsersCsv: builder.mutation<ExportUsersCsvResponse, void>({
       query: () => ({

@@ -91,6 +91,7 @@
     "retry": "Retry"
   },
   "common": {
+    "draftConflict": "This record changed on the server. Your unsaved edits have been preserved. Close and reopen to load the latest version.",
     "close": "Close dialog",
     "home": "Home",
     "dashboard": "Dashboard",

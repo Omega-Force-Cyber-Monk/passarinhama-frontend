@@ -90,7 +90,7 @@ for (const kind of ['role', 'member']) {
     }
     assert.equal(all(row(tree), 'button')[0].props.disabled, false); save(tree); await flush();
     const owner = kind === 'role' ? { role_id: 'target' } : { user_id: 'target' };
-    assert.deepEqual(plain(h.calls), [[kind === 'role' ? 'createRole' : 'createMember', { ...owner, feature: 'article', can_view: true, can_create: false, can_edit: false, can_delete: false }], ['refetch']]);
+    assert.deepEqual(plain(h.calls), [[kind === 'role' ? 'createRole' : 'createMember', { ...owner, feature: 'article', can_view: true, can_create: false, can_edit: false, can_delete: false }]]);
     assert.deepEqual(h.busy, [true, false]); assert.equal(h.notices[0][0], 'success');
     assert.equal(all(row(h.render()), 'input')[0].props.checked, true);
     assert.equal(all(row(h.render()), 'button')[0].props.disabled, true);
@@ -166,13 +166,14 @@ test('actual existing endpoints retain POST/PATCH payloads and invalidate permis
     ['updateMemberPermission', 'member', 'PATCH', '/user/user-permissions/permission'],
   ]) {
     const declaration = find(api, (n) => ts.isPropertyAssignment(n) && n.name.getText(api) === endpoint)[0];
-    const context = { builder: { mutation: (options) => options } };
+    const context = { builder: { mutation: (options) => options }, mutationChanged: error => !error, projectionTags: [] };
     evaluate(`result = ${declaration.initializer.getText(api)};`, context);
     const args = { id: 'permission', [kind === 'role' ? 'role_id' : 'user_id']: 'target', can_view: true };
     const request = context.result.query(args); assert.equal(request.url, url); assert.equal(request.method, method); assert.equal(request.body.can_view, true);
     if (method === 'PATCH') { assert.equal(request.body.id, undefined); assert.equal(request.body.role_id, undefined); assert.equal(request.body.user_id, undefined); }
     const tags = plain(context.result.invalidatesTags(null, null, args));
-    assert.ok(tags.some((tag) => tag.id === 'ME')); assert.ok(tags.some((tag) => tag.id === `${kind === 'role' ? 'PERMISSIONS' : 'USER-PERMISSIONS'}-target`));
+    assert.ok(tags.some((tag) => kind === 'role' ? tag.type === 'RoleMembers' && tag.id === 'target' : tag.type === 'User' && tag.id === 'target'));
+    assert.ok(tags.some((tag) => tag.id === `${kind === 'role' ? 'PERMISSIONS' : 'USER-PERMISSIONS'}-target`));
   }
 });
 

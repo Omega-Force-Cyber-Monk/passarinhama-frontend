@@ -1,3 +1,4 @@
+import { mutationChanged } from '../api/cacheTags';
 import type { FetchBaseQueryMeta } from '@reduxjs/toolkit/query';
 import { apiSlice } from '../api/apiSlice';
 import {
@@ -67,7 +68,7 @@ export const adminApi = apiSlice.injectEndpoints({
         method: 'PUT',
         body,
       }),
-      invalidatesTags: [{ type: 'Admin', id: 'SMTP_SETTINGS' }],
+      invalidatesTags: (result,error) => mutationChanged(error) ? [{ type: 'Admin', id: 'SMTP_SETTINGS' }] : [],
     }),
     testAdminSmtpSettings: builder.mutation<
       TestAdminSmtpResponse,
@@ -105,7 +106,7 @@ export const adminApi = apiSlice.injectEndpoints({
         url: '/settings/admin/logs',
         method: 'DELETE',
       }),
-      invalidatesTags: [{ type: 'Admin', id: 'SYSTEM_LOGS' }],
+      invalidatesTags: (result,error) => mutationChanged(error) ? [{ type: 'Admin', id: 'SYSTEM_LOGS' }] : [],
     }),
     getAdminBackups: builder.query<AdminBackupsResponse, void>({
       query: () => ({
@@ -122,14 +123,14 @@ export const adminApi = apiSlice.injectEndpoints({
         method: 'PUT',
         body,
       }),
-      invalidatesTags: [{ type: 'Admin', id: 'BACKUPS' }],
+      invalidatesTags: (result,error) => mutationChanged(error) ? [{ type: 'Admin', id: 'BACKUPS' }] : [],
     }),
     runAdminBackup: builder.mutation<AdminBackupsResponse['backups'][number], void>({
       query: () => ({
         url: '/settings/admin/backups/run',
         method: 'POST',
       }),
-      invalidatesTags: [{ type: 'Admin', id: 'BACKUPS' }],
+      invalidatesTags: (result,error) => mutationChanged(error) ? [{ type: 'Admin', id: 'BACKUPS' }] : [],
     }),
     testAdminBackupPermissions: builder.mutation<
       AdminBackupDirectoryActionResponse,
@@ -139,14 +140,14 @@ export const adminApi = apiSlice.injectEndpoints({
         url: '/settings/admin/backups/test-permissions',
         method: 'POST',
       }),
-      invalidatesTags: [{ type: 'Admin', id: 'BACKUPS' }],
+      invalidatesTags: (result,error) => mutationChanged(error) ? [{ type: 'Admin', id: 'BACKUPS' }] : [],
     }),
     deleteAdminBackup: builder.mutation<DeleteAdminBackupResponse, string>({
       query: (id) => ({
         url: `/settings/admin/backups/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: [{ type: 'Admin', id: 'BACKUPS' }],
+      invalidatesTags: (result,error) => mutationChanged(error) ? [{ type: 'Admin', id: 'BACKUPS' }] : [],
     }),
     downloadAdminBackup: builder.mutation<AdminFileDownloadResponse, string>({
       query: (id) => ({

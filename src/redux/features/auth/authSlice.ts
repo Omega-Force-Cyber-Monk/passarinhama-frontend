@@ -1,6 +1,7 @@
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { UserProfile, AuthState } from './authTypes';
+import { newSessionId, restoreStoredSession, writeStoredSession, browserSessionChanged, type StoredSession } from './sessionStorage';
 
 const mapUserProfile = (user: UserProfile): UserProfile => {
   const avatarInitials =
@@ -22,15 +23,18 @@ const mapUserProfile = (user: UserProfile): UserProfile => {
   };
 };
 
+const stored = restoreStoredSession();
 const initialState: AuthState = {
   // Persisted profile/role data is never authorization evidence for a restored session.
   user: null,
-  token: localStorage.getItem('token'),
-  refreshToken: localStorage.getItem('refreshToken'),
+  token: stored.token,
+  refreshToken: stored.refreshToken,
   isAuthenticated: false,
-  status: localStorage.getItem('token') ? 'initializing' : 'unauthenticated',
-  permissionsStatus: localStorage.getItem('token') ? 'loading' : 'unknown',
+  status: stored.token ? 'initializing' : 'unauthenticated',
+  permissionsStatus: stored.token ? 'loading' : 'unknown',
   sessionVersion: 0,
+  sessionId: stored.id,
+  profileRequestOrder: 0,
   error: null,
 };
 
@@ -47,47 +51,36 @@ const authSlice = createSlice({
         user?: UserProfile;
       }>
     ) => {
-      const { access_token, refresh_token, user } = action.payload;
+      const { access_token, refresh_token } = action.payload;
       state.token = access_token;
-      if (refresh_token) {
-        state.refreshToken = refresh_token;
-        localStorage.setItem('refreshToken', refresh_token);
-      }
+      state.refreshToken = refresh_token || null;
+      state.sessionId = newSessionId();
+      state.profileRequestOrder = 0;
       state.sessionVersion += 1;
       state.user = null;
       state.status = 'initializing';
       state.permissionsStatus = 'loading';
       state.isAuthenticated = false;
       state.error = null;
-      if (!refresh_token) {
-        state.refreshToken = null;
-        localStorage.removeItem('refreshToken');
-      }
-      localStorage.setItem('token', access_token);
-      
-      if (user) {
-        const mappedUser = mapUserProfile(user);
-        state.user = mappedUser;
-        localStorage.setItem('user', JSON.stringify(mappedUser));
-      }
+      writeStoredSession({ id: state.sessionId, token: state.token, refreshToken: state.refreshToken });
     },
     tokenRefreshed: (state, action: PayloadAction<{ access_token: string; refresh_token?: string; sessionVersion: number }>) => {
-      if (state.sessionVersion !== action.payload.sessionVersion || !state.token) return;
+      if (state.sessionVersion !== action.payload.sessionVersion || !state.token || browserSessionChanged(state.sessionId)) return;
       state.token = action.payload.access_token;
-      localStorage.setItem('token', state.token);
       if (action.payload.refresh_token) {
         state.refreshToken = action.payload.refresh_token;
-        localStorage.setItem('refreshToken', state.refreshToken);
       }
+      writeStoredSession({ id: state.sessionId, token: state.token, refreshToken: state.refreshToken });
     },
-    sessionResolved: (state, action: PayloadAction<{ user: UserProfile; sessionVersion: number }>) => {
+    sessionResolved: (state, action: PayloadAction<{ user: UserProfile; sessionVersion: number; requestOrder?: number }>) => {
       if (state.sessionVersion !== action.payload.sessionVersion || !state.token) return;
+      if (action.payload.requestOrder !== undefined && action.payload.requestOrder < state.profileRequestOrder) return;
+      if (action.payload.requestOrder !== undefined) state.profileRequestOrder = action.payload.requestOrder;
       state.user = mapUserProfile(action.payload.user);
       state.status = 'authenticated';
       state.permissionsStatus = 'ready';
       state.isAuthenticated = true;
       state.error = null;
-      localStorage.setItem('user', JSON.stringify(state.user));
     },
     sessionFailed: (state, action: PayloadAction<{ error: number | string; sessionVersion: number }>) => {
       if (state.sessionVersion !== action.payload.sessionVersion || !state.token) return;
@@ -106,16 +99,16 @@ const authSlice = createSlice({
     setUser: (state, action: PayloadAction<UserProfile>) => {
       const mappedUser = mapUserProfile(action.payload);
       state.user = mappedUser;
-      localStorage.setItem('user', JSON.stringify(mappedUser));
     },
 
     updateRole: (state, action: PayloadAction<string>) => {
       if (state.user) {
         state.user.role = action.payload;
-        localStorage.setItem('user', JSON.stringify(state.user));
       }
     },
     logout: (state) => {
+      // A late request from an obsolete tab must not remove another login's credentials.
+      const obsolete = browserSessionChanged(state.sessionId);
       state.sessionVersion += 1;
       state.status = 'unauthenticated';
       state.permissionsStatus = 'unknown';
@@ -124,12 +117,29 @@ const authSlice = createSlice({
       state.token = null;
       state.refreshToken = null;
       state.isAuthenticated = false;
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
+      state.profileRequestOrder = 0;
+      state.sessionId = newSessionId();
+      if (!obsolete) writeStoredSession({ id: state.sessionId, token: null, refreshToken: null });
+    },
+    sessionReplaced: (state, action: PayloadAction<StoredSession>) => {
+      state.sessionVersion += 1;
+      state.sessionId = action.payload.id;
+      state.token = action.payload.token;
+      state.refreshToken = action.payload.refreshToken;
+      state.user = null;
+      state.isAuthenticated = false;
+      state.status = state.token ? 'initializing' : 'unauthenticated';
+      state.permissionsStatus = state.token ? 'loading' : 'unknown';
+      state.profileRequestOrder = 0;
+      state.error = null;
+    },
+    tokenSynchronized: (state, action: PayloadAction<StoredSession>) => {
+      if (state.sessionId !== action.payload.id) return;
+      state.token = action.payload.token;
+      state.refreshToken = action.payload.refreshToken;
     },
   },
 });
 
-export const { setCredentials, setUser, logout, updateRole, tokenRefreshed, sessionResolved, sessionFailed, retrySession } = authSlice.actions;
+export const { setCredentials, setUser, logout, updateRole, tokenRefreshed, sessionResolved, sessionFailed, retrySession, sessionReplaced, tokenSynchronized } = authSlice.actions;
 export default authSlice.reducer;

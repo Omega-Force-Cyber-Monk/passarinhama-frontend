@@ -1,3 +1,4 @@
+import { projectionTags, mutationChanged } from '../api/cacheTags';
 import { apiSlice } from "../api/apiSlice";
 import type { CategoryQueryParams, PaginatedResponse } from "../api/apiTypes";
 import {
@@ -73,16 +74,7 @@ export const technicoProApi = apiSlice.injectEndpoints({
 
         return `/technicopro/technicopros?${params.toString()}`;
       },
-      providesTags: (result) =>
-        result
-          ? [
-              ...result.results.map(({ id }) => ({
-                type: "TechnicoPro" as const,
-                id,
-              })),
-              { type: "TechnicoPro", id: "LIST" },
-            ]
-          : [{ type: "TechnicoPro", id: "LIST" }],
+      providesTags: (result) => [{type:'TechnicoPro',id:'LIST'}, ...(result ? result.results.flatMap(item => [{type:'TechnicoPro' as const,id:item.id}, ...(item.category?.id ? [{type:'TechnicoProCategory' as const,id:item.category.id}] : [])]) : [])],
     }),
     getMyTechnicoPros: builder.query<
       PaginatedTechnicoPros,
@@ -90,16 +82,7 @@ export const technicoProApi = apiSlice.injectEndpoints({
     >({
       query: ({ page = 1, pageSize = 20 }) =>
         `/technicopro/my-technicopros?page=${page}&page_size=${pageSize}`,
-      providesTags: (result) =>
-        result
-          ? [
-              ...result.results.map(({ id }) => ({
-                type: "TechnicoPro" as const,
-                id,
-              })),
-              { type: "TechnicoPro", id: "MY_LIST" },
-            ]
-          : [{ type: "TechnicoPro", id: "MY_LIST" }],
+      providesTags: (result) => [{type:'TechnicoPro',id:'MY_LIST'}, ...(result ? result.results.flatMap(item => [{type:'TechnicoPro' as const,id:item.id}, ...(item.category?.id ? [{type:'TechnicoProCategory' as const,id:item.category.id}] : [])]) : [])],
     }),
     getTechnicoProCategories: builder.query<
       PaginatedResponse<TechnicoProCategory>,
@@ -121,7 +104,7 @@ export const technicoProApi = apiSlice.injectEndpoints({
         const queryString = searchParams.toString();
         return `/technicopro/technicopro-categories${queryString ? `?${queryString}` : ""}`;
       },
-      providesTags: ["TechnicoProCategory"],
+      providesTags: (result) => [{type:'TechnicoProCategory',id:'LIST'}, ...(result?.results.map(item => ({type:'TechnicoProCategory' as const,id:item.id})) || [])],
     }),
     createTechnicoProCategory: builder.mutation<
       TechnicoProCategory,
@@ -135,7 +118,7 @@ export const technicoProApi = apiSlice.injectEndpoints({
           "Content-Type": "application/json",
         },
       }),
-      invalidatesTags: ["TechnicoProCategory", { type: "TechnicoPro", id: "LIST" }],
+      invalidatesTags: (result,error) => mutationChanged(error) ? [{type:'TechnicoProCategory',id:'LIST'}] : [],
     }),
     updateTechnicoProCategory: builder.mutation<
       TechnicoProCategory,
@@ -149,14 +132,14 @@ export const technicoProApi = apiSlice.injectEndpoints({
           "Content-Type": "application/json",
         },
       }),
-      invalidatesTags: ["TechnicoProCategory", { type: "TechnicoPro", id: "LIST" }],
+      invalidatesTags: (result,error,arg) => mutationChanged(error) ? ([{type:'TechnicoProCategory',id:typeof arg==='string'?arg:arg.id},{type:'TechnicoProCategory',id:'LIST'},...projectionTags]) : [],
     }),
     deleteTechnicoProCategory: builder.mutation<void, string>({
       query: (id) => ({
         url: `/technicopro/technicopro-categories/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["TechnicoProCategory", { type: "TechnicoPro", id: "LIST" }],
+      invalidatesTags: (result,error,arg) => mutationChanged(error) ? ([{type:'TechnicoProCategory',id:arg},{type:'TechnicoProCategory',id:'LIST'},...projectionTags,{type:'TechnicoPro',id:'LIST'},{type:'TechnicoPro',id:'MY_LIST'}]) : [],
     }),
     createTechnicoPro: builder.mutation<TechnicoPro, TechnicoProRequest>({
       query: (data) => ({
@@ -164,14 +147,14 @@ export const technicoProApi = apiSlice.injectEndpoints({
         method: "POST",
         body: buildTechnicoProFormData(data),
       }),
-      invalidatesTags: [
+      invalidatesTags: (result,error) => mutationChanged(error) ? [
         { type: "TechnicoPro", id: "LIST" },
         { type: "TechnicoPro", id: "MY_LIST" },
-      ],
+        ...projectionTags] : [],
     }),
     getTechnicoProById: builder.query<TechnicoPro, string>({
       query: (id) => `/technicopro/technicopros/${id}`,
-      providesTags: (_result, _error, id) => [{ type: "TechnicoPro", id }],
+      providesTags: (result, error, id) => [{type:'TechnicoPro',id}, ...(result?.category?.id ? [{type:'TechnicoProCategory' as const,id:result.category.id}] : [])],
     }),
     updateTechnicoPro: builder.mutation<
       TechnicoPro,
@@ -182,21 +165,18 @@ export const technicoProApi = apiSlice.injectEndpoints({
         method: "PATCH",
         body: buildTechnicoProFormData(data),
       }),
-      invalidatesTags: (_result, _error, { id }) => [
+      invalidatesTags: (_result, _error, { id }) => mutationChanged(_error) ? ([
         { type: "TechnicoPro", id },
         { type: "TechnicoPro", id: "LIST" },
         { type: "TechnicoPro", id: "MY_LIST" },
-      ],
+        ...projectionTags]) : [],
     }),
     deleteTechnicoPro: builder.mutation<void, string>({
       query: (id) => ({
         url: `/technicopro/technicopros/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: [
-        { type: "TechnicoPro", id: "LIST" },
-        { type: "TechnicoPro", id: "MY_LIST" },
-      ],
+      invalidatesTags: (result,error,id) => mutationChanged(error) ? ([{type:'TechnicoPro',id},{type:'TechnicoPro',id:'LIST'},{type:'TechnicoPro',id:'MY_LIST'},...projectionTags]) : [],
     }),
     publishTechnicoPro: builder.mutation<PublishTechnicoProResponse, string>({
       query: (id) => ({
@@ -204,11 +184,11 @@ export const technicoProApi = apiSlice.injectEndpoints({
         method: "POST",
         body: {},
       }),
-      invalidatesTags: (_result, _error, id) => [
+      invalidatesTags: (_result, _error, id) => mutationChanged(_error) ? ([
         { type: "TechnicoPro", id },
         { type: "TechnicoPro", id: "LIST" },
         { type: "TechnicoPro", id: "MY_LIST" },
-      ],
+        ...projectionTags]) : [],
     }),
     getTechnicoProPermissions: builder.query<TechnicoProPermission[], string>({
       query: (id) => `/technicopro/technicopros/${id}/permissions`,
@@ -226,10 +206,10 @@ export const technicoProApi = apiSlice.injectEndpoints({
           "Content-Type": "application/json",
         },
       }),
-      invalidatesTags: (_result, _error, { technicopro_id }) => [
+      invalidatesTags: (_result, _error, { technicopro_id }) => mutationChanged(_error) ? ([
         { type: "TechnicoPro", id: "LIST" },
         ...technicopro_id.map((id) => ({ type: "TechnicoPro" as const, id })),
-      ],
+      ...projectionTags,]) : [],
     }),
   }),
 });

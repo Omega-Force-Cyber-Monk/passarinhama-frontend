@@ -6,6 +6,7 @@ import { buildAdminForumCreatePayload, isUndisplayedAdminStatus } from "./admin/
 import "./AdminPanel.css";
 import { useArticleAuthorization } from "../hooks/useArticleAuthorization";
 import React, { useState } from "react";
+import { reconcileDraft, type DraftSnapshot } from '../utils/recordDraft';
 import {
   Users,
   Shield,
@@ -407,6 +408,7 @@ export default function AdminPanel() {
 
   // --- COMPONENT STATE ---
   const [activeTab, setActiveTab] = useState<AdminTab>("members");
+  const [modSubTab, setModSubTab] = useState<"queue" | "logs">("queue");
   const [searchTerm, setSearchTerm] = useState("");
   const [memberStatusFilter, setMemberStatusFilter] = useState("all");
   const [memberRoleFilter, setMemberRoleFilter] = useState("all");
@@ -599,7 +601,7 @@ export default function AdminPanel() {
 
   // Entities state
   const {
-    data: usersData,
+    currentData: usersData,
     isLoading: isLoadingUsers,
     isFetching: isFetchingUsers,
   } = useGetUsersQuery({
@@ -609,55 +611,55 @@ export default function AdminPanel() {
     search: searchTerm.trim() || undefined,
     role_id: memberRoleFilter !== "all" ? memberRoleFilter : undefined,
     status: memberStatusFilter !== "all" ? memberStatusFilter : undefined,
-  });
-  const { data: forumsResponse } = useGetForumsQuery({ pageSize: 100 });
+  }, {skip: !canAccessAdminPanel || activeTab !== 'members'});
+  const { currentData: forumsResponse } = useGetForumsQuery({ pageSize: 100 }, {skip: !canAccessAdminPanel || activeTab !== 'forums'});
   const forumsData = forumsResponse?.results ?? [];
   const {
-    data: articlesData,
+    currentData: articlesData,
     isLoading: isLoadingArticles,
     isFetching: isFetchingArticles,
   } = useGetArticlesQuery({
     page: articlePage,
     pageSize: ARTICLES_PAGE_SIZE,
-  });
+  }, {skip: !canAccessAdminPanel || activeTab !== 'articles'});
   const {
-    data: technicoproData,
+    currentData: technicoproData,
     isLoading: isLoadingTechnicoPro,
     isFetching: isFetchingTechnicoPro,
   } = useGetTechnicoProsQuery({
     page: technicoproPage,
     pageSize: TECHNICOPRO_PAGE_SIZE,
-  });
-  const { data: eventsData } = useGetEventsQuery({
+  }, {skip: !canAccessAdminPanel || activeTab !== 'technicopro'});
+  const { currentData: eventsData } = useGetEventsQuery({
     year: new Date().getFullYear(),
     month: new Date().getMonth() + 1,
-  });
-  const { data: eventCategoriesResponse } = useGetEventCategoriesQuery({
+  }, {skip: !canAccessAdminPanel || activeTab !== 'events'});
+  const { currentData: eventCategoriesResponse } = useGetEventCategoriesQuery({
     pageSize: 100,
-  });
+  }, {skip: !canAccessAdminPanel || activeTab !== 'events'});
   const eventCategories = eventCategoriesResponse?.results ?? [];
-  const { data: trainingsData } = useGetAllTrainingsQuery();
-  const { data: userRolesData = [] } = useGetUserRolesQuery();
+  const { currentData: trainingsData } = useGetAllTrainingsQuery(undefined, {skip: !canAccessAdminPanel || activeTab !== 'trainings'});
+  const { currentData: userRolesData = [] } = useGetUserRolesQuery(undefined, {skip: !canAccessAdminPanel || !['members','rolesPermissions'].includes(activeTab)});
 
   const {
-    data: moderationQueueData,
+    currentData: moderationQueueData,
     isLoading: isLoadingModeration,
     isFetching: isFetchingModerationQueue,
   } = useGetModerationQueueQuery({
     page: moderationQueuePage,
     pageSize: MODERATION_QUEUE_PAGE_SIZE,
-  });
+  }, {skip: !canAccessAdminPanel || activeTab !== 'moderation' || modSubTab !== 'queue'});
   const {
-    data: moderationLogsData,
+    currentData: moderationLogsData,
     isLoading: isLoadingModerationLogs,
     isFetching: isFetchingModerationLogs,
   } = useGetModerationLogsQuery({
     page: moderationLogsPage,
     pageSize: MODERATION_LOGS_PAGE_SIZE,
-  });
+  }, {skip: !canAccessAdminPanel || activeTab !== 'moderation' || modSubTab !== 'logs'});
 
   // Moderation state
-  const [modSubTab, setModSubTab] = useState<"queue" | "logs">("queue");
+
   const [pendingModAction, setPendingModAction] = useState<{
     id: string;
     type: "approve" | "reject";
@@ -796,21 +798,21 @@ export default function AdminPanel() {
     }
   };
 
-  const { data: articleCategoriesResponse } = useGetArticleCategoriesQuery({
+  const { currentData: articleCategoriesResponse } = useGetArticleCategoriesQuery({
     pageSize: 100,
-  });
+  }, {skip: !canAccessAdminPanel || activeTab !== 'articles'});
   const articleCategories = articleCategoriesResponse?.results ?? [];
-  const { data: technicoproCategoriesResponse } =
-    useGetTechnicoProCategoriesQuery({ pageSize: 100 });
+  const { currentData: technicoproCategoriesResponse } =
+    useGetTechnicoProCategoriesQuery({ pageSize: 100 }, {skip: !canAccessAdminPanel || activeTab !== 'technicopro'});
   const technicoproCategories = technicoproCategoriesResponse?.results ?? [];
-  const { data: trainingCategoriesResponse } = useGetTrainingCategoriesQuery({
+  const { currentData: trainingCategoriesResponse } = useGetTrainingCategoriesQuery({
     pageSize: 100,
-  });
+  }, {skip: !canAccessAdminPanel || activeTab !== 'trainings'});
   const trainingCategories = trainingCategoriesResponse?.results ?? [];
 
   // Fetch specific entity data when in edit mode
   const {
-    data: forumDetail,
+    currentData: forumDetail,
     isLoading: isLoadingForum,
     isError: isErrorForum,
     refetch: refetchForum,
@@ -821,7 +823,7 @@ export default function AdminPanel() {
       (!editingItem && !viewingId),
   });
   const {
-    data: memberDetail,
+    currentData: memberDetail,
     isLoading: isLoadingMember,
     isError: isErrorMember,
     refetch: refetchMember,
@@ -844,7 +846,7 @@ export default function AdminPanel() {
       (!editingItem && !viewingId),
   });
   const {
-    data: technicoproDetail,
+    currentData: technicoproDetail,
     isLoading: isLoadingTechnicoProDetail,
     isError: isErrorTechnicoPro,
     refetch: refetchTechnicoPro,
@@ -855,7 +857,7 @@ export default function AdminPanel() {
       (!editingItem && !viewingId),
   });
   const {
-    data: eventDetail,
+    currentData: eventDetail,
     isLoading: isLoadingEvent,
     isError: isErrorEvent,
     refetch: refetchEvent,
@@ -866,7 +868,7 @@ export default function AdminPanel() {
       (!editingItem && !viewingId),
   });
   const {
-    data: trainingDetail,
+    currentData: trainingDetail,
     isLoading: isLoadingTraining,
     isError: isErrorTraining,
     refetch: refetchTraining,
@@ -892,10 +894,16 @@ export default function AdminPanel() {
                 ? trainingDetail
                 : null;
   const detailsItem = viewingItem as any;
+  const editorDraft = React.useRef<DraftSnapshot<any> | null>(null);
+  const [hasDraftConflict, setHasDraftConflict] = useState(false);
+  const isCurrentDetailError = activeTab === 'members' ? isErrorMember
+    : activeTab === 'forums' ? isErrorForum : activeTab === 'articles' ? isErrorArticle
+    : activeTab === 'technicopro' ? isErrorTechnicoPro : activeTab === 'events' ? isErrorEvent : isErrorTraining;
+  const isEditorDetailReady = viewingItem?.id === editingItem?.id && !isCurrentDetailError;
 
   const isDetailsLoading =
-    isDetailsOpen &&
-    (isLoadingForum ||
+    isDetailsOpen && !isCurrentDetailError &&
+    (!viewingItem || isLoadingForum ||
       isLoadingMember ||
       isLoadingArticle ||
       isLoadingTechnicoProDetail ||
@@ -919,18 +927,18 @@ export default function AdminPanel() {
     else if (activeTab === "trainings") refetchTraining();
   };
 
-  const { data: smtpSettings, isLoading: isLoadingSmtpSettings } =
-    useGetAdminSmtpSettingsQuery();
+  const { currentData: smtpSettings, isLoading: isLoadingSmtpSettings } =
+    useGetAdminSmtpSettingsQuery(undefined, {skip: !canAccessAdminPanel || activeTab !== 'settingsBackups'});
   const {
-    data: systemLogs,
+    currentData: systemLogs,
     isLoading: isLoadingSystemLogs,
     isFetching: isFetchingSystemLogs,
   } = useGetAdminSystemLogsQuery({
     limit: systemLogsLimit,
     search: systemLogSearchTerm.trim() || undefined,
-  });
-  const { data: backupsData, isLoading: isLoadingBackups } =
-    useGetAdminBackupsQuery();
+  }, {skip: !canAccessAdminPanel || activeTab !== 'settingsBackups'});
+  const { currentData: backupsData, isLoading: isLoadingBackups } =
+    useGetAdminBackupsQuery(undefined, {skip: !canAccessAdminPanel || activeTab !== 'settingsBackups'});
   const [updateAdminSmtpSettings, { isLoading: isSavingSmtpSettings }] =
     useUpdateAdminSmtpSettingsMutation();
   const [testAdminSmtpSettings, { isLoading: isTestingSmtpSettings }] =
@@ -1054,12 +1062,12 @@ export default function AdminPanel() {
                 ? 5
                 : 5;
   const showTableSkeleton =
-    (activeTab === "members" && isLoadingUsers) ||
-    (activeTab === "articles" && isLoadingArticles) ||
-    (activeTab === "technicopro" && isLoadingTechnicoPro) ||
+    (activeTab === "members" && (isLoadingUsers || (isFetchingUsers && !usersData))) ||
+    (activeTab === "articles" && (isLoadingArticles || (isFetchingArticles && !articlesData))) ||
+    (activeTab === "technicopro" && (isLoadingTechnicoPro || (isFetchingTechnicoPro && !technicoproData))) ||
     (activeTab === "moderation" &&
-      ((modSubTab === "queue" && isLoadingModeration) ||
-        (modSubTab === "logs" && isLoadingModerationLogs)));
+      ((modSubTab === "queue" && (isLoadingModeration || (isFetchingModerationQueue && !moderationQueueData))) ||
+        (modSubTab === "logs" && (isLoadingModerationLogs || (isFetchingModerationLogs && !moderationLogsData)))));
 
   React.useEffect(() => {
     setMemberPage(1);
@@ -1080,10 +1088,16 @@ export default function AdminPanel() {
 
   // Sync detail data to formData when it arrives
   React.useEffect(() => {
-    if (isModalOpen && editingItem) {
-      if (activeTab === "forums" && forumDetail) setFormData(forumDetail);
+    const sync = (incoming: any) => {
+      const next = reconcileDraft(editorDraft.current, `${activeTab}:${editingItem.id}`, incoming, formData, selectedFiles.length > 0 || removedFileUrls.length > 0);
+      editorDraft.current = next.snapshot;
+      setHasDraftConflict(next.conflict);
+      if (next.value !== formData) setFormData(next.value);
+    };
+    if (isModalOpen && editingItem && isEditorDetailReady) {
+      if (activeTab === "forums" && forumDetail?.id === editingItem.id) sync(forumDetail);
       if (activeTab === "members" && memberDetail) {
-        setFormData({
+        sync({
           ...memberDetail,
           role_id: memberDetail.role_details?.id || "",
           is_superuser: memberDetail.is_superuser,
@@ -1097,7 +1111,7 @@ export default function AdminPanel() {
         if (!normalized.structured_fields) {
           normalized.structured_fields = { file_urls: [] };
         }
-        setFormData(normalized);
+        sync(normalized);
       }
       if (activeTab === "technicopro" && technicoproDetail) {
         const normalized = { ...technicoproDetail };
@@ -1107,10 +1121,10 @@ export default function AdminPanel() {
         if (!normalized.structured_fields) {
           normalized.structured_fields = { file_urls: [] };
         }
-        setFormData(normalized);
+        sync(normalized);
       }
       if (activeTab === "events" && eventDetail) {
-        setFormData({
+        sync({
           ...eventDetail,
           event_category_id:
             eventDetail.event_category?.id ||
@@ -1121,7 +1135,7 @@ export default function AdminPanel() {
         });
       }
       if (activeTab === "trainings" && trainingDetail) {
-        setFormData({
+        sync({
           ...trainingDetail,
           category_id:
             trainingDetail.category?.id ||
@@ -1231,6 +1245,9 @@ export default function AdminPanel() {
     if ((item && !canEditForTab) || (!item && !canCreateForTab)) {
       return;
     }
+
+    editorDraft.current = null;
+    setHasDraftConflict(false);
 
     setSelectedFiles([]);
     setRemovedFileUrls([]);
@@ -1559,6 +1576,7 @@ export default function AdminPanel() {
     if (!canAccessAdminPanel) return;
     e.preventDefault();
     const id = editingItem ? editingItem.id : null;
+    if (editingItem && !isEditorDetailReady) return;
     if (activeTab === "articles" && (editingItem
       ? isFetchingArticle || isErrorArticle || articleDetail?.id !== id || !canModify(articleDetail, "edit")
       : !canCreateArticles)) return;
@@ -3901,7 +3919,7 @@ export default function AdminPanel() {
         footer={(<ModalSubmitButton
           formId="admin-entity-form"
           disabled={
-            isCreatingMember ||
+            Boolean(editingItem && !isEditorDetailReady) || isCreatingMember ||
             isUpdatingMember ||
             isCreatingForum ||
             isUpdatingForum ||
@@ -3955,12 +3973,15 @@ export default function AdminPanel() {
               ? translate("adminPanelPage.submitEdit")
               : translate("adminPanelPage.submitCreate")}
         </ModalSubmitButton>)}>
+        {hasDraftConflict && <p role="status">{translate('common.draftConflict')}</p>}
+        {editingItem && !isEditorDetailReady && <p role="status">{translate(isCurrentDetailError ? 'common.error' : 'common.loading')}</p>}
         <form
           id="admin-entity-form"
           noValidate
           onSubmit={handleSubmit}
           className="space-y-5 text-left"
         >
+          <fieldset disabled={Boolean(editingItem && !isEditorDetailReady)} className="contents">
           {/* MEMBER FORM */}
           {activeTab === "members" && (
             <>
@@ -4887,6 +4908,7 @@ export default function AdminPanel() {
             </>
           )}
 
+        </fieldset>
         </form>
       </Modal>
       <ConfirmModal presentation="compact"

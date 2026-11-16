@@ -532,7 +532,6 @@ export default function Forums() {
     data: pinnedTopics = [],
     isLoading: isPinnedTopicsLoading,
     isError: isPinnedTopicsError,
-    refetch: refetchPinnedTopics,
   } = useGetPinnedTopicsQuery();
   const [createForum, { isLoading: isCreatingForum }] =
     useCreateForumMutation();
@@ -583,10 +582,6 @@ export default function Forums() {
   const selectedTopicId = topicId || null;
   const [topicPage, setTopicPage] = useState(1);
   const [postPage, setPostPage] = useState(1);
-
-  const [localTopics, setLocalTopics] = useState<Topic[]>([]);
-  const [hiddenTopicIds, setHiddenTopicIds] = useState<string[]>([]);
-  const [localPosts, setLocalPosts] = useState<Post[]>([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewForumModalOpen, setIsNewForumModalOpen] = useState(false);
@@ -714,10 +709,7 @@ export default function Forums() {
   }, [selectedTopicId]);
 
   const topics = useMemo<Topic[]>(() => {
-    const scopedLocalTopics = localTopics.filter(
-      (topic) => topic.forumId === activeForumId,
-    );
-    const localTopicIds = new Set(scopedLocalTopics.map((topic) => topic.id));
+
     const apiTopics = (forumTopicsData?.results || [])
       .map((topic) => {
         const authorName =
@@ -739,13 +731,10 @@ export default function Forums() {
           status: "approved" as const,
           attachments: topic.attachment,
         };
-      })
-      .filter((topic) => !localTopicIds.has(topic.id));
+      });
 
-    return [...scopedLocalTopics, ...apiTopics].filter(
-      (topic) => !hiddenTopicIds.includes(topic.id),
-    );
-  }, [activeForumId, forumTopicsData, hiddenTopicIds, localTopics, localeCode]);
+    return apiTopics;
+  }, [activeForumId, forumTopicsData, localeCode]);
 
   // Derived data
   const filteredTopics = useMemo(() => {
@@ -786,10 +775,7 @@ export default function Forums() {
   );
 
   const topicPosts = useMemo<Post[]>(() => {
-    const scopedLocalPosts = localPosts.filter(
-      (post) => post.topicId === selectedTopicId,
-    );
-    const localPostIds = new Set(scopedLocalPosts.map((post) => post.id));
+
     const apiPosts = (topicPostsData?.results || [])
       .map((post) => {
         const authorName =
@@ -805,11 +791,10 @@ export default function Forums() {
           status: post.moderation_status,
           attachments: post.attachment,
         };
-      })
-      .filter((post) => !localPostIds.has(post.id));
+      });
 
-    return [...apiPosts, ...scopedLocalPosts];
-  }, [localPosts, selectedTopicId, topicPostsData]);
+    return apiPosts;
+  }, [selectedTopicId, topicPostsData]);
 
   // Handlers
   const handleNavigateToForum = (id: string) => {
@@ -1021,26 +1006,6 @@ export default function Forums() {
     try {
       const updatedTopic = await updateTopic(payload).unwrap();
 
-      setLocalTopics((prev) =>
-        prev.map((topic) =>
-          topic.id === editTopicData.id
-            ? {
-                ...topic,
-                title: updatedTopic.title,
-                content: updatedTopic.content,
-                attachments: updatedTopic.attachment || [],
-                replyCount: updatedTopic.reply_count,
-                viewCount: updatedTopic.view_count,
-                isPinned: updatedTopic.is_pinned,
-                createdAt: updatedTopic.created_at,
-                lastActivity: formatTopicActivity(
-                  updatedTopic.last_activity_at,
-                  localeCode,
-                ),
-              }
-            : topic,
-        ),
-      );
       setEditTopicData((prev) => ({
         ...prev,
         title: updatedTopic.title,
@@ -1133,16 +1098,6 @@ export default function Forums() {
         files: editPostFiles,
       }).unwrap();
 
-      setLocalPosts((prev) =>
-        prev.map((post) =>
-          post.id === editPostData.id
-            ? {
-                ...post,
-                content: editPostData.content,
-              }
-            : post,
-        ),
-      );
       setEditPostFiles([]);
       setIsEditPostModalOpen(false);
       toast.success(translate("forumsPage.success"));
@@ -1228,19 +1183,6 @@ export default function Forums() {
         pinned: !topic.isPinned,
       }).unwrap();
 
-      setLocalTopics((prev) => {
-        const hasLocalTopic = prev.some((item) => item.id === topic.id);
-
-        if (hasLocalTopic) {
-          return prev.map((item) =>
-            item.id === topic.id
-              ? { ...item, isPinned: !topic.isPinned }
-              : item,
-          );
-        }
-
-        return [{ ...topic, isPinned: !topic.isPinned }, ...prev];
-      });
     } catch (error) {
       toast.error(getApiErrorDisplayMessage(error, translate, "apiErrors.default"));
     } finally {
@@ -1302,17 +1244,6 @@ export default function Forums() {
           topic_id: deleteTarget.id,
           forum_id: deleteTarget.forumId,
         }).unwrap();
-        await refetchPinnedTopics();
-
-        setLocalTopics((prev) =>
-          prev.filter((topic) => topic.id !== deleteTarget.id),
-        );
-        setHiddenTopicIds((prev) =>
-          prev.includes(deleteTarget.id) ? prev : [...prev, deleteTarget.id],
-        );
-        setLocalPosts((prev) =>
-          prev.filter((post) => post.topicId !== deleteTarget.id),
-        );
 
         if (selectedTopicId === deleteTarget.id) {
           navigate(selectedForumId ? `/forums/${selectedForumId}` : "/forums");
@@ -1326,9 +1257,6 @@ export default function Forums() {
           forum_id: deleteTarget.forumId,
         }).unwrap();
 
-        setLocalPosts((prev) =>
-          prev.filter((post) => post.id !== deleteTarget.id),
-        );
       }
 
       setDeleteTarget(null);

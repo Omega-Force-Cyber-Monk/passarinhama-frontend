@@ -59,7 +59,6 @@ export function AdminPermissionsEditor({ kind, targetId, canManage, onBusyChange
       } else {
         await updateMember({ id: original!.id!, user_id: targetId, ...changes }).unwrap();
       }
-      await query.refetch().unwrap();
       setDrafts((current) => { const next = { ...current }; delete next[feature]; return next; });
       toast.success(translate("adminPanelPage.operationSuccessful"));
     } catch (error) {

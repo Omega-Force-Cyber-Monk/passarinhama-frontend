@@ -312,7 +312,7 @@ export default function DocumentLibrary() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchTerm, setSearchTerm] = useState("");
 
-  const { data: allFolders, isLoading: isLoadingFolders } =
+  const { currentData: allFolders, isLoading: isLoadingFolders } =
     useGetDocumentFoldersQuery();
 
   const [createFolder] = useCreateFolderMutation();
@@ -394,7 +394,7 @@ export default function DocumentLibrary() {
       : rootPath;
 
   const currentFolder = path[path.length - 1];
-  const { data: folderContent, isLoading: isLoadingContent } =
+  const { currentData: folderContent, isLoading: isLoadingContent, isFetching: isFetchingContent } =
     useGetDocumentsQuery(
       { folder_id: currentFolder.id || "" },
       { skip: !currentFolder.id },
@@ -433,10 +433,10 @@ export default function DocumentLibrary() {
   }, [allFolders, buildFolderPath, folderId, isLoadingFolders, navigate]);
 
   React.useEffect(() => {
-    if (fileId && folderId && !isLoadingContent && !selectedPreviewFile) {
+    if (fileId && folderId && !isLoadingContent && !isFetchingContent && !selectedPreviewFile) {
       navigate(`/documents/folder/${folderId}`, { replace: true });
     }
-  }, [fileId, folderId, isLoadingContent, selectedPreviewFile, navigate]);
+  }, [fileId, folderId, isLoadingContent, isFetchingContent, selectedPreviewFile, navigate]);
 
   React.useEffect(() => {
     setPreviewUrl(null);
@@ -997,7 +997,7 @@ export default function DocumentLibrary() {
             <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 ml-1">
               {translate("documentLibraryPage.files")}
             </h3>
-            {isLoadingContent ? (
+            {isLoadingContent || (isFetchingContent && !folderContent) ? (
               viewMode === "grid" ? (
                 <FileGridSkeleton />
               ) : (

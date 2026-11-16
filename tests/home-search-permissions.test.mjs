@@ -65,7 +65,7 @@ test('search rows and count exclude denied and unknown result types, regardless 
   function visit(node) { if (ts.isVariableDeclaration(node)) declarations.set(node.name.getText(sf), node.initializer?.getText(sf)); ts.forEachChild(node, visit); }
   visit(sf);
   for (const isAuthenticated of [true, false]) {
-    const context = {isAuthenticated, useMemo: fn => fn(), SEARCH_PERMISSION_FEATURES: {articles: 'article', documents: 'document'},
+    const context = {isAuthenticated, debouncedSearchTerm: 'term', normalizedSearchTerm: 'term', useMemo: fn => fn(), SEARCH_PERMISSION_FEATURES: {articles: 'article', documents: 'document'},
       hasPermission: feature => feature === 'article', searchResults: {results: [{type: 'articles', id: 'allowed'}, {type: 'documents', id: 'forbidden', snippet: 'private'}, {type: 'unknown', id: 'unknown'}], meta: {total_results: 999}}};
     runInNewContext(`const visibleSearchResults = ${declarations.get('visibleSearchResults')}; result = {rows: visibleSearchResults, count: ${declarations.get('searchResultCount')}};`, context);
     assert.equal(context.result.count, isAuthenticated ? 1 : 0);

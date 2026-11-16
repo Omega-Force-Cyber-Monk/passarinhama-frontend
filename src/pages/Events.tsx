@@ -57,7 +57,7 @@ export default function Events() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ title: '', type: 'general', day: '12', endDay: '12', time: '14:00', location: 'Zoom' });
   const [activeTab, setActiveTab] = useState<'info' | 'participants'>('info');
-  const { data: apiEvents = [], isLoading: isLoadingEvents } = useGetEventsQuery({
+  const { currentData: apiEvents = [], isLoading: isLoadingEvents, isFetching: isFetchingEvents } = useGetEventsQuery({
     year: currentMonth.getFullYear(),
     month: currentMonth.getMonth() + 1,
   });
@@ -81,7 +81,8 @@ export default function Events() {
       return;
     }
 
-    if (isLoadingEvents) {
+    if (isLoadingEvents || isFetchingEvents) {
+      if (selectedEvent?.id !== eventId) setSelectedEvent(null);
       return;
     }
 
@@ -93,7 +94,7 @@ export default function Events() {
       return;
     }
     navigate('/events', { replace: true });
-  }, [eventId, events, isLoadingEvents, navigate]);
+  }, [eventId, events, isLoadingEvents, isFetchingEvents, navigate]);
 
   const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault();

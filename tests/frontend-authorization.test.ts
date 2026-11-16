@@ -96,6 +96,7 @@ function harness() {
       let data: any = {}, status = 200;
       if (path === '/auth/refresh') { data = { access_token: 'refreshed-token', refresh_token: 'refreshed-refresh' }; h.profileStatus = 200; }
       else if (path === '/user/users/me' && request.method === 'GET') { data = h.profile; status = h.profileStatus; }
+      else if (path.endsWith('/dashboard/upcoming-events')) data = [];
       else if (request.method !== 'GET') { h.writes.push(request.clone()); status = h.writeStatus; data = { id: 'record', results: [], backups: [] }; }
       else if (path === '/forums/forums') data = { total: 1, total_pages: 1, results: [{ id: 'forum', can_post: h.canPost }] };
       else if (path === '/forums/forums/forum/topics') data = { total: 1, total_pages: 1, results: [{ id: 'record', author: { id: h.owner }, is_locked: h.locked, reply_count: h.replies }] };

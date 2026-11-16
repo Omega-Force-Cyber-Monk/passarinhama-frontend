@@ -212,9 +212,11 @@ test('Document missing/unsupported source does not load, and unmounted pending r
 
 test('Document route validation preserves folder redirect and waits for initial content loading', () => {
   const validation = find(docs, (n) => ts.isCallExpression(n) && n.expression.getText(docs) === 'React.useEffect' && n.arguments[0]?.getText(docs).includes('!selectedPreviewFile'))[0];
-  const calls = [], c = { fileId: 'A', folderId: 'folder', selectedPreviewFile: null, isLoadingContent: true, navigate: (...args) => calls.push(args) };
+  const calls = [], c = { fileId: 'A', folderId: 'folder', selectedPreviewFile: null, isLoadingContent: true, isFetchingContent: false, navigate: (...args) => calls.push(args) };
   const check = () => evaluate(validation.arguments[0].getText(docs), c)();
   check(); assert.equal(calls.length, 0);
+  c.isLoadingContent = false; c.isFetchingContent = true; check(); assert.equal(calls.length, 0);
+  c.isFetchingContent = false;
   c.isLoadingContent = false; c.selectedPreviewFile = a; check(); assert.equal(calls.length, 0);
   c.selectedPreviewFile = null; check(); assert.equal(calls.length, 1);
   assert.equal(calls[0][0], '/documents/folder/folder'); assert.equal(calls[0][1].replace, true);

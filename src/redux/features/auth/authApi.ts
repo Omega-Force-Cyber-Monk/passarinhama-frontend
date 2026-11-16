@@ -1,4 +1,6 @@
 import { apiSlice } from '../api/apiSlice';
+import { normalizeUserProfile } from './normalizeProfile';
+export { normalizeUserProfile } from './normalizeProfile';
 import { 
   LoginRequest, 
   SignupRequest, 
@@ -25,10 +27,7 @@ const buildFormBody = (entries: Array<[string, string | undefined]>) => {
   return body.toString();
 };
 
-const normalizeRole = (role: string | UserRoleDetails | null | undefined) => {
-  if (!role) return '';
-  return typeof role === 'string' ? role : role.slug || role.name;
-};
+
 
 const normalizeAuthResponse = (response: AuthResponse): AuthResponse => ({
   ...response,
@@ -40,15 +39,6 @@ const normalizeVerifyOtpResponse = (
 ): VerifyOtpResponse => ({
   ...response,
   sessionKey: response.sessionKey ?? response.session_key,
-});
-
-export const normalizeUserProfile = (user: UserProfileApiResponse): UserProfile => ({
-  ...user,
-  role: normalizeRole(user.role),
-  is_superuser: user.is_superuser ?? false,
-  role_details: typeof user.role === 'string' ? null : user.role,
-  permissions: user.permissions ?? [],
-  user_permissions: user.user_permissions ?? [],
 });
 
 export const authApi = apiSlice.injectEndpoints({

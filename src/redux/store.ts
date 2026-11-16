@@ -2,12 +2,13 @@
 import { configureStore, createListenerMiddleware, isAnyOf } from '@reduxjs/toolkit';
 import { setupListeners } from '@reduxjs/toolkit/query';
 import { apiSlice } from './features/api/apiSlice';
-import authReducer, { logout, setCredentials } from './features/auth/authSlice';
+import authReducer, { logout, setCredentials, sessionReplaced } from './features/auth/authSlice';
+import { listenForSessionChanges } from './features/auth/sessionSync';
 
 const listenerMiddleware = createListenerMiddleware();
 
 listenerMiddleware.startListening({
-  matcher: isAnyOf(logout, setCredentials),
+  matcher: isAnyOf(logout, setCredentials, sessionReplaced),
   effect: async (_, api) => {
     api.dispatch(apiSlice.util.resetApiState());
   },
@@ -26,6 +27,7 @@ export const store = configureStore({
 });
 
 setupListeners(store.dispatch);
+listenForSessionChanges(store);
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;

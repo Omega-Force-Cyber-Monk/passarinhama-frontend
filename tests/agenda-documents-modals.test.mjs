@@ -43,7 +43,7 @@ function inspect(file) {
       canCreateEvent: true, canEditEvent: true, canDeleteEventPermission: true, eventCategories: [{ id: 'cat', name: 'Category' }],
       getPreviewName: (url) => url.split('/').pop(), getEventCategoryStyle: () => ({}), getEventCategoryLabel: () => 'Category',
       agendaId: 'event', selectedEventId: 'event', selectedEventDescription: '<p>Event body</p>', activeTab: 'info',
-      canSeeParticipants: false, isLoadingRegistrations: false, registrationsData: { registrations: [] }, isRegistering: false, isUnregistering: false,
+      canSeeParticipants: false, isLoadingRegistrations: false, isFetchingRegistrations: false, registrationsData: { registrations: [] }, isRegistering: false, isUnregistering: false,
       selectedEvent: { id: 'event', title: 'Event', description: '<p>Body</p>', event_date: '2026-10-18', end_date: '2026-10-19', event_time: '14:00', location: 'Place', attendee_count: 1, max_attendees: 2, spots_left: 1, is_registered: false, is_public: false, attachments: [] },
       dayViewModal: { isOpen: true, date: new Date(2026, 9, 18), events: [] },
       isFolderModalOpen: true, isRenameModalOpen: true, isUploadModalOpen: true, newFolderName: ' Folder ', renamingName: ' Renamed ', renameInfo: { type: 'folder', id: 'target' },

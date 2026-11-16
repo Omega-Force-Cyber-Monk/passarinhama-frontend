@@ -91,6 +91,7 @@
     "retry": "Réessayer"
   },
   "common": {
+    "draftConflict": "Cet élément a été modifié sur le serveur. Vos modifications non enregistrées sont conservées. Fermez puis rouvrez pour charger la dernière version.",
     "close": "Fermer la fenêtre",
     "home": "Accueil",
     "dashboard": "Tableau de bord",

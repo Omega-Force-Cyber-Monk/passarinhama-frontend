@@ -1,3 +1,4 @@
+import { projectionTags, mutationChanged } from '../api/cacheTags';
 import { apiSlice } from '../api/apiSlice';
 import {
   ModerationLogsResponse,
@@ -11,12 +12,12 @@ export const moderationApi = apiSlice.injectEndpoints({
     getModerationLogs: builder.query<ModerationLogsResponse, { page?: number; pageSize?: number }>({
       query: ({ page = 1, pageSize = 20 }) =>
         `/admin&modarator/moderation/logs?page=${page}&page_size=${pageSize}`,
-      providesTags: ['Post', 'Admin'],
+      providesTags: [{type:'Post',id:'MODERATION'}],
     }),
     getModerationQueue: builder.query<ModerationQueueResponse, { page?: number; pageSize?: number }>({
       query: ({ page = 1, pageSize = 20 }) =>
         `/admin&modarator/moderation/queue?page=${page}&page_size=${pageSize}`,
-      providesTags: ['Post'],
+      providesTags: [{type:'Post',id:'MODERATION'}],
     }),
     moderatePost: builder.mutation<ModeratePostResponse, { postId: string; body: ModeratePostRequest }>({
       query: ({ postId, body }) => ({
@@ -24,7 +25,7 @@ export const moderationApi = apiSlice.injectEndpoints({
         method: 'PATCH',
         body,
       }),
-      invalidatesTags: ['Post'],
+      invalidatesTags: (result,error,{postId}) => mutationChanged(error) ? ([{type:'Post',id:postId},{type:'Post',id:'MODERATION'},'Topic','Forum',...projectionTags]) : [],
     }),
   }),
 });

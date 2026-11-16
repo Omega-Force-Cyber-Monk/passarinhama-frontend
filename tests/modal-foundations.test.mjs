@@ -263,7 +263,11 @@ test('object-URL leases and local viewer/download paths clean up, preserve files
 
 function fileComponents() {
   const h = hooks(), created = [], released = [], calls = [];
-  const attachment = evaluate('src/utils/attachments.ts');
+  const attachment = evaluate('src/utils/attachments.ts', {
+    '../redux/store': {store: {getState() { throw new Error('File presentation must not read session state'); }}},
+    '../redux/features/auth/sessionSync': {synchronizeSession() {}},
+    '../redux/features/auth/permissionUtils': {isActiveUser: () => false},
+  });
   const local = { createObjectUrlLease: (file) => { const url = `blob:${created.length}`; created.push(file); return { url, release: () => released.push(url) }; },
     localPreviewMime: (file) => file.type === 'image/png' || file.type === 'application/pdf',
     openLocalFile: (file) => calls.push(['local-open', file]), downloadLocalFile: (file) => calls.push(['local-download', file]) };

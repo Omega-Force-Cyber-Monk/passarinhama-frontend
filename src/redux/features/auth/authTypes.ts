@@ -132,5 +132,7 @@ export interface AuthState {
   status: 'initializing' | 'authenticated' | 'unauthenticated' | 'error';
   permissionsStatus: 'unknown' | 'loading' | 'ready' | 'error';
   sessionVersion: number;
+  sessionId: string;
+  profileRequestOrder: number;
   error: number | string | null;
 }

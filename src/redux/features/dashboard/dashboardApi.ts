@@ -1,3 +1,4 @@
+
 import { apiSlice } from '../api/apiSlice';
 
 const DASHBOARD_BASE_PATH = '/admin%26modarator/dashboard';
@@ -78,20 +79,21 @@ export const dashboardApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getDashboardStats: builder.query<DashboardStatsResponse, void>({
       query: () => `${DASHBOARD_BASE_PATH}/stats`,
-      providesTags: ['User', 'Topic', 'Event', 'Training'],
+      providesTags: [{type:'Dashboard',id:'STATS'}],
     }),
     getDashboardActivity: builder.query<DashboardActivityItem[], void>({
       query: () => `${DASHBOARD_BASE_PATH}/activity`,
-      providesTags: ['User', 'Topic', 'Event', 'Training', 'Article'],
+      providesTags: [{type:'Dashboard',id:'ACTIVITY'}],
     }),
     getDashboardUpcomingEvents: builder.query<DashboardUpcomingEventItem[], void>({
       query: () => `${DASHBOARD_BASE_PATH}/upcoming-events`,
-      providesTags: ['Event'],
+      providesTags: (result) => [{type:'Event',id:'LIST'},...(result?.map(item=>({type:'Event' as const,id:item.id}))||[])],
     }),
     getDashboardSearch: builder.query<
       GlobalSearchResponse,
       { q: string; limit?: number; type?: GlobalSearchResultType }
     >({
+      serializeQueryArgs: ({queryArgs}) => ({q: queryArgs.q.trim(), limit: queryArgs.limit ?? 10, type: queryArgs.type}),
       query: ({ q, limit = 10, type }) => {
         const params = new URLSearchParams({
           q: q.trim(),
@@ -104,6 +106,7 @@ export const dashboardApi = apiSlice.injectEndpoints({
 
         return `/home/?${params.toString()}`;
       },
+      providesTags: [{type:'Search',id:'GLOBAL'}],
     }),
   }),
 });
@@ -113,4 +116,5 @@ export const {
   useGetDashboardActivityQuery,
   useGetDashboardUpcomingEventsQuery,
   useLazyGetDashboardSearchQuery,
+  useGetDashboardSearchQuery,
 } = dashboardApi;

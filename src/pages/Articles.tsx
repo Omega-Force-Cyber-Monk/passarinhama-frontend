@@ -3,6 +3,7 @@ import "./ArticleForumModals.css";
 import { ContentCard, ContentCardSkeleton, ContentPageHeader, ContentStatusField, ContentStatusTabs, useListingStatus } from "../components/ui/ContentListing";
 import CategoryManagerDialog, { type CategoryValues } from "../components/ui/CategoryManagerDialog";
 import React, { useState, useEffect } from "react";
+import { reconcileDraft, type DraftSnapshot } from '../utils/recordDraft';
 import {
   FileText,
   Trash2,
@@ -198,7 +199,7 @@ export default function Articles() {
   const [draftPage, setDraftPage] = useState(1);
 
   const {
-    data: publishedArticlesData,
+    currentData: publishedArticlesData,
     isLoading: isLoadingPublished,
     isFetching: isFetchingPublished,
     isError: isPublishedError,
@@ -207,9 +208,9 @@ export default function Articles() {
     pageSize: ARTICLES_PAGE_SIZE,
     status: "published",
     category_id: categoryId,
-  });
+  }, {skip: statusFilter !== 'published'});
   const {
-    data: draftArticlesData,
+    currentData: draftArticlesData,
     isLoading: isLoadingDrafts,
     isFetching: isFetchingDrafts,
     isError: isDraftsError,
@@ -221,10 +222,10 @@ export default function Articles() {
       category_id: categoryId,
     },
     {
-      skip: !canManageArticleContent,
+      skip: !canManageArticleContent || statusFilter !== 'draft',
     } as any,
   );
-  const { data: categoriesResponse, isLoading: isLoadingCategories, error: categoriesError, refetch: refetchCategories } = useGetArticleCategoriesQuery({
+  const { currentData: categoriesResponse, isLoading: isLoadingCategories, error: categoriesError, refetch: refetchCategories } = useGetArticleCategoriesQuery({
     pageSize: 100,
   });
   const categoriesData = categoriesResponse?.results ?? [];
@@ -259,6 +260,8 @@ export default function Articles() {
     getDefaultArticleFormData(defaultArticleAuthor),
   );
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const articleDraft = React.useRef<DraftSnapshot<ArticleFormState> | null>(null);
+  const [hasDraftConflict, setHasDraftConflict] = useState(false);
   const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState<string | null>(
     null,
   );
@@ -283,7 +286,7 @@ export default function Articles() {
   // Sync article detail to form when fetched
   useEffect(() => {
     if (articleDetail && articleDetail.id === selectedArticleId && canModify(articleDetail, "edit")) {
-      setFormData({
+      const incoming = {
         title: articleDetail.title,
         category_id: getArticleCategoryId(articleDetail, categoriesData),
         excerpt: articleDetail.excerpt || "",
@@ -295,9 +298,12 @@ export default function Articles() {
           articleDetail.structured_fields,
           defaultArticleAuthor,
         ),
-      });
+      };
+      const next = reconcileDraft(articleDraft.current, articleDetail.id, incoming, formData, selectedFiles.length > 0);
+      articleDraft.current = next.snapshot;
+      setHasDraftConflict(next.conflict);
+      if (next.value !== formData) setFormData(next.value);
       setEditingArticle(articleDetail);
-      setSelectedFiles([]);
     }
   }, [articleDetail, selectedArticleId, defaultArticleAuthor, categoriesData, canModify]);
 
@@ -310,6 +316,8 @@ export default function Articles() {
     if ((article && !canModify(article, "edit")) || (!article && !canCreateArticle)) {
       return;
     }
+    articleDraft.current = null;
+    setHasDraftConflict(false);
 
     if (article) {
       setSelectedArticleId(article.id);
@@ -565,7 +573,7 @@ export default function Articles() {
 
       <section className="space-y-6">
         <div className="content-list-grid">
-            {activeIsLoading ? (
+            {activeIsLoading || (activeIsFetching && !((statusFilter === 'published' ? publishedArticlesData : draftArticlesData))) ? (
               <div className="col-span-full">
                 <ArticlesSectionSkeleton count={4} />
               </div>
@@ -681,6 +689,7 @@ export default function Articles() {
           )}
         </ModalSubmitButton>) : undefined}
       >
+        {hasDraftConflict && <p role="status">{translate('common.draftConflict')}</p>}
         {isFetchingDetail ? (
           <ArticleModalSkeleton />
         ) : (

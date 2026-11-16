@@ -230,16 +230,16 @@ export default function Agenda() {
   const selectedMonth = currentMonth.getMonth() + 1;
 
   // API Fetching
-  const { data: apiEvents, isLoading: isLoadingEvents, isError: isCalendarError } = useGetEventsQuery({
+  const { currentData: apiEvents, isLoading: isLoadingEvents, isError: isCalendarError } = useGetEventsQuery({
     year: selectedYear,
     month: selectedMonth,
   });
   const {
-    data: upcomingEvents,
+    currentData: upcomingEvents,
     isLoading: isLoadingUpcoming,
     isError: isUpcomingError,
   } = useGetUpcomingEventsQuery({ limit: 6 });
-  const { data: eventCategoriesResponse, isLoading: isLoadingCategories, error: categoriesError, refetch: refetchCategories } = useGetEventCategoriesQuery({
+  const { currentData: eventCategoriesResponse, isLoading: isLoadingCategories, error: categoriesError, refetch: refetchCategories } = useGetEventCategoriesQuery({
     pageSize: 100,
   });
   const eventCategories = eventCategoriesResponse?.results ?? [];
@@ -283,7 +283,7 @@ export default function Agenda() {
     (event) => event.id === detailEventId,
   );
   const {
-    data: selectedEventDetails,
+    currentData: selectedEventDetails,
     isError: isSelectedEventError,
     isLoading: isLoadingSelectedEvent,
   } =
@@ -292,8 +292,8 @@ export default function Agenda() {
     });
   const selectedEvent = selectedEventFromList || (selectedEventDetails?.id === detailEventId ? selectedEventDetails : undefined);
   const canSeeParticipants = canModify("event", selectedEvent, "edit") || canModify("event", selectedEvent, "delete");
-  const { data: registrationsData, isLoading: isLoadingRegistrations } =
-    useGetEventRegistrationsQuery(selectedEventId || "", { skip: !selectedEventId || !canSeeParticipants });
+  const { currentData: registrationsData, isLoading: isLoadingRegistrations, isFetching: isFetchingRegistrations } =
+    useGetEventRegistrationsQuery(detailEventId, { skip: !detailEventId || !canSeeParticipants });
   const selectedEventDescription = selectedEvent
     ? enhanceEventDescription(selectedEvent.description)
     : "";
@@ -398,7 +398,7 @@ export default function Agenda() {
       return;
     }
 
-    if (selectedEventDetails) {
+    if (selectedEventDetails?.id === agendaId) {
       setSelectedEventId(selectedEventDetails.id);
       setActiveTab("info");
     }
@@ -1704,7 +1704,7 @@ export default function Agenda() {
                           {translate("agendaPage.registryLimited")}
                         </p>
                       </div>
-                    ) : isLoadingRegistrations ? (
+                    ) : isLoadingRegistrations || (isFetchingRegistrations && !registrationsData) ? (
                       <div className="py-12 text-center">
                         <RefreshCw className="w-8 h-8 animate-spin mx-auto text-primary" />
                         <p className="text-xs text-slate-400 mt-2 font-bold uppercase tracking-widest">

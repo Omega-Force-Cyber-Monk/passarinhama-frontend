@@ -1,3 +1,4 @@
+import { projectionTags, mutationChanged } from '../api/cacheTags';
 import { apiSlice } from '../api/apiSlice';
 import type { AuthorizationContext } from '../api/mutationAuthorization';
 import type { CategoryQueryParams, PaginatedResponse } from '../api/apiTypes';
@@ -84,13 +85,7 @@ export const articlesApi = apiSlice.injectEndpoints({
 
         return `/articles/articles?${params.toString()}`;
       },
-      providesTags: (result) =>
-        result
-          ? [
-              ...result.results.map(({ id }) => ({ type: 'Article' as const, id })),
-              { type: 'Article', id: 'LIST' },
-            ]
-          : [{ type: 'Article', id: 'LIST' }],
+      providesTags: (result) => [{type:'Article',id:'LIST'}, ...(result ? result.results.flatMap(item => [{type:'Article' as const,id:item.id}, ...(item.category?.id ? [{type:'ArticleCategory' as const,id:item.category.id}] : [])]) : [])],
     }),
     getArticleCategories: builder.query<
       PaginatedResponse<ArticleCategory>,
@@ -112,7 +107,7 @@ export const articlesApi = apiSlice.injectEndpoints({
         const queryString = searchParams.toString();
         return `/articles/article-categories${queryString ? `?${queryString}` : ''}`;
       },
-      providesTags: ['Article'],
+      providesTags: (result) => [{type:'ArticleCategory',id:'LIST'}, ...(result?.results.map(item => ({type:'ArticleCategory' as const,id:item.id})) || [])],
     }),
     createArticle: builder.mutation<Article, CreateArticleRequest>({
       query: (data) => ({
@@ -120,21 +115,15 @@ export const articlesApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: buildArticleFormData(data),
       }),
-      invalidatesTags: [{ type: 'Article', id: 'LIST' }, { type: 'Article', id: 'MY_LIST' }],
+      invalidatesTags: (result,error) => mutationChanged(error) ? [{ type: 'Article', id: 'LIST' }, { type: 'Article', id: 'MY_LIST' },...projectionTags] : [],
     }),
     getMyArticles: builder.query<PaginatedArticles, { page?: number; pageSize?: number }>({
       query: ({ page = 1, pageSize = 20 }) => `/articles/my-articles?page=${page}&page_size=${pageSize}`,
-      providesTags: (result) =>
-        result
-          ? [
-              ...result.results.map(({ id }) => ({ type: 'Article' as const, id })),
-              { type: 'Article', id: 'MY_LIST' },
-            ]
-          : [{ type: 'Article', id: 'MY_LIST' }],
+      providesTags: (result) => [{type:'Article',id:'MY_LIST'}, ...(result ? result.results.flatMap(item => [{type:'Article' as const,id:item.id}, ...(item.category?.id ? [{type:'ArticleCategory' as const,id:item.category.id}] : [])]) : [])],
     }),
     getArticleById: builder.query<Article, string>({
       query: (id) => `/articles/articles/${id}`,
-      providesTags: (result, error, id) => [{ type: 'Article', id }],
+      providesTags: (result, error, id) => [{type:'Article',id}, ...(result?.category?.id ? [{type:'ArticleCategory' as const,id:result.category.id}] : [])],
     }),
     getArticlePermissions: builder.query<ArticlePermission[], string>({
       query: (id) => `/articles/articles/${id}/permissions`,
@@ -152,18 +141,18 @@ export const articlesApi = apiSlice.injectEndpoints({
           'Content-Type': 'application/json',
         },
       }),
-      invalidatesTags: (_result, _error, { article_id }) => [
+      invalidatesTags: (_result, _error, { article_id }) => mutationChanged(_error) ? ([
         { type: 'Article', id: 'LIST' },
         { type: 'Article', id: 'MY_LIST' },
         ...article_id.map((id) => ({ type: 'Article' as const, id })),
-      ],
+      ...projectionTags,]) : [],
     }),
     deleteArticle: builder.mutation<void, string>({
       async queryFn(id, _api, _options, baseQuery) {
         const result = await baseQuery({ url: '/articles/articles/' + id, method: 'DELETE' });
         return result.error ? { error: result.error } : { data: undefined };
       },
-      invalidatesTags: [{ type: 'Article', id: 'LIST' }, { type: 'Article', id: 'MY_LIST' }],
+      invalidatesTags: (result,error,id) => mutationChanged(error) ? ([{type:'Article',id},{type:'Article',id:'LIST'},{type:'Article',id:'MY_LIST'},...projectionTags]) : [],
     }),
     publishArticle: builder.mutation<PublishArticleResponse, string>({
       query: (id) => ({
@@ -171,11 +160,11 @@ export const articlesApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: {},
       }),
-      invalidatesTags: (result, error, id) => [
+      invalidatesTags: (result, error, id) => mutationChanged(error) ? ([
         { type: 'Article', id },
         { type: 'Article', id: 'LIST' },
         { type: 'Article', id: 'MY_LIST' },
-      ],
+        ...projectionTags]) : [],
     }),
     updateArticle: builder.mutation<Article, { id: string; data: Partial<CreateArticleRequest> }>({
       async queryFn({ id, data }, _api, _options, baseQuery) {
@@ -184,11 +173,11 @@ export const articlesApi = apiSlice.injectEndpoints({
         });
         return result.error ? { error: result.error } : { data: result.data as Article };
       },
-      invalidatesTags: (result, error, { id }) => [
+      invalidatesTags: (result, error, { id }) => mutationChanged(error) ? ([
         { type: 'Article', id },
         { type: 'Article', id: 'LIST' },
         { type: 'Article', id: 'MY_LIST' },
-      ],
+        ...projectionTags]) : [],
     }),
     createArticleCategory: builder.mutation<ArticleCategory, CreateArticleCategoryRequest>({
       query: (body) => ({
@@ -199,7 +188,7 @@ export const articlesApi = apiSlice.injectEndpoints({
           'Content-Type': 'application/json',
         },
       }),
-      invalidatesTags: ['Article'],
+      invalidatesTags: (result,error) => mutationChanged(error) ? [{type:'ArticleCategory',id:'LIST'}] : [],
     }),
     updateArticleCategory: builder.mutation<ArticleCategory, UpdateArticleCategoryRequest>({
       query: ({ id, ...body }) => ({
@@ -210,14 +199,14 @@ export const articlesApi = apiSlice.injectEndpoints({
           'Content-Type': 'application/json',
         },
       }),
-      invalidatesTags: ['Article'],
+      invalidatesTags: (result,error,arg) => mutationChanged(error) ? ([{type:'ArticleCategory',id:typeof arg==='string'?arg:arg.id},{type:'ArticleCategory',id:'LIST'},...projectionTags]) : [],
     }),
     deleteArticleCategory: builder.mutation<void, string>({
       query: (id) => ({
         url: `/articles/article-categories/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Article'],
+      invalidatesTags: (result,error,arg) => mutationChanged(error) ? ([{type:'ArticleCategory',id:arg},{type:'ArticleCategory',id:'LIST'},...projectionTags,{type:'Article',id:'LIST'},{type:'Article',id:'MY_LIST'}]) : [],
     }),
     uploadFile: builder.mutation<FileUploadResponse, FormData | { formData: FormData; authorization: AuthorizationContext }>({
       query: (input) => ({

@@ -1,3 +1,5 @@
+import { mutationChanged, projectionTags } from '../api/cacheTags';
+import type { RootState } from '../../store';
 import { apiSlice } from '../api/apiSlice';
 import {
   DocumentFoldersResponse, 
@@ -77,6 +79,22 @@ const normalizeDocumentsResponse = (response: unknown): DocumentsResponse => {
   };
 };
 
+const folderIds = (folders: DocumentFolder[]): string[] => folders.flatMap(folder => [folder.id, ...folderIds(folder.children || [])]);
+// Capture known descendants before the tree refetch can remove them.
+const invalidateBranch = (ids: string[], { dispatch, getState, queryFulfilled }: any) => {
+  const state = getState() as RootState;
+  const tree = documentsApi.endpoints.getDocumentFolders.select()(state).data || [];
+  const branches = (rows: DocumentFolder[]): string[] => rows.flatMap(row => ids.includes(row.id) ? [row.id, ...folderIds(row.children || [])] : branches(row.children || []));
+  const affected = [...new Set([...ids, ...branches(tree)])];
+  const documents = affected.flatMap(folder_id => documentsApi.endpoints.getDocuments.select({ folder_id })(state).data?.documents || []);
+  const invalidate = () => dispatch(documentsApi.util.invalidateTags([
+    { type: 'Folder', id: 'LIST' }, ...projectionTags,
+    ...affected.flatMap(id => [{ type: 'Folder' as const, id }, { type: 'Folder' as const, id: `${id}-permissions` }]),
+    ...documents.map(({ id }) => ({ type: 'Document' as const, id })),
+  ]));
+  void queryFulfilled.then(invalidate).catch((failure: any) => { if (mutationChanged(failure.error)) invalidate(); });
+};
+
 export const documentsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getDocumentFolders: builder.query<DocumentFoldersResponse, void>({
@@ -85,7 +103,7 @@ export const documentsApi = apiSlice.injectEndpoints({
       providesTags: (result) =>
         result
           ? [
-              ...result.map(({ id }) => ({ type: 'Folder' as const, id })),
+              ...folderIds(result).map(id => ({ type: 'Folder' as const, id })),
               { type: 'Folder' as const, id: 'LIST' },
             ]
           : [{ type: 'Folder' as const, id: 'LIST' }],
@@ -96,7 +114,7 @@ export const documentsApi = apiSlice.injectEndpoints({
         method: 'POST',
         body,
       }),
-      invalidatesTags: [{ type: 'Folder' as const, id: 'LIST' }],
+      invalidatesTags: (result,error) => mutationChanged(error) ? [{ type: 'Folder' as const, id: 'LIST' }, ...projectionTags] : [],
     }),
     updateFolder: builder.mutation<DocumentFolder, { id: string; body: UpdateFolderRequest }>({
       query: ({ id, body }) => ({
@@ -104,23 +122,25 @@ export const documentsApi = apiSlice.injectEndpoints({
         method: 'PATCH',
         body,
       }),
-      invalidatesTags: (result, error, { id }) => [
+      invalidatesTags: (result,error,{ id }) => mutationChanged(error) ? ([
         { type: 'Folder' as const, id },
         { type: 'Folder' as const, id: 'LIST' },
-      ],
+        ...projectionTags,
+      ]) : [],
     }),
     deleteFolder: builder.mutation<void, string>({
+      onQueryStarted: (id, lifecycle) => invalidateBranch([id], lifecycle),
       query: (id) => ({
         url: `/documents/documents/folders/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: [{ type: 'Folder' as const, id: 'LIST' }],
     }),
     getFolderPermissions: builder.query<FolderPermission[], string>({
       query: (id) => `/documents/documents/folders/${id}/permissions`,
       providesTags: (result, error, id) => [{ type: 'Folder' as const, id: `${id}-permissions` }],
     }),
     updateFolderPermissionsBulk: builder.mutation<BulkUpdatePermissionsResponse, BulkUpdatePermissionsRequest>({
+      onQueryStarted: ({folder_id}, lifecycle) => invalidateBranch(folder_id, lifecycle),
       query: (body) => ({
         url: '/documents/folder/permissions/bulk',
         method: 'PATCH',
@@ -129,21 +149,18 @@ export const documentsApi = apiSlice.injectEndpoints({
           'Content-Type': 'application/json',
         },
       }),
-      invalidatesTags: (result, error, { folder_id }) => [
-        ...folder_id.map(id => ({ type: 'Folder' as const, id: `${id}-permissions` })),
-        { type: 'Folder' as const, id: 'LIST' }
-      ],
     }),
     getDocuments: builder.query<DocumentsResponse, { folder_id: string }>({
       query: ({ folder_id }) => `/documents/documents?folder_id=${folder_id}`,
       transformResponse: normalizeDocumentsResponse,
-      providesTags: (result) =>
+      providesTags: (result, error, {folder_id}) =>
         result
           ? [
               ...result.documents.map(({ id }) => ({ type: 'Document' as const, id })),
               { type: 'Document' as const, id: 'LIST' },
+              { type: 'Folder' as const, id: folder_id },
             ]
-          : [{ type: 'Document' as const, id: 'LIST' }],
+          : [{ type: 'Folder' as const, id: folder_id }, { type: 'Document' as const, id: 'LIST' }],
     }),
     uploadDocument: builder.mutation<Document, UploadDocumentRequest>({
       query: ({ folder_id, file }) => {
@@ -156,7 +173,7 @@ export const documentsApi = apiSlice.injectEndpoints({
           body: formData,
         };
       },
-      invalidatesTags: [{ type: 'Document' as const, id: 'LIST' }],
+      invalidatesTags: (result,error,{folder_id}) => mutationChanged(error) ? [{ type: 'Folder' as const, id: folder_id }, { type: 'Folder' as const, id: 'LIST' }, ...projectionTags] : [],
     }),
     renameDocument: builder.mutation<Document, { id: string; body: RenameDocumentRequest; folderId?: string }>({
       query: ({ id, body, folderId }) => ({
@@ -165,10 +182,10 @@ export const documentsApi = apiSlice.injectEndpoints({
         method: 'PATCH',
         body,
       }),
-      invalidatesTags: (result, error, { id }) => [
+      invalidatesTags: (result,error,{ id }) => mutationChanged(error) ? ([
         { type: 'Document' as const, id },
-        { type: 'Document' as const, id: 'LIST' },
-      ],
+        ...projectionTags,
+      ]) : [],
     }),
     deleteDocument: builder.mutation<void, string | { id: string; folderId: string }>({
       query: (target) => ({
@@ -176,10 +193,15 @@ export const documentsApi = apiSlice.injectEndpoints({
         clientAuthorization: { folderId: typeof target === "string" ? undefined : target.folderId },
         method: 'DELETE',
       }),
-      invalidatesTags: [{ type: 'Document' as const, id: 'LIST' }],
+      invalidatesTags: (result,error,target) => mutationChanged(error) ? [
+        { type: 'Document' as const, id: typeof target === 'string' ? target : target.id },
+        ...(typeof target === 'string' ? [{ type: 'Document' as const, id: 'LIST' }] : [{ type: 'Folder' as const, id: target.folderId }]),
+        { type: 'Folder' as const, id: 'LIST' }, ...projectionTags,
+      ] : [],
     }),
     downloadDocument: builder.query<DownloadDocumentResponse, string>({
       query: (id) => `/documents/documents/${id}/download`,
+      providesTags: (result,error,id) => [{type:'Document',id}],
     }),
   }),
 });

@@ -1,3 +1,4 @@
+import { mutationChanged } from '../api/cacheTags';
 import { apiSlice } from '../api/apiSlice';
 import { NotificationPreference, UpdateNotificationPreferenceRequest } from './notificationTypes';
 
@@ -5,7 +6,7 @@ export const notificationsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getNotificationPreferences: builder.query<NotificationPreference[], void>({
       query: () => '/settings/notifications/preferences',
-      providesTags: ['User'],
+      providesTags: [{type:'NotificationPreference',id:'SELF'}],
     }),
     updateNotificationPreference: builder.mutation<NotificationPreference, UpdateNotificationPreferenceRequest>({
       query: (body) => ({
@@ -13,7 +14,7 @@ export const notificationsApi = apiSlice.injectEndpoints({
         method: 'PATCH',
         body,
       }),
-      invalidatesTags: ['User'],
+      invalidatesTags: (result,error) => mutationChanged(error) ? [{type:'NotificationPreference',id:'SELF'}] : [],
     }),
   }),
 });

@@ -6,6 +6,9 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
 
 const require = createRequire(import.meta.url);
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -67,6 +70,7 @@ test('password control preserves validation and toggles accessibly without submi
 function modalHarness(activeTab = 'members', allowed = true) {
   const state = { visible: true, open: false, form: null };
   const context = { activeTab, canAccessAdminPanel: allowed, canModify: () => allowed,
+    editorDraft: {current:null}, setHasDraftConflict() {},
     ROLE_SLUGS: { MEMBER: 'member' }, userRolesData: [{ slug: 'member', id: 'role' }],
     technicoproCategories: [], trainingCategories: [], eventCategories: [],
     setSelectedFiles() {}, setRemovedFileUrls() {}, setViewingId() {}, setEditingItem() {},

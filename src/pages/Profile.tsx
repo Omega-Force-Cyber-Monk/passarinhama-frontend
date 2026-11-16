@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useDispatch } from "react-redux";
+import { reconcileDraft, type DraftSnapshot } from '../utils/recordDraft';
 import {
   User,
   Shield,
@@ -19,14 +19,12 @@ import {
   useUploadUserPhotoMutation,
 } from "../redux/features/members/membersApi";
 import { useResetPasswordMutation } from "../redux/features/auth/authApi";
-import { setUser } from "../redux/features/auth/authSlice";
 import {
   useGetNotificationPreferencesQuery,
   useUpdateNotificationPreferenceMutation,
 } from "../redux/features/notifications/notificationsApi";
 import { getNotificationLabelKey } from "../redux/features/notifications/notificationTypes";
 import { useI18n } from "../i18n";
-import type { AppDispatch } from "../redux/store";
 import { getApiErrorDisplayMessage } from "../utils/apiErrorMessages";
 import type { UpdateUsersMeRequest } from "../redux/features/members/membersTypes";
 
@@ -121,7 +119,6 @@ const ProfilePageSkeleton = () => (
 
 export default function Profile() {
   const { translate } = useI18n();
-  const dispatch = useDispatch<AppDispatch>();
   // API Hooks
   const { data: apiUser, isLoading: isLoadingUser } = useGetUsersMeQuery();
   const [updateProfile, { isLoading: isUpdating }] = useUpdateUsersMeMutation();
@@ -146,10 +143,12 @@ export default function Profile() {
     department: "",
     address: "",
   });
+  const profileDraft = React.useRef<DraftSnapshot<UpdateUsersMeRequest> | null>(null);
+  const [hasDraftConflict, setHasDraftConflict] = useState(false);
 
   useEffect(() => {
     if (apiUser) {
-      setFormData({
+      const incoming = {
         first_name: apiUser.first_name || "",
         last_name: apiUser.last_name || "",
         email: apiUser.email || "",
@@ -159,7 +158,11 @@ export default function Profile() {
         society: apiUser.society || "",
         department: apiUser.department || "",
         address: apiUser.address || "",
-      });
+      };
+      const next = reconcileDraft(profileDraft.current, apiUser.id, incoming, formData);
+      profileDraft.current = next.snapshot;
+      setHasDraftConflict(next.conflict);
+      if (next.value !== formData) setFormData(next.value);
     }
   }, [apiUser]);
 
@@ -229,7 +232,8 @@ export default function Profile() {
 
     try {
       const updatedUser = await updateProfile(formData).unwrap();
-      dispatch(setUser(updatedUser));
+      profileDraft.current = {key: updatedUser.id, source: JSON.stringify(formData), baseline: formData};
+      setHasDraftConflict(false);
       showToast(translate("profilePage.profileUpdated"), "success");
     } catch (err: any) {
       showToast(
@@ -244,11 +248,10 @@ export default function Profile() {
     if (!file || !apiUser?.id) return;
 
     try {
-      const updatedUser = await uploadPhoto({
+      await uploadPhoto({
         userId: apiUser.id,
         photo: file,
       }).unwrap();
-      dispatch(setUser(updatedUser));
       showToast(translate("profilePage.photoUpdated"), "success");
     } catch (err: any) {
       showToast(
@@ -356,6 +359,7 @@ export default function Profile() {
 
   return (
     <div className="relative space-y-8 p-4 text-slate-900 sm:p-6 lg:p-8">
+      {hasDraftConflict && <p role="status">{translate('common.draftConflict')}</p>}
       {/* TOAST NOTIFICATION */}
       <AnimatePresence>
         {toast && (

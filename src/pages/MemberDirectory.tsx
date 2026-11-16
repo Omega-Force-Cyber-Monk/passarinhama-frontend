@@ -232,7 +232,7 @@ export default function MemberDirectory() {
   const [toast, setToast] = useState<FeedbackToastState | null>(null);
 
   const {
-    data: usersData,
+    currentData: usersData,
     isLoading,
     isFetching,
     isError,
@@ -245,7 +245,7 @@ export default function MemberDirectory() {
     role_id: roleFilter !== "all" ? roleFilter : undefined,
     status: statusFilter !== "all" ? statusFilter : undefined,
   });
-  const { data: userRoles = [] } = useGetUserRolesQuery(undefined, { skip: !isSuperuser });
+  const { currentData: userRoles = [] } = useGetUserRolesQuery(undefined, { skip: !isSuperuser });
 
   const [createUser, { isLoading: isCreatingMember }] = useCreateUserMutation();
   const [updateUser, { isLoading: isUpdatingMember }] = useUpdateUserMutation();
@@ -556,7 +556,7 @@ export default function MemberDirectory() {
         </div>
       )}
 
-      {isLoading && (
+      {(isLoading || (isFetching && !usersData)) && (
         <div className="member-directory-grid">
           {Array.from({ length: MEMBER_SKELETON_COUNT }).map((_, index) => (
             <div
@@ -591,7 +591,7 @@ export default function MemberDirectory() {
         </div>
       )}
 
-      {!isLoading && !isError && (
+      {!isLoading && !isError && !(isFetching && !usersData) && (
         <>
           <div className="member-directory-grid">
             <AnimatePresence mode="popLayout">

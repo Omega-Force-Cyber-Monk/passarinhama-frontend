@@ -1,3 +1,4 @@
+import { projectionTags, statsTag, mutationChanged } from '../api/cacheTags';
 import { apiSlice } from "../api/apiSlice";
 import type { CategoryQueryParams, PaginatedResponse } from "../api/apiTypes";
 import {
@@ -73,13 +74,7 @@ export const trainingsApi = apiSlice.injectEndpoints({
 
         return `/trainings/trainings?${params.toString()}`;
       },
-      providesTags: (result) =>
-        result
-          ? [
-              ...result.results.map(({ id }) => ({ type: "Training" as const, id })),
-              { type: "Training", id: "LIST" },
-            ]
-          : [{ type: "Training", id: "LIST" }],
+      providesTags: (result) => [{type:'Training',id:'LIST'}, ...(result ? result.results.flatMap(item => [{type:'Training' as const,id:item.id}, ...(item.category?.id ? [{type:'TrainingCategory' as const,id:item.category.id}] : [])]) : [])],
     }),
     getAllTrainings: builder.query<Training[], GetTrainingsQueryParams | void>({
       query: (queryParams) => {
@@ -105,13 +100,7 @@ export const trainingsApi = apiSlice.injectEndpoints({
       },
       transformResponse: (response: Training[] | PaginatedTrainings): Training[] =>
         Array.isArray(response) ? response : response.results,
-      providesTags: (result) =>
-        result
-          ? [
-              ...result.map(({ id }) => ({ type: "Training" as const, id })),
-              { type: "Training", id: "LIST" },
-            ]
-          : [{ type: "Training", id: "LIST" }],
+      providesTags: (result) => [{type:'Training',id:'LIST'}, ...(result ? result.flatMap(item => [{type:'Training' as const,id:item.id}, ...(item.category?.id ? [{type:'TrainingCategory' as const,id:item.category.id}] : [])]) : [])],
     }),
     getTrainingCategories: builder.query<
       PaginatedResponse<TrainingCategory>,
@@ -133,7 +122,7 @@ export const trainingsApi = apiSlice.injectEndpoints({
         const queryString = searchParams.toString();
         return `/trainings/training-categories${queryString ? `?${queryString}` : ""}`;
       },
-      providesTags: ["TrainingCategory"],
+      providesTags: (result) => [{type:'TrainingCategory',id:'LIST'}, ...(result?.results.map(item => ({type:'TrainingCategory' as const,id:item.id})) || [])],
     }),
     createTrainingCategory: builder.mutation<
       TrainingCategory,
@@ -147,7 +136,7 @@ export const trainingsApi = apiSlice.injectEndpoints({
           "Content-Type": "application/json",
         },
       }),
-      invalidatesTags: ["TrainingCategory", { type: "Training", id: "LIST" }],
+      invalidatesTags: (result,error) => mutationChanged(error) ? [{type:'TrainingCategory',id:'LIST'}] : [],
     }),
     updateTrainingCategory: builder.mutation<
       TrainingCategory,
@@ -161,18 +150,18 @@ export const trainingsApi = apiSlice.injectEndpoints({
           "Content-Type": "application/json",
         },
       }),
-      invalidatesTags: ["TrainingCategory", { type: "Training", id: "LIST" }],
+      invalidatesTags: (result,error,arg) => mutationChanged(error) ? ([{type:'TrainingCategory',id:typeof arg==='string'?arg:arg.id},{type:'TrainingCategory',id:'LIST'},...projectionTags]) : [],
     }),
     deleteTrainingCategory: builder.mutation<void, string>({
       query: (id) => ({
         url: `/trainings/training-categories/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["TrainingCategory", { type: "Training", id: "LIST" }],
+      invalidatesTags: (result,error,arg) => mutationChanged(error) ? ([{type:'TrainingCategory',id:arg},{type:'TrainingCategory',id:'LIST'},...projectionTags,{type:'Training',id:'LIST'},statsTag]) : [],
     }),
     getTrainingById: builder.query<Training, string>({
       query: (id) => `/trainings/trainings/${id}`,
-      providesTags: (result, error, id) => [{ type: "Training", id }],
+      providesTags: (result, error, id) => [{type:'Training',id}, ...(result?.category?.id ? [{type:'TrainingCategory' as const,id:result.category.id}] : [])],
     }),
     getTrainingPermissions: builder.query<TrainingPermission[], string>({
       query: (id) => `/trainings/trainings/${id}/permissions`,
@@ -190,10 +179,10 @@ export const trainingsApi = apiSlice.injectEndpoints({
           "Content-Type": "application/json",
         },
       }),
-      invalidatesTags: (_result, _error, { training_id }) => [
+      invalidatesTags: (_result, _error, { training_id }) => mutationChanged(_error) ? ([
         { type: "Training", id: "LIST" },
         ...training_id.map((id) => ({ type: "Training" as const, id })),
-      ],
+      ...projectionTags,]) : [],
     }),
     createTraining: builder.mutation<Training, TrainingRequest | FormData>({
       query: (data) => ({
@@ -201,7 +190,7 @@ export const trainingsApi = apiSlice.injectEndpoints({
         method: "POST",
         body: resolveTrainingBody(data),
       }),
-      invalidatesTags: [{ type: "Training", id: "LIST" }],
+      invalidatesTags: (result,error) => mutationChanged(error) ? [{ type: "Training", id: "LIST" },...projectionTags,statsTag] : [],
     }),
     updateTraining: builder.mutation<
       Training,
@@ -212,17 +201,17 @@ export const trainingsApi = apiSlice.injectEndpoints({
         method: "PATCH",
         body: resolveTrainingBody(formData ?? data ?? {}),
       }),
-      invalidatesTags: (result, error, { id }) => [
+      invalidatesTags: (result, error, { id }) => mutationChanged(error) ? ([
         { type: "Training", id },
         { type: "Training", id: "LIST" },
-      ],
+        ...projectionTags,statsTag]) : [],
     }),
     deleteTraining: builder.mutation<void, string>({
       query: (id) => ({
         url: `/trainings/trainings/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: [{ type: "Training", id: "LIST" }],
+      invalidatesTags: (result,error,id) => mutationChanged(error) ? ([{type:'Training',id},{type:'Training',id:'LIST'},...projectionTags,statsTag]) : [],
     }),
   }),
 });

@@ -1,3 +1,4 @@
+import { projectionTags, statsTag, mutationChanged } from '../api/cacheTags';
 import { apiSlice } from "../api/apiSlice";
 import type { CategoryQueryParams, PaginatedResponse } from "../api/apiTypes";
 import {
@@ -153,18 +154,31 @@ export const forumApi = apiSlice.injectEndpoints({
           body: buildForumThumbnailFormData(thumbnail),
         };
       },
-      invalidatesTags: [{ type: "Forum", id: "LIST" }],
+      invalidatesTags: (result,error) => mutationChanged(error) ? [{ type: "Forum", id: "LIST" },...projectionTags,statsTag] : [],
     }),
     deleteForum: builder.mutation<void, string>({
+      async onQueryStarted(forumId, { dispatch, getState, queryFulfilled }) {
+        const state = getState();
+        const ids = new Set<string>();
+        const known = new Set<string>();
+        for (const args of forumApi.util.selectCachedArgsForQuery(state, 'getForumTopics')) {
+          forumApi.endpoints.getForumTopics.select(args)(state).data?.results.forEach(topic => { known.add(topic.id); if (args.forumId === forumId) ids.add(topic.id); });
+        }
+        forumApi.endpoints.getPinnedTopics.select()(state).data?.forEach(topic => { known.add(topic.id); if (topic.forum.id === forumId) ids.add(topic.id); });
+        const unknownParent = forumApi.util.selectCachedArgsForQuery(state, 'getTopicPosts').some(args => !known.has(args.topicId));
+        const invalidate = () => dispatch(forumApi.util.invalidateTags([
+          { type: 'Forum', id: forumId }, { type: 'Forum', id: 'LIST' }, { type: 'Topic', id: forumId },
+          ...[...ids].flatMap(id => [{ type: 'Topic' as const, id }, { type: 'Post' as const, id }]),
+          { type: 'Topic', id: 'PINNED' },
+          ...(unknownParent ? ['Post' as const] : []),
+          ...projectionTags, statsTag,
+        ]));
+        try { await queryFulfilled; invalidate(); } catch (failure) { if (mutationChanged((failure as any).error)) invalidate(); }
+      },
       query: (forumId) => ({
         url: `${FORUMS_BASE_PATH}/${forumId}`,
         method: "DELETE",
       }),
-      invalidatesTags: (_result, _error, forumId) => [
-        { type: "Forum", id: forumId },
-        { type: "Forum", id: "LIST" },
-        { type: "Topic", id: forumId },
-      ],
     }),
     updateForum: builder.mutation<ForumDetails, UpdateForumRequest>({
       query: ({
@@ -189,10 +203,10 @@ export const forumApi = apiSlice.injectEndpoints({
           body: buildForumThumbnailFormData(thumbnail),
         };
       },
-      invalidatesTags: (_result, _error, { forum_id }) => [
+      invalidatesTags: (_result,_error,{ forum_id }) => mutationChanged(_error) ? ([
         { type: "Forum", id: forum_id },
         { type: "Forum", id: "LIST" },
-      ],
+        ...projectionTags,statsTag]) : [],
     }),
     getForum: builder.query<ForumDetails, string>({
       query: (forumId) => `${FORUMS_BASE_PATH}/${forumId}`,
@@ -203,10 +217,7 @@ export const forumApi = apiSlice.injectEndpoints({
     getForumTopics: builder.query<ForumTopicsResponse, GetForumTopicsQueryParams>({
       query: ({ forumId, page = 1, pageSize = 20 }) =>
         `${FORUMS_BASE_PATH}/${forumId}/topics?page=${page}&page_size=${pageSize}`,
-      providesTags: (_result, _error, { forumId }) => [
-        { type: "Forum", id: forumId },
-        { type: "Topic", id: forumId },
-      ],
+      providesTags: (result,error,{forumId})=>[{type:'Forum',id:forumId},{type:'Topic',id:forumId},...(result?.results.map(item=>({type:'Topic' as const,id:item.id}))||[])],
     }),
     createForumTopic: builder.mutation<ForumTopic, CreateForumTopicRequest>({
       query: ({ forum_id, title, content, files }) => {
@@ -226,10 +237,7 @@ export const forumApi = apiSlice.injectEndpoints({
           body: formData,
         };
       },
-      invalidatesTags: (_result, _error, { forum_id }) => [
-        { type: "Forum", id: forum_id },
-        { type: "Topic", id: forum_id },
-      ],
+      invalidatesTags: (result,error,{forum_id}) => mutationChanged(error) ? ([{type:'Forum',id:forum_id},{type:'Topic',id:forum_id},...projectionTags,statsTag]) : [],
     }),
     deleteTopic: builder.mutation<
       void,
@@ -240,12 +248,7 @@ export const forumApi = apiSlice.injectEndpoints({
         clientAuthorization: { forumId: forum_id },
         method: "DELETE",
       }),
-      invalidatesTags: (_result, _error, { topic_id, forum_id }) => [
-        { type: "Post", id: topic_id },
-        { type: "Topic", id: topic_id },
-        { type: "Topic", id: "PINNED" },
-        ...(forum_id ? [{ type: "Topic" as const, id: forum_id }] : []),
-      ],
+      invalidatesTags: (result,error,arg) => mutationChanged(error) ? ([{type:'Topic',id:arg.topic_id},{type:'Post',id:arg.topic_id},...(arg.forum_id?[{type:'Topic' as const,id:arg.forum_id},{type:'Forum' as const,id:arg.forum_id}]:[{type:'Forum' as const,id:'LIST'}]),...projectionTags,statsTag]) : [],
     }),
     updateTopic: builder.mutation<ForumTopic, UpdateForumTopicRequest>({
       query: ({ topic_id, forum_id, title, content, files, delete_files }) => {
@@ -272,17 +275,12 @@ export const forumApi = apiSlice.injectEndpoints({
           body: formData,
         };
       },
-      invalidatesTags: (_result, _error, { topic_id, forum_id }) => [
-        { type: "Post", id: topic_id },
-        ...(forum_id ? [{ type: "Topic" as const, id: forum_id }] : []),
-      ],
+      invalidatesTags: (result,error,arg) => mutationChanged(error) ? ([{type:'Topic',id:arg.topic_id},{type:'Post',id:arg.topic_id},...(arg.forum_id?[{type:'Topic' as const,id:arg.forum_id},{type:'Forum' as const,id:arg.forum_id}]:[{type:'Forum' as const,id:'LIST'}]),...projectionTags]) : [],
     }),
     getTopicPosts: builder.query<TopicPostsResponse, GetTopicPostsQueryParams>({
       query: ({ topicId, page = 1, pageSize = 20 }) =>
         `/forums/topics/${topicId}/posts?page=${page}&page_size=${pageSize}`,
-      providesTags: (_result, _error, { topicId }) => [
-        { type: "Post", id: topicId },
-      ],
+      providesTags: (result,error,{topicId})=>[{type:'Post',id:topicId},{type:'Topic',id:topicId},...(result?.results.map(item=>({type:'Post' as const,id:item.id}))||[])],
     }),
     createTopicPost: builder.mutation<unknown, CreateTopicPostRequest>({
       query: ({ topic_id, forum_id, content, files }) => {
@@ -299,10 +297,7 @@ export const forumApi = apiSlice.injectEndpoints({
           body: formData,
         };
       },
-      invalidatesTags: (_result, _error, { topic_id, forum_id }) => [
-        { type: "Post", id: topic_id },
-        ...(forum_id ? [{ type: "Topic" as const, id: forum_id }] : []),
-      ],
+      invalidatesTags: (result,error,arg) => mutationChanged(error) ? ([{type:'Topic',id:arg.topic_id},{type:'Post',id:arg.topic_id},...(arg.forum_id?[{type:'Topic' as const,id:arg.forum_id},{type:'Forum' as const,id:arg.forum_id}]:[{type:'Forum' as const,id:'LIST'}]),...projectionTags]) : [],
     }),
     deletePost: builder.mutation<
       void,
@@ -313,10 +308,7 @@ export const forumApi = apiSlice.injectEndpoints({
         clientAuthorization: { forumId: forum_id, topicId: topic_id },
         method: "DELETE",
       }),
-      invalidatesTags: (_result, _error, { topic_id, forum_id }) => [
-        { type: "Post", id: topic_id },
-        ...(forum_id ? [{ type: "Topic" as const, id: forum_id }] : []),
-      ],
+      invalidatesTags: (result,error,arg) => mutationChanged(error) ? ([{type:'Topic',id:arg.topic_id},{type:'Post',id:arg.topic_id},...(arg.forum_id?[{type:'Topic' as const,id:arg.forum_id},{type:'Forum' as const,id:arg.forum_id}]:[{type:'Forum' as const,id:'LIST'}]),...projectionTags]) : [],
     }),
     updatePost: builder.mutation<unknown, UpdateTopicPostRequest>({
       query: ({ post_id, topic_id, forum_id, content, files }) => {
@@ -333,10 +325,7 @@ export const forumApi = apiSlice.injectEndpoints({
           body: formData,
         };
       },
-      invalidatesTags: (_result, _error, { topic_id, forum_id }) => [
-        { type: "Post", id: topic_id },
-        ...(forum_id ? [{ type: "Topic" as const, id: forum_id }] : []),
-      ],
+      invalidatesTags: (result,error,arg) => mutationChanged(error) ? ([{type:'Topic',id:arg.topic_id},{type:'Post',id:arg.topic_id},...(arg.forum_id?[{type:'Topic' as const,id:arg.forum_id},{type:'Forum' as const,id:arg.forum_id}]:[{type:'Forum' as const,id:'LIST'}]),...projectionTags]) : [],
     }),
     pinTopic: builder.mutation<unknown, PinTopicRequest>({
       query: ({ topic_id, pinned }) => {
@@ -349,16 +338,32 @@ export const forumApi = apiSlice.injectEndpoints({
           method: "PATCH",
         };
       },
-      invalidatesTags: (_result, _error, { topic_id, forum_id }) => [
-        { type: "Post", id: topic_id },
-        { type: "Topic", id: "PINNED" },
-        ...(forum_id ? [{ type: "Topic" as const, id: forum_id }] : []),
-      ],
+      invalidatesTags: (result,error,arg) => mutationChanged(error) ? [{type:'Topic',id:'PINNED'}, {type:'Topic',id:arg.forum_id || arg.topic_id}, ...projectionTags] : [],
     }),
     setForumPermission: builder.mutation<
       BulkPermissionResponse,
       SetForumPermissionRequest
     >({
+      async onQueryStarted({forum_id}, {dispatch, getState, queryFulfilled}) {
+        const state = getState();
+        const targets = new Set<string>();
+        const known = new Set<string>();
+        for (const args of forumApi.util.selectCachedArgsForQuery(state, 'getForumTopics')) {
+          forumApi.endpoints.getForumTopics.select(args)(state).data?.results.forEach(topic => {
+            known.add(topic.id); if (forum_id.includes(args.forumId)) targets.add(topic.id);
+          });
+        }
+        forumApi.endpoints.getPinnedTopics.select()(state).data?.forEach(topic => {
+          known.add(topic.id); if (forum_id.includes(topic.forum.id)) targets.add(topic.id);
+        });
+        const unknownParent = forumApi.util.selectCachedArgsForQuery(state, 'getTopicPosts').some(args => !known.has(args.topicId));
+        const invalidate = () => dispatch(forumApi.util.invalidateTags([
+          {type:'Forum', id:'LIST'}, ...forum_id.map(id => ({type:'Forum' as const, id})),
+          ...[...targets].flatMap(id => [{type:'Topic' as const,id}, {type:'Post' as const,id}]),
+          ...(unknownParent ? ['Post' as const] : []), ...projectionTags,
+        ]));
+        try { await queryFulfilled; invalidate(); } catch (failure) { if (mutationChanged((failure as any).error)) invalidate(); }
+      },
       query: (body) => ({
         url: `${FORUMS_BASE_PATH}/permissions/bulk`,
         method: "PATCH",
@@ -367,10 +372,6 @@ export const forumApi = apiSlice.injectEndpoints({
           "Content-Type": "application/json",
         },
       }),
-      invalidatesTags: (_result, _error, { forum_id }) => [
-        { type: "Forum", id: "LIST" },
-        ...forum_id.map((id) => ({ type: "Forum" as const, id })),
-      ],
     }),
     getForumPermissions: builder.query<ForumPermission[], string>({
       query: (forumId) => `${FORUMS_BASE_PATH}/${forumId}/permissions`,
