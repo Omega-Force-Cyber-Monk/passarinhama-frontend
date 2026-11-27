@@ -9,13 +9,6 @@ import type {
 
 type DirectPermissionMap = Partial<Record<PermissionFeature, UserPermission>>;
 
-const ACTION_FIELD_MAP: Record<PermissionActionKey, PermissionAction> = {
-  view: 'can_view',
-  create: 'can_create',
-  edit: 'can_edit',
-  delete: 'can_delete',
-};
-
 const isPermissionFeature = (feature: string): feature is PermissionFeature =>
   [
     'article',
@@ -28,7 +21,7 @@ const isPermissionFeature = (feature: string): feature is PermissionFeature =>
   ].includes(feature);
 
 export const useDirectUserPermissions = () => {
-  const { user: currentUser } = usePermissions();
+  const { user: currentUser, hasPermission } = usePermissions();
 
   const directPermissions = useMemo<DirectPermissionMap>(() => {
     const permissions = currentUser?.user_permissions ?? [];
@@ -47,11 +40,9 @@ export const useDirectUserPermissions = () => {
     feature: PermissionFeature,
     action: PermissionAction | PermissionActionKey,
   ) => {
-    const permission = directPermissions[feature];
-    if (!permission) return false;
-
-    const field = ACTION_FIELD_MAP[action as PermissionActionKey] ?? action;
-    return Boolean(permission[field as PermissionAction]);
+    // Legacy name retained for compatibility; checks use the same authoritative
+    // decisions as routes and navigation, never raw management records.
+    return hasPermission(feature, action);
   };
 
   return {

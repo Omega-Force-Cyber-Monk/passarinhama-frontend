@@ -1,0 +1,27 @@
+{
+  "capturedAt": "2026-11-27",
+  "head": "55acb39",
+  "note": "Inert metadata only. Original bytes remain in local Git history; do not execute historical configurations or init.",
+  "files": [
+    {
+      "path": "init",
+      "bytes": 34212,
+      "sha256": "05a91a3aaa53ecfe4e325425435bcbe97ab36c119c95e4868847ef2c9c33b77e"
+    },
+    {
+      "path": "vite.config.ts",
+      "bytes": 1587,
+      "sha256": "034b44a4e552dd577b4fb392fdcec2dca5bc0b0de61ee2489596c2a2eb430882"
+    },
+    {
+      "path": ".env",
+      "bytes": 97,
+      "sha256": "013447f2f2bc1ce8bed0707b7ff01dddb4938128e95975377cab7cf43cc490a4"
+    },
+    {
+      "path": "package.json",
+      "bytes": 1497,
+      "sha256": "5e19d89bf60cd1586fb275cd2e3dc703fc55512b0395b94ba5aeeac0e87443c2"
+    }
+  ]
+}

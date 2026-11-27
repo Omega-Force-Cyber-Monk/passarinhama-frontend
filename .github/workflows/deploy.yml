@@ -35,7 +35,7 @@ jobs:
         run: npm ci
 
       - name: Run linter
-        run: npm run lint || true
+        run: npm run lint
 
       - name: Build to verify compilation
         run: |

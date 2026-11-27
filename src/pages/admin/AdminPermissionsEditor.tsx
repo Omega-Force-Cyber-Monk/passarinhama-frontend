@@ -8,7 +8,7 @@ import {
   useUpdateMemberPermissionMutation,
 } from "../../redux/features/members/membersApi";
 import type { UserPermission } from "../../redux/features/members/membersTypes";
-import { PERMISSION_FEATURES, PERMISSION_ACTIONS, getMergedPermissions, hasPermission, type PermissionAction } from "../../redux/features/auth/permissionUtils";
+import { PERMISSION_FEATURES, PERMISSION_ACTIONS, hasPermission, type PermissionAction } from "../../redux/features/auth/permissionUtils";
 
 type Props = {
   kind: "role" | "member";
@@ -35,7 +35,6 @@ export function AdminPermissionsEditor({ kind, targetId, canManage, onBusyChange
   const permissions = query.currentData;
   const member = kind === "member" ? profileQuery.currentData : undefined;
   const profileUnavailable = kind === "member" && (member?.id !== targetId || profileQuery.isFetching || profileQuery.isError);
-  const inherited = getMergedPermissions(member ? { ...member, is_superuser: false, user_permissions: [] } : null);
 
   const savePermission = async (feature: string) => {
     if (!canManage || !targetId || pending.current || !permissions || query.isFetching || query.isError || profileUnavailable || !drafts[feature]) return;
@@ -85,7 +84,7 @@ export function AdminPermissionsEditor({ kind, targetId, canManage, onBusyChange
       const values = Object.fromEntries(PERMISSION_ACTIONS.map((field) => [field, Boolean(drafts[feature]?.[field] ?? original?.[field])])) as Record<PermissionAction, boolean>;
       const dirty = Boolean(drafts[feature]) && (!original || PERMISSION_ACTIONS.some((field) => field in drafts[feature] && values[field] !== original[field]));
       const missingOverride = kind === "member" && !original?.id;
-      const preview = member ? { ...member, user_permissions: [...permissions.filter((row) => row.feature !== feature), { ...original, feature, ...drafts[feature] }] } : null;
+      const inherited = member?.role_permissions?.find(row => row.feature === feature);
       return <fieldset key={feature} disabled={saving || query.isFetching || profileUnavailable || missingOverride} className="min-w-0 rounded-2xl border border-slate-200 p-4">
         <legend className="px-2 text-sm font-bold">{translate(`adminPanelPage.rolePermissions.features.${feature}`)}</legend>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -105,8 +104,8 @@ export function AdminPermissionsEditor({ kind, targetId, canManage, onBusyChange
                 <option value="true">{translate("adminPanelPage.memberPermissions.allow")}</option>
                 <option value="false">{translate("adminPanelPage.memberPermissions.deny")}</option>
               </select>
-              <span className="block font-normal">{translate("adminPanelPage.memberPermissions.inheritedValue", { value: translate(`adminPanelPage.memberPermissions.${inherited[feature][field] === true ? "allow" : "deny"}`) })}</span>
-              <span className="block font-normal">{translate("adminPanelPage.memberPermissions.effectiveValue", { value: translate(`adminPanelPage.memberPermissions.${hasPermission(preview, feature, field) ? "allow" : "deny"}`) })}</span>
+              <span className="block font-normal">{translate("adminPanelPage.memberPermissions.inheritedValue", { value: typeof inherited?.[field] === "boolean" ? translate(`adminPanelPage.memberPermissions.${inherited[field] ? "allow" : "deny"}`) : "—" })}</span>
+              <span className="block font-normal">{translate("adminPanelPage.memberPermissions.effectiveValue", { value: translate(`adminPanelPage.memberPermissions.${hasPermission(member, feature, field) ? "allow" : "deny"}`) })}</span>
             </span> : <input type="checkbox" className="h-4 w-4 shrink-0 accent-primary focus-visible:ring-2 focus-visible:ring-primary" checked={values[field]} onChange={(event) => {
               const checked = event.target.checked;
               setDrafts((current) => ({ ...current, [feature]: { ...current[feature], [field]: checked } }));

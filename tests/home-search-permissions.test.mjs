@@ -8,6 +8,7 @@ const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'
 const parse = path => ts.createSourceFile(path, read(path), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const policy = parse('src/redux/features/auth/permissionUtils.ts');
 const home = parse('src/pages/Home.tsx');
+const navigation = parse('src/utils/navigation.ts');
 const code = file => file.statements.filter(node => !ts.isImportDeclaration(node)).map(node => node.getText(file).replace(/\bexport default /g, '').replace(/\bexport /g, '')).join('\n');
 const messages = JSON.parse(read('src/i18n/locales/en.json'));
 const translate = key => {
@@ -19,29 +20,28 @@ const elements = (tree, type) => {
   function visit(node) { if (Array.isArray(node)) return node.forEach(visit); if (!node?.props) return; if (node.type === type) result.push(node); visit(node.props.children); }
   visit(tree); return result;
 };
-function render(features, extra = {}) {
+function render(features, extra = {}, failedFeature) {
   const queries = [], navigations = [];
   const actor = {id: 'member', status: 'active', is_deleted: false, is_superuser: false, permissions: features.map(feature => ({feature, can_view: true})), user_permissions: [], ...extra};
-  const query = (name, data) => (args, options) => {queries.push({name, skip: options?.skip}); return {data};};
+  const query = (name, data) => (args, options) => {queries.push({name, skip: options?.skip}); return {data, isError: failedFeature === name, error: failedFeature === name ? {status: 500, data: {detail: "Feed failed"}} : undefined};};
   const context = {
     actor, React: {Fragment: 'fragment', createElement: (type, props, ...children) => ({type, props: {...props, children}})},
     useState: initial => [initial, () => {}], useLocation: () => ({}), useNavigate: () => path => navigations.push(path),
-    useI18n: () => ({translate, localeCode: 'en'}), AccessRestrictedNotice: 'restricted',
+    useI18n: () => ({translate, localeCode: 'en'}), AccessRestrictedNotice: 'restricted', Navigate: 'redirect', LoadingIndicator: 'loading',
     useGetForumsQuery: query('forum', {results: []}), useGetArticlesQuery: query('article', {results: []}),
     useGetUpcomingEventsQuery: query('event', []), useGetTrainingsPaginatedQuery: query('training', {results: []}),
     ...Object.fromEntries(['BookOpen', 'Calendar', 'FileText', 'MapPin', 'MessageSquare'].map(name => [name, name])),
   };
-  const source = `${code(policy)}\nfunction usePermissions() { return {hasPermission: (feature, action) => hasPermission(actor, feature, action)}; }\n${code(home)}\nresult = Home();`;
+  const source = `${code(policy)}\n${code(navigation)}\nfunction usePermissions() { return {user: actor, hasPermission: (feature, action) => hasPermission(actor, feature, action)}; }\n${code(home)}\nresult = Home();`;
   runInNewContext(ts.transpileModule(source, {compilerOptions: {target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React}}).outputText, context);
   return {tree: context.result, queries, navigations};
 }
 for (const [feature, path] of [['technicopro', '/technicopro'], ['user', '/directory'], ['document', '/documents']]) {
-  test(`${feature}-only Home shows an authorized landing link and skips all feed queries`, () => {
+  test(`${feature}-only Home redirects to the authorized module and skips all feed queries`, () => {
     const h = render([feature]);
     assert.equal(elements(h.tree, 'restricted').length, 0);
-    assert.match(JSON.stringify(h.tree), /Your available modules/);
-    const buttons = elements(h.tree, 'button'); assert.equal(buttons.length, 1);
-    buttons[0].props.onClick(); assert.deepEqual(h.navigations, [path]);
+    assert.equal(elements(h.tree, 'redirect')[0].props.to, path);
+    assert.equal(elements(h.tree, 'button').length, 0);
     assert.ok(h.queries.every(query => query.skip));
   });
 }
@@ -58,6 +58,13 @@ test('active superusers and feed-authorized members retain their existing Home f
   const member = render(['article']);
   assert.equal(elements(member.tree, 'restricted').length, 0);
   assert.deepEqual(member.queries.filter(query => !query.skip).map(query => query.name), ['article']);
+});
+test('authorized Home feed failures retain the real error instead of displaying an empty-feed state', () => {
+  for (const feature of ['article', 'forum', 'event', 'training']) {
+    const h = render([feature], {}, feature);
+    assert.match(JSON.stringify(h.tree), /Feed failed/);
+    assert.equal(elements(h.tree, 'restricted').length, 0);
+  }
 });
 test('search rows and count exclude denied and unknown result types, regardless of raw totals', () => {
   const sf = parse('src/layouts/DashboardLayout.tsx');

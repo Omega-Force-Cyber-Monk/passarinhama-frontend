@@ -1,5 +1,8 @@
+import { getDefaultDestination } from "../utils/navigation";
+import LoadingIndicator from "../components/ui/LoadingIndicator";
+import { getApiErrorDisplayMessage } from "../utils/apiErrorMessages";
 import { useState, type ReactNode } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import {
   BookOpen,
   Calendar,
@@ -27,6 +30,14 @@ const SkeletonLine = ({ className }: { className: string }) => (
 );
 
 const MAX_SECTION_CARDS = 4;
+
+const HomeSectionError = ({ error, onRetry }: { error: unknown; onRetry: () => void }) => {
+  const { translate } = useI18n();
+  return <div role="alert" className="rounded-[14px] border border-[var(--archi-border)] bg-white p-6 text-sm text-[var(--archi-secondary)]">
+    <p>{getApiErrorDisplayMessage(error, translate)}</p>
+    <button type="button" className="mt-3 rounded-xl border px-3 py-2" onClick={onRetry}>{translate("common.retry")}</button>
+  </div>;
+};
 
 type SectionGridProps<T> = {
   items: T[];
@@ -96,41 +107,25 @@ const ContentCard = ({ image, icon, badge, title, description, metadata, onClick
 
 export default function Home() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { localeCode, translate } = useI18n();
-  const { hasPermission } = usePermissions();
+  const { user, hasPermission, isLoading } = usePermissions();
   const canViewForum = hasPermission("forum", "view");
   const canViewArticle = hasPermission("article", "view");
   const canViewEvent = hasPermission("event", "view");
   const canViewTraining = hasPermission("training", "view");
-  const canViewDocument = hasPermission("document", "view");
-  const canViewTechnicoPro = hasPermission("technicopro", "view");
-  const canViewDirectory = hasPermission("user", "view");
-  const canViewAnyHomeSection =
-    canViewForum ||
-    canViewArticle ||
-    canViewEvent ||
-    canViewTraining;
-  const moduleLinks = [
-    { allowed: canViewTechnicoPro, path: "/technicopro", label: "common.technicopro" },
-    { allowed: canViewDirectory, path: "/directory", label: "common.members" },
-    { allowed: canViewDocument, path: "/documents", label: "common.documents" },
-  ].filter((link) => link.allowed);
-  const canAccessPortal = canViewAnyHomeSection || moduleLinks.length > 0;
-  const showRestrictedNotice =
-    Boolean((location.state as { accessRestricted?: boolean } | null)?.accessRestricted) ||
-    !canAccessPortal;
+  const canViewAnyHomeSection = canViewForum || canViewArticle || canViewEvent || canViewTraining;
+  const destination = getDefaultDestination(user);
 
-  const { data: forumsData, isLoading: isForumsLoading } = useGetForumsQuery(
+  const { data: forumsData, isLoading: isForumsLoading, isError: isForumsError, error: forumsError, refetch: refetchForums } = useGetForumsQuery(
     { pageSize: MAX_SECTION_CARDS },
     { skip: !canViewForum },
   );
-  const { data: upcomingEvents = [], isLoading: isEventsLoading } =
+  const { data: upcomingEvents = [], isLoading: isEventsLoading, isError: isEventsError, error: eventsError, refetch: refetchEvents } =
     useGetUpcomingEventsQuery(
       { limit: MAX_SECTION_CARDS },
       { skip: !canViewEvent },
     );
-  const { data: articlesData, isLoading: isArticlesLoading } = useGetArticlesQuery(
+  const { data: articlesData, isLoading: isArticlesLoading, isError: isArticlesError, error: articlesError, refetch: refetchArticles } = useGetArticlesQuery(
     {
       page: 1,
       pageSize: MAX_SECTION_CARDS,
@@ -138,7 +133,7 @@ export default function Home() {
     },
     { skip: !canViewArticle },
   );
-  const { data: trainingsData, isLoading: isTrainingsLoading } =
+  const { data: trainingsData, isLoading: isTrainingsLoading, isError: isTrainingsError, error: trainingsError, refetch: refetchTrainings } =
     useGetTrainingsPaginatedQuery(
       {
         page: 1,
@@ -167,31 +162,13 @@ export default function Home() {
   const getAttachmentUrl = (value: string | { url: string } | null | undefined) =>
     typeof value === "string" ? value : value?.url || null;
 
-  if (!canAccessPortal) {
-    return (
-      <main className="home-page bg-[var(--archi-bg)]">
-        <AccessRestrictedNotice />
-      </main>
-    );
+  if (isLoading) return <LoadingIndicator />;
+  if (!canViewAnyHomeSection) {
+    return destination ? <Navigate to={destination} replace /> : <AccessRestrictedNotice />;
   }
 
   return (
     <main className="home-page bg-[var(--archi-bg)]">
-      {showRestrictedNotice && (
-        <section className="mb-10">
-          <AccessRestrictedNotice />
-        </section>
-      )}
-      {!canViewAnyHomeSection && <section className="rounded-2xl border border-slate-200 bg-white p-6">
-        <h2 className="text-xl font-bold text-slate-900">{translate("homePage.moduleLandingTitle")}</h2>
-        <p className="mt-2 text-sm text-slate-500">{translate("homePage.moduleLandingDescription")}</p>
-        <nav aria-label={translate("homePage.moduleLandingTitle")} className="mt-4 flex flex-wrap gap-3">
-          {moduleLinks.map((link) => <button key={link.path} type="button" onClick={() => navigate(link.path)} className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white focus-visible:ring-2 focus-visible:ring-primary">
-            {translate(link.label)}
-          </button>)}
-        </nav>
-      </section>}
-
       {canViewForum && <section className="mb-10">
         <div className="mb-5">
           <div className="home-section-heading">
@@ -228,7 +205,7 @@ export default function Home() {
               <ContentCardSkeleton key={index} />
             ))}
           </div>
-        ) : forums.length > 0 ? (
+        ) : isForumsError ? <HomeSectionError error={forumsError} onRetry={() => { void refetchForums(); }} /> : forums.length > 0 ? (
           <SectionGrid
             items={forums}
             getKey={(forum) => forum.id}
@@ -290,7 +267,7 @@ export default function Home() {
               <AgendaCardSkeleton key={index} />
             ))}
           </div>
-        ) : upcomingEvents.length > 0 ? (
+        ) : isEventsError ? <HomeSectionError error={eventsError} onRetry={() => { void refetchEvents(); }} /> : upcomingEvents.length > 0 ? (
           <SectionGrid
             agenda
             items={upcomingEvents}
@@ -377,7 +354,7 @@ export default function Home() {
               <ContentCardSkeleton key={index} />
             ))}
           </div>
-        ) : trainings.length > 0 ? (
+        ) : isTrainingsError ? <HomeSectionError error={trainingsError} onRetry={() => { void refetchTrainings(); }} /> : trainings.length > 0 ? (
           <SectionGrid
             items={trainings}
             getKey={(training) => training.id}
@@ -455,7 +432,7 @@ export default function Home() {
               <ContentCardSkeleton key={index} />
             ))}
           </div>
-        ) : articles.length > 0 ? (
+        ) : isArticlesError ? <HomeSectionError error={articlesError} onRetry={() => { void refetchArticles(); }} /> : articles.length > 0 ? (
           <SectionGrid
             items={articles}
             getKey={(article) => article.id}

@@ -61,6 +61,7 @@ export function sanitizeRichContent(html: string): string {
       }
       if (styles.length) element.setAttribute("style", styles.join("; "));
       if (codeClass) element.setAttribute("class", codeClass);
+      if (tag === "div" && element.hasAttribute("data-youtube-video")) element.setAttribute("class", "youtube-embed");
       for (const attribute of ["href", "src", "poster"]) {
         const value = element.getAttribute(attribute);
         if (value && !isSafeUrl(value, tag === "img" || attribute === "poster", attribute === "href")) element.removeAttribute(attribute);

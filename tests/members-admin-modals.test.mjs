@@ -23,6 +23,7 @@ function inspect(file) { const source = read(file), sf = ts.createSourceFile(fil
   function model(file) {
     const { sf, modals } = inspect(file), admin = file.includes('AdminPanel');
     const c = {
+      sanitizeRichContent: html => html,
       React: { createElement: (type, props, ...children) => ({ type, props: { ...props, children } }), Fragment: 'Fragment' }, File,
       isSuperuser: true, canAccessAdminPanel: true, adminFieldId: ':admin-model:', translate: (key) => key, useI18n: () => ({ translate: (key) => key }), calls: [], notices: [], activeTab: 'members',
       hasDraftConflict: false, isEditorDetailReady: true, editorDraft: {current:null}, setHasDraftConflict() {},
@@ -56,6 +57,14 @@ function inspect(file) { const source = read(file), sf = ts.createSourceFile(fil
   function all(tree, type) {
     const result = []; function visit(n) { if (Array.isArray(n)) return n.forEach(visit); if (!n?.props) return; if (n.type === type) result.push(n); visit(n.props.children); visit(n.props.footer); visit(n.props.preview); visit(n.props.value); } visit(tree); return result;
   }
+
+  test('Directory edits use an explicit role ID and never substitute a creation default', () => {
+    const m = model(files[0]);
+    const member = {first_name:'A',last_name:'Member',email:'a@example.test',role_id:'assigned-id',role_details:null,status:'active'};
+    assert.equal(m.c.buildFormData(member, 'default-role').role_id, 'assigned-id');
+    assert.equal(m.c.buildFormData({...member, role_id:undefined}, 'default-role').role_id, '');
+    assert.equal(m.c.buildFormData(undefined, 'default-role').role_id, 'default-role');
+  });
 
   test('Directory password visibility, edit-only email disablement, tel inputs, statuses and footer association remain distinct', () => {
     const m = model(files[0]), c = m.c; let tree = m.render(0);

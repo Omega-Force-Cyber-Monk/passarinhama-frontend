@@ -105,6 +105,7 @@ export interface User {
   city: string | null;
   society: string | null;
   department: string | null;
+  role_id?: string | null;
   role: string;
   role_details?: UserRoleDetails | null;
   is_superuser: boolean;
@@ -119,6 +120,7 @@ export interface User {
   last_login_at: string | null;
   created_at: string;
   is_deleted: boolean;
+  role_permissions?: UserPermission[];
   permissions: UserPermission[];
   user_permissions: UserPermission[];
   // Legacy/Optional fields

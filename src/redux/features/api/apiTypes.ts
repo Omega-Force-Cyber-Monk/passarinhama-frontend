@@ -62,6 +62,7 @@ export interface CurrentUserApiResponse {
   city: string | null;
   society: string | null;
   department: string | null;
+  role_id?: string | null;
   role: string | ApiUserRoleDetails | null;
   is_superuser?: boolean;
   status: string;
@@ -74,6 +75,7 @@ export interface CurrentUserApiResponse {
   last_login_at: string | null;
   created_at: string;
   is_deleted: boolean;
+  role_permissions?: ApiUserPermission[];
   permissions?: ApiUserPermission[];
   user_permissions?: ApiUserPermission[];
 }

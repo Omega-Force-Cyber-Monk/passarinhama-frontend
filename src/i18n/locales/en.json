@@ -1021,6 +1021,12 @@
     "confirmRejectionMessage": "Are you sure you want to reject this content? This action will notify the author and delete the post."
   },
   "adminPanelPage": {
+    "counts": {
+      "loading": "Loading total",
+      "error": "Some totals could not be loaded.",
+      "stale": "Last known total; refresh failed.",
+      "unavailable": "Total unavailable; API metadata or count definition requires confirmation."
+    },
     "operationSuccessful": "Operation successful!",
     "title": "Administration",
     "subtitle": "Global administrative controls and infrastructure.",

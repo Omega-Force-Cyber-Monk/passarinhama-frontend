@@ -1,3 +1,4 @@
+import { getVisibleNavigation } from "../utils/navigation";
 import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -199,6 +200,7 @@ const DashboardLayout: React.FC = () => {
   const { hasPermission, canAccessAdminPanel } =
     usePermissions();
   const isSuperuser = canAccessAdminPanel;
+  const canSearch = Object.values(SEARCH_PERMISSION_FEATURES).some(feature => hasPermission(feature, "view"));
 
   const { data: onlineUsersData } = useGetUsersOnlineQuery(undefined, {
     skip: !isAuthenticated,
@@ -209,12 +211,12 @@ const DashboardLayout: React.FC = () => {
       isError: isSearchError,
       refetch: refetchSearch,
   } = useGetDashboardSearchQuery({q: debouncedSearchTerm, limit: 10}, {
-    skip: !isAuthenticated || !debouncedSearchTerm || !searchOpen,
+    skip: !isAuthenticated || !canSearch || !debouncedSearchTerm || !searchOpen,
   });
   useEffect(() => {
     // Reopening a failed search retries once; error changes alone must not loop.
-    if (searchOpen && debouncedSearchTerm && isSearchError && !isSearchFetching) void refetchSearch();
-  }, [searchOpen, debouncedSearchTerm]);
+    if (canSearch && searchOpen && debouncedSearchTerm && isSearchError && !isSearchFetching) void refetchSearch();
+  }, [searchOpen, debouncedSearchTerm, canSearch]);
 
   useEffect(() => {
     setArticlesDropdownOpen(location.pathname.startsWith("/articles"));
@@ -254,80 +256,11 @@ const DashboardLayout: React.FC = () => {
   };
 
   const navItems = useMemo<NavItem[]>(() => {
-    const items: NavItem[] = [
-      { name: translate("common.home"), path: "/", icon: Home },
-    ];
-
-    if (hasPermission("event", "view")) {
-      items.push({
-        name: translate("common.agenda"),
-        path: "/agenda",
-        icon: Calendar,
-      });
-    }
-
-    if (hasPermission("article", "view")) {
-      items.push({
-        name: translate("common.articles"),
-        path: "/articles",
-        icon: FileText,
-      });
-    }
-
-    if (hasPermission("forum", "view")) {
-      items.push({
-        name: translate("common.forums"),
-        path: "/forums",
-        icon: MessageSquare,
-      });
-    }
-
-    if (hasPermission("training", "view")) {
-      items.push({
-        name: translate("common.training"),
-        path: "/trainings",
-        icon: BookOpen,
-      });
-    }
-
-    if (hasPermission("technicopro", "view")) {
-      items.push({
-        name: translate("common.technicopro"),
-        path: "/technicopro",
-        icon: Wrench,
-      });
-    }
-
-    if (hasPermission("document", "view")) {
-      items.push({
-        name: translate("common.documents"),
-        path: "/documents",
-        icon: FolderOpen,
-      });
-    }
-
-    if (hasPermission("user", "view")) {
-      items.push({
-        name: translate("common.members"),
-        path: "/directory",
-        icon: Users,
-      });
-    }
-
-    if (canAccessAdminPanel) {
-      items.push({
-        name: translate("common.administration"),
-        path: "/admin",
-        icon: Settings,
-      });
-    }
-
-    return items;
-  }, [
-    canAccessAdminPanel,
-    hasPermission,
-    translate,
-  ]);
+    const icons = { Home, Calendar, FileText, MessageSquare, BookOpen, Wrench, FolderOpen, Users, Settings };
+    return getVisibleNavigation(user).map(item => ({
+      name: translate(item.label), path: item.path, icon: icons[item.icon],
+    }));
+  }, [user, translate]);
 
   const pageTitle =
     navItems.find((item) =>
@@ -360,7 +293,7 @@ const DashboardLayout: React.FC = () => {
 
   const executeSearch = async (query: string, force = false) => {
     const trimmedQuery = query.trim();
-    if (!trimmedQuery) {
+    if (!isAuthenticated || !canSearch || !trimmedQuery) {
       setSearchOpen(false);
       setDebouncedSearchTerm('');
       return;
@@ -767,6 +700,7 @@ const DashboardLayout: React.FC = () => {
               <input
                 ref={searchInputRef}
                 type="text"
+                disabled={!canSearch}
                 aria-label={translate("layout.searchButton")}
                 aria-expanded={searchOpen}
                 aria-controls="global-search-results"
@@ -774,7 +708,7 @@ const DashboardLayout: React.FC = () => {
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 onFocus={() => {
-                  if (trimmedSearchTerm) {
+                  if (canSearch && trimmedSearchTerm) {
                     setSearchOpen(true);
                     if (searchOpen && isSearchError && !isSearchFetching) void refetchSearch();
                   }
@@ -800,7 +734,7 @@ const DashboardLayout: React.FC = () => {
               <button
                 type="button"
                 onClick={handleSearchSubmit}
-                disabled={!trimmedSearchTerm}
+                disabled={!canSearch || !trimmedSearchTerm}
                 aria-label={translate("layout.searchButton")}
                 className="absolute inset-y-0 right-0 flex w-10 cursor-pointer items-center justify-center rounded-r-[10px] text-[var(--archi-secondary)] hover:bg-[var(--archi-accent-soft)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-[var(--archi-accent)]"
               >

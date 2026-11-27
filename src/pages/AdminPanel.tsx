@@ -1,3 +1,5 @@
+import { readAdminCount, type AdminCount } from "./admin/adminCounts";
+import { sanitizeRichContent } from "../utils/richContent";
 import { ModalFieldGrid, ModalFullWidth, ModalSection, ModalMediaSplit, ModalSubmitButton } from "../components/ui/ModalLayout";
 import "./MemberAdminModals.css";
 import { AdminPasswordField } from "./admin/AdminPasswordField";
@@ -126,6 +128,7 @@ import {
 } from "../redux/features/events/eventsApi";
 import {
   useGetAllTrainingsQuery,
+  useGetTrainingsPaginatedQuery,
   useDeleteTrainingMutation,
   useCreateTrainingMutation,
   useUpdateTrainingMutation,
@@ -639,7 +642,17 @@ export default function AdminPanel() {
   }, {skip: !canAccessAdminPanel || activeTab !== 'events'});
   const eventCategories = eventCategoriesResponse?.results ?? [];
   const { currentData: trainingsData } = useGetAllTrainingsQuery(undefined, {skip: !canAccessAdminPanel || activeTab !== 'trainings'});
-  const { currentData: userRolesData = [] } = useGetUserRolesQuery(undefined, {skip: !canAccessAdminPanel || !['members','rolesPermissions'].includes(activeTab)});
+  const rolesCountQuery = useGetUserRolesQuery(undefined, { skip: !canAccessAdminPanel });
+  const userRolesData = rolesCountQuery.currentData ?? [];
+
+  // Stable, unfiltered metadata subscriptions keep every badge available while
+  // full record/category queries remain scoped to the selected tab.
+  const usersCountQuery = useGetUsersQuery({ archived: false, page: 1, pageSize: 1 }, { skip: !canAccessAdminPanel });
+  const forumsCountQuery = useGetForumsQuery({ page: 1, pageSize: 1 }, { skip: !canAccessAdminPanel });
+  const articlesCountQuery = useGetArticlesQuery({ page: 1, pageSize: 1 }, { skip: !canAccessAdminPanel });
+  const technicoproCountQuery = useGetTechnicoProsQuery({ page: 1, pageSize: 1 }, { skip: !canAccessAdminPanel });
+  const trainingsCountQuery = useGetTrainingsPaginatedQuery({ page: 1, pageSize: 1 }, { skip: !canAccessAdminPanel });
+
 
   const {
     currentData: moderationQueueData,
@@ -1099,7 +1112,7 @@ export default function AdminPanel() {
       if (activeTab === "members" && memberDetail) {
         sync({
           ...memberDetail,
-          role_id: memberDetail.role_details?.id || "",
+          role_id: memberDetail.role_id ?? memberDetail.role_details?.id ?? "",
           is_superuser: memberDetail.is_superuser,
         });
       }
@@ -2061,13 +2074,13 @@ export default function AdminPanel() {
     }
   };
 
-  const tabs: { id: AdminTab; icon: any; label: string; count: number }[] = [
+  const tabs: { id: AdminTab; icon: React.ComponentType<{ className?: string }>; label: string; count: AdminCount }[] = [
     canViewMembers
       ? {
           id: "members",
           icon: Users,
           label: getTabLabel("members"),
-          count: usersData?.counts.all || 0,
+          count: readAdminCount(usersCountQuery),
         }
       : null,
     canViewForums
@@ -2075,7 +2088,7 @@ export default function AdminPanel() {
           id: "forums",
           icon: Database,
           label: getTabLabel("forums"),
-          count: forumsResponse?.total ?? forumsData.length,
+          count: readAdminCount(forumsCountQuery),
         }
       : null,
     canViewArticles
@@ -2083,7 +2096,7 @@ export default function AdminPanel() {
           id: "articles",
           icon: FileText,
           label: getTabLabel("articles"),
-          count: articlesData?.total || 0,
+          count: readAdminCount(articlesCountQuery),
         }
       : null,
     canViewTechnicoPro
@@ -2091,7 +2104,7 @@ export default function AdminPanel() {
           id: "technicopro",
           icon: Wrench,
           label: getTabLabel("technicopro"),
-          count: technicoproData?.total || 0,
+          count: readAdminCount(technicoproCountQuery),
         }
       : null,
     canViewEvents
@@ -2099,7 +2112,7 @@ export default function AdminPanel() {
           id: "events",
           icon: CalendarIcon,
           label: getTabLabel("events"),
-          count: eventsData?.length || 0,
+          count: { status: "unavailable" },
         }
       : null,
     canViewTrainings
@@ -2107,7 +2120,7 @@ export default function AdminPanel() {
           id: "trainings",
           icon: BookOpen,
           label: getTabLabel("trainings"),
-          count: trainingsData?.length || 0,
+          count: readAdminCount(trainingsCountQuery),
         }
       : null,
     canManageRolesPermissions
@@ -2115,7 +2128,7 @@ export default function AdminPanel() {
           id: "rolesPermissions",
           icon: Shield,
           label: getTabLabel("rolesPermissions"),
-          count: userRolesData.length,
+          count: readAdminCount(rolesCountQuery, true),
         }
       : null,
     canManageRolesPermissions
@@ -2123,14 +2136,14 @@ export default function AdminPanel() {
           id: "settingsBackups",
           icon: Globe,
           label: getTabLabel("settingsBackups"),
-          count: 2,
+          count: { status: "unavailable" },
         }
       : null,
   ].filter(Boolean) as {
     id: AdminTab;
-    icon: any;
+    icon: React.ComponentType<{ className?: string }>;
     label: string;
-    count: number;
+    count: AdminCount;
   }[];
 
   React.useEffect(() => {
@@ -2223,12 +2236,21 @@ export default function AdminPanel() {
               <p
                 className={`text-xl font-black ${activeTab === tab.id ? "text-white" : "text-slate-900"}`}
               >
-                {tab.count}
+                <span title={tab.count.status === "ready" ? undefined : translate(`adminPanelPage.counts.${tab.count.status}`)} aria-label={tab.count.status === "ready" ? undefined : translate(`adminPanelPage.counts.${tab.count.status}`)}>
+                  {tab.count.value ?? (tab.count.status === "loading" ? "…" : "—")}
+                </span>
               </p>
             </div>
           </button>
         ))}
       </div>
+
+      {[usersCountQuery, forumsCountQuery, articlesCountQuery, technicoproCountQuery, trainingsCountQuery, rolesCountQuery].some(query => query.isError) && <div role="alert" className="mb-4 flex items-center gap-3 text-sm text-slate-600">
+        <span>{translate("adminPanelPage.counts.error")}</span>
+        <button type="button" className="rounded-xl border px-3 py-2" onClick={() => {
+          [usersCountQuery, forumsCountQuery, articlesCountQuery, technicoproCountQuery, trainingsCountQuery, rolesCountQuery].forEach(query => { if (query.isError && !query.isFetching) void query.refetch(); });
+        }}>{translate("adminPanelPage.retryFetch")}</button>
+      </div>}
 
       {/* Main Admin Section */}
       <div className="admin-main-panel w-full max-w-full min-w-0 bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden text-slate-900">
@@ -5560,7 +5582,7 @@ export default function AdminPanel() {
                     </p>
                     <div
                       className="text-sm text-slate-700 leading-relaxed font-medium prose prose-slate max-w-none"
-                      dangerouslySetInnerHTML={{ __html: detailsItem.body }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeRichContent(detailsItem.body) }}
                     />
                   </div>
                 )}

@@ -1021,6 +1021,12 @@
     "confirmRejectionMessage": "Êtes-vous sûr de vouloir rejeter ce contenu ? Cette action avertira l’auteur et supprimera le message."
   },
   "adminPanelPage": {
+    "counts": {
+      "loading": "Chargement du total",
+      "error": "Certains totaux n’ont pas pu être chargés.",
+      "stale": "Dernier total connu ; échec de l’actualisation.",
+      "unavailable": "Total indisponible ; les métadonnées API ou la définition du compteur doivent être confirmées."
+    },
     "operationSuccessful": "Opération réussie !",
     "title": "Administration",
     "subtitle": "Contrôles administratifs globaux et infrastructure.",

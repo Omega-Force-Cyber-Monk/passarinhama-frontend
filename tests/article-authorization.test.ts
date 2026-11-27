@@ -32,7 +32,7 @@ test('missing data and inactive users fail closed; existing overrides are respec
   assert.equal(canModifyArticle(user(true, true, { id: '' }), { id: 'article' }, 'edit'), false);
   assert.equal(canModifyArticle(user(true, true, { status: 'pending' }), own, 'edit'), false);
   assert.equal(canModifyArticle(user(true, true, { is_deleted: true }), own, 'delete'), false);
-  assert.equal(canModifyArticle(user(true, true, { user_permissions: [{ feature: 'article', can_edit: false }] }), own, 'edit'), false);
+  assert.equal(canModifyArticle(user(false, true, { user_permissions: [{ feature: 'article', can_edit: true }] }), own, 'edit'), false);
 });
 
 test('RTK mutations revalidate server ownership/permissions and propagate 403 without writing', async () => {

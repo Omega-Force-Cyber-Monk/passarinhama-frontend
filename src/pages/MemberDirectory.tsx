@@ -199,7 +199,7 @@ const buildFormData = (
     society: member.society || "",
     department: member.department || "",
     address: member.address || "",
-    role_id: member.role_details?.id || defaultRoleId || "",
+    role_id: member.role_id ?? member.role_details?.id ?? "",
     status: isMemberStatus(member.status || "")
       ? (member.status as MemberStatus)
       : "active",

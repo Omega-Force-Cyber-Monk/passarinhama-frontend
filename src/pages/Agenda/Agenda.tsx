@@ -1,3 +1,4 @@
+import { sanitizeRichContent } from "../../utils/richContent";
 import { ModalFieldGrid, ModalFullWidth, ModalSection, ModalSubmitButton } from "../../components/ui/ModalLayout";
 import "../AgendaDocumentModals.css";
 import CategoryManagerDialog, { type CategoryValues } from "../../components/ui/CategoryManagerDialog";
@@ -1502,7 +1503,7 @@ export default function Agenda() {
                       <div
                         className="mt-4 text-sm leading-7 text-slate-700 prose prose-slate max-w-none prose-p:text-slate-700 prose-headings:text-slate-900 prose-strong:text-slate-900 prose-a:text-primary prose-a:break-all prose-ul:list-disc prose-ol:list-decimal prose-li:marker:text-slate-400 [&_.youtube-embed]:relative [&_.youtube-embed]:my-6 [&_.youtube-embed]:overflow-hidden [&_.youtube-embed]:rounded-[24px] [&_.youtube-embed]:border [&_.youtube-embed]:border-slate-200 [&_.youtube-embed]:bg-slate-950 [&_.youtube-embed]:pt-[56.25%] [&_.youtube-embed_iframe]:absolute [&_.youtube-embed_iframe]:left-0 [&_.youtube-embed_iframe]:top-0 [&_.youtube-embed_iframe]:h-full [&_.youtube-embed_iframe]:w-full"
                         dangerouslySetInnerHTML={{
-                          __html: selectedEventDescription,
+                          __html: sanitizeRichContent(selectedEventDescription),
                         }}
                       />
                     ) : (

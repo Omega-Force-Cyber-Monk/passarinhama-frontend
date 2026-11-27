@@ -1,0 +1,519 @@
+src\constants.ts:52:The role of the expert is shifting from data collector to data interpreter.
+src\components\PermissionRoute.tsx:26:  const { user, hasPermission, isLoading, isError } = usePermissions();
+src\components\PermissionRoute.tsx:34:      ? hasPermission(feature, action)
+src\index.css:499:.forum-side-panel [role="link"] { min-width: 0; }
+src\index.css:561:.forums-page :is(button, [role="link"]):focus-visible { outline: 2px solid var(--archi-accent); outline-offset: 2px; }
+src\hooks\usePermissions.ts:10:  canAccessFeature,
+src\hooks\usePermissions.ts:12:  getMergedPermissions,
+src\hooks\usePermissions.ts:13:  hasAnyPermission,
+src\hooks\usePermissions.ts:14:  hasPermission,
+src\hooks\usePermissions.ts:21:  const permissions = getMergedPermissions(user);
+src\hooks\usePermissions.ts:28:    permissions,
+src\hooks\usePermissions.ts:33:    hasPermission: (
+src\hooks\usePermissions.ts:36:    ) => hasPermission(user, feature, action),
+src\hooks\usePermissions.ts:37:    hasAnyPermission: (
+src\hooks\usePermissions.ts:40:    ) => hasAnyPermission(user, feature, actions),
+src\hooks\usePermissions.ts:41:    canAccessFeature: (feature: PermissionFeature) =>
+src\hooks\usePermissions.ts:42:      canAccessFeature(user, feature),
+src\layouts\SidebarCategorySection.tsx:252:          role="region"
+src\layouts\DashboardLayout.tsx:167:  Record<GlobalSearchResultType, Parameters<ReturnType<typeof usePermissions>["hasPermission"]>[0]>
+src\layouts\DashboardLayout.tsx:200:  const { hasPermission, canAccessAdminPanel } =
+src\layouts\DashboardLayout.tsx:203:  const canSearch = Object.values(SEARCH_PERMISSION_FEATURES).some(feature => hasPermission(feature, "view"));
+src\layouts\DashboardLayout.tsx:243:  const getRoleLabel = (role?: string | null) => {
+src\layouts\DashboardLayout.tsx:246:    switch (role) {
+src\layouts\DashboardLayout.tsx:254:        return roleDetailsName || role?.replace(/_/g, " ") || translate("common.member");
+src\layouts\DashboardLayout.tsx:287:      return feature ? hasPermission(feature, "view") : false;
+src\layouts\DashboardLayout.tsx:289:  }, [hasPermission, isAuthenticated, searchResults?.results, debouncedSearchTerm, normalizedSearchTerm]);
+src\layouts\DashboardLayout.tsx:504:                    skip={!isAuthenticated || !hasPermission("article", "view")}
+src\layouts\DashboardLayout.tsx:540:                    skip={!isAuthenticated || !hasPermission("training", "view")}
+src\layouts\DashboardLayout.tsx:558:                    skip={!isAuthenticated || !hasPermission("technicopro", "view")}
+src\layouts\DashboardLayout.tsx:660:                {getRoleLabel(user?.role)}
+src\hooks\useDirectUserPermissions.ts:24:  const { user: currentUser, hasPermission } = usePermissions();
+src\hooks\useDirectUserPermissions.ts:27:    const permissions = currentUser?.user_permissions ?? [];
+src\hooks\useDirectUserPermissions.ts:29:    return permissions.reduce<DirectPermissionMap>((acc, permission) => {
+src\hooks\useDirectUserPermissions.ts:37:  }, [currentUser?.user_permissions]);
+src\hooks\useDirectUserPermissions.ts:45:    return hasPermission(feature, action);
+src\components\SessionError.tsx:16:    <div role="alert" className="max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center">
+src\i18n\locales\fr.json:343:    "role": "Rôle",
+src\i18n\locales\fr.json:351:    "restoreMemberMessage": "Voulez-vous vraiment restaurer ce membre suspendu ? Il retrouvera son accès selon son rôle et ses permissions actuels.",
+src\i18n\locales\fr.json:513:    "role": "Rôle",
+src\i18n\locales\fr.json:742:    "role": "Rôle",
+src\i18n\locales\fr.json:774:    "permissions": "Permissions",
+src\i18n\locales\fr.json:803:    "loadingPermissions": "Chargement des permissions...",
+src\i18n\locales\fr.json:804:    "permissionsDescription": "Gérez les niveaux d'accès pour chaque rôle utilisateur. Ces permissions s'appliqueront à tous les contenus de ce dossier.",
+src\i18n\locales\fr.json:806:    "role": "Rôle",
+src\i18n\locales\fr.json:810:    "savePermissions": "Enregistrer les permissions",
+src\i18n\locales\fr.json:950:    "setForumPermission": "Définir les permissions du forum",
+src\i18n\locales\fr.json:952:    "managePermissions": "Gérer les permissions",
+src\i18n\locales\fr.json:956:    "role": "Rôle",
+src\i18n\locales\fr.json:959:    "selectForumPrompt": "Sélectionnez un forum ci-dessus pour voir les permissions",
+src\i18n\locales\fr.json:965:    "applyBulkPermissions": "Appliquer les permissions en masse",
+src\i18n\locales\fr.json:1069:    "testBackupPermissions": "Tester les permissions",
+src\i18n\locales\fr.json:1116:    "setForumPermission": "Définir les permissions du forum",
+src\i18n\locales\fr.json:1118:    "managePermissions": "Gérer les permissions",
+src\i18n\locales\fr.json:1124:    "selectForumPrompt": "Sélectionnez un forum ci-dessus pour inspecter les permissions",
+src\i18n\locales\fr.json:1130:    "savingPermission": "Enregistrement des permissions...",
+src\i18n\locales\fr.json:1131:    "applyBulkPermissions": "Appliquer les permissions en masse",
+src\i18n\locales\fr.json:1163:      "role": "Rôle",
+src\i18n\locales\fr.json:1194:      "rolesPermissions": "Rôles & permissions",
+src\i18n\locales\fr.json:1203:      "description": "Créez des rôles et gérez les permissions par fonctionnalité pour chacun.",
+src\i18n\locales\fr.json:1208:      "selectRolePrompt": "Sélectionnez un rôle pour consulter et modifier ses permissions",
+src\i18n\locales\fr.json:1337:      "role": "Rôle",
+src\i18n\locales\fr.json:1422:    "rolesDescription": "Gérez les rôles et les permissions accordés aux différents profils membres.",
+src\i18n\locales\fr.json:1425:    "createRoleSub": "Définissez un nouveau rôle avec ses permissions",
+src\i18n\locales\fr.json:1466:    "modalSubtitle": "Définissez un nom de rôle et choisissez les permissions associées.",
+src\i18n\locales\fr.json:1472:    "permissions": "Permissions",
+src\i18n\locales\fr.json:1492:        "description": "Contrôle total de la plateforme : gestion des membres, contenus, événements et permissions.",
+src\i18n\locales\fr.json:1493:        "permissions": {
+src\i18n\locales\fr.json:1507:        "permissions": {
+src\i18n\locales\fr.json:1520:        "permissions": {
+src\i18n\locales\fr.json:1532:        "permissions": {
+src\i18n\locales\fr.json:1544:        "permissions": {
+src\i18n\locales\fr.json:1626:            "label": "Gestion des rôles et permissions",
+src\i18n\locales\en.json:35:    "rolesDescription": "Create and manage role names and descriptions.",
+src\i18n\locales\en.json:343:    "role": "Role",
+src\i18n\locales\en.json:351:    "restoreMemberMessage": "Are you sure you want to restore this suspended member? They will regain access based on their current role and permissions.",
+src\i18n\locales\en.json:510:    "selectArticleToView": "Select article to view permissions",
+src\i18n\locales\en.json:513:    "role": "Role",
+src\i18n\locales\en.json:718:    "trainingPermissionsUpdated": "Training permissions updated!",
+src\i18n\locales\en.json:728:    "trainingPermissions": "Training permissions",
+src\i18n\locales\en.json:740:    "selectTrainingToView": "Select training to view permissions",
+src\i18n\locales\en.json:743:    "role": "Role",
+src\i18n\locales\en.json:750:    "selectTrainingPrompt": "Select a training to review permissions",
+src\i18n\locales\en.json:766:    "permissions": "Permissions",
+src\i18n\locales\en.json:795:    "loadingPermissions": "Loading permissions...",
+src\i18n\locales\en.json:796:    "permissionsDescription": "Manage access levels for each user role. These permissions will apply to all contents within this folder.",
+src\i18n\locales\en.json:798:    "role": "Role",
+src\i18n\locales\en.json:826:    "labelPermissions": "Select folder to view permissions",
+src\i18n\locales\en.json:956:    "role": "Role",
+src\i18n\locales\en.json:959:    "selectForumPrompt": "Select a forum above to view permissions",
+src\i18n\locales\en.json:1083:    "selectTrainingToView": "Select training to view permissions",
+src\i18n\locales\en.json:1085:    "selectTrainingPrompt": "Select a training to review permissions",
+src\i18n\locales\en.json:1124:    "selectForumPrompt": "Select a forum above to inspect permissions",
+src\i18n\locales\en.json:1163:      "role": "Role",
+src\i18n\locales\en.json:1203:      "description": "Create roles and manage feature-level permissions for each one.",
+src\i18n\locales\en.json:1204:      "permissionsFor": "Permissions for role",
+src\i18n\locales\en.json:1208:      "selectRolePrompt": "Select a role to inspect and update permissions",
+src\i18n\locales\en.json:1231:      "inheritanceUnavailable": "Allow and Deny are explicit personal overrides. Inherit follows the role. Creating new overrides and resetting saved overrides to Inherit require server support and are currently unavailable. Effective access also respects account status and the superuser bypass.",
+src\i18n\locales\en.json:1232:      "newOverrideUnavailable": "This feature inherits its role permissions. New personal overrides cannot be saved safely with the current server contract.",
+src\i18n\locales\en.json:1337:      "role": "Role",
+src\i18n\locales\en.json:1422:    "rolesDescription": "Manage roles and permissions granted to different member profiles.",
+src\i18n\locales\en.json:1425:    "createRoleSub": "Define a new role and its permissions",
+src\i18n\locales\en.json:1466:    "modalSubtitle": "Define a role name and choose the associated permissions.",
+src\i18n\locales\en.json:1471:    "roleDescriptionPlaceholder": "Describe the scope of this role…",
+src\i18n\locales\en.json:1472:    "permissions": "Permissions",
+src\i18n\locales\en.json:1474:    "saveRole": "Save role",
+src\i18n\locales\en.json:1475:    "updateRole": "Update role",
+src\i18n\locales\en.json:1483:    "noActivePermissions": "No active permissions",
+src\i18n\locales\en.json:1484:    "roleCreatedToday": "Custom role • Created today",
+src\i18n\locales\en.json:1485:    "roleAddedFromMemberArea": "Custom role added from the member area.",
+src\i18n\locales\en.json:1491:        "subtitle": "Full access • System role",
+src\i18n\locales\en.json:1492:        "description": "Full control of the platform across members, content, events, and permissions.",
+src\i18n\locales\en.json:1493:        "permissions": {
+src\i18n\locales\en.json:1505:        "subtitle": "Custom role • Created recently",
+src\i18n\locales\en.json:1507:        "permissions": {
+src\i18n\locales\en.json:1518:        "subtitle": "Custom role • Created in February",
+src\i18n\locales\en.json:1520:        "permissions": {
+src\i18n\locales\en.json:1530:        "subtitle": "Default role • System role",
+src\i18n\locales\en.json:1532:        "permissions": {
+src\i18n\locales\en.json:1542:        "subtitle": "Custom role • Created in March",
+src\i18n\locales\en.json:1544:        "permissions": {
+src\i18n\locales\en.json:1626:            "label": "Manage roles & permissions",
+src\i18n\locales\en.json:1627:            "description": "Create, edit, or delete other role types."
+src\pages\AdminPanel.tsx:186:  role: string;
+src\pages\AdminPanel.tsx:187:  is_superuser?: boolean;
+src\pages\AdminPanel.tsx:379:  const { hasPermission, canAccessAdminPanel, canAccessModeration } =
+src\pages\AdminPanel.tsx:383:  const canViewMembers = hasPermission("user", "view");
+src\pages\AdminPanel.tsx:384:  const canCreateMembers = hasPermission("user", "create");
+src\pages\AdminPanel.tsx:385:  const canEditMembers = hasPermission("user", "edit");
+src\pages\AdminPanel.tsx:386:  const canDeleteMembers = hasPermission("user", "delete");
+src\pages\AdminPanel.tsx:387:  const canViewForums = hasPermission("forum", "view");
+src\pages\AdminPanel.tsx:388:  const canCreateForums = hasPermission("forum", "create");
+src\pages\AdminPanel.tsx:389:  const canEditForums = hasPermission("forum", "edit");
+src\pages\AdminPanel.tsx:390:  const canDeleteForums = hasPermission("forum", "delete");
+src\pages\AdminPanel.tsx:391:  const canViewArticles = hasPermission("article", "view");
+src\pages\AdminPanel.tsx:392:  const canCreateArticles = hasPermission("article", "create");
+src\pages\AdminPanel.tsx:393:  const canEditArticles = hasPermission("article", "edit");
+src\pages\AdminPanel.tsx:394:  const canDeleteArticles = hasPermission("article", "delete");
+src\pages\AdminPanel.tsx:395:  const canViewTechnicoPro = hasPermission("technicopro", "view");
+src\pages\AdminPanel.tsx:396:  const canCreateTechnicoPro = hasPermission("technicopro", "create");
+src\pages\AdminPanel.tsx:397:  const canEditTechnicoPro = hasPermission("technicopro", "edit");
+src\pages\AdminPanel.tsx:398:  const canDeleteTechnicoPro = hasPermission("technicopro", "delete");
+src\pages\AdminPanel.tsx:399:  const canViewEvents = hasPermission("event", "view");
+src\pages\AdminPanel.tsx:400:  const canCreateEvents = hasPermission("event", "create");
+src\pages\AdminPanel.tsx:401:  const canEditEvents = hasPermission("event", "edit");
+src\pages\AdminPanel.tsx:402:  const canDeleteEvents = hasPermission("event", "delete");
+src\pages\AdminPanel.tsx:403:  const canViewTrainings = hasPermission("training", "view");
+src\pages\AdminPanel.tsx:404:  const canCreateTrainings = hasPermission("training", "create");
+src\pages\AdminPanel.tsx:405:  const canEditTrainings = hasPermission("training", "edit");
+src\pages\AdminPanel.tsx:406:  const canDeleteTrainings = hasPermission("training", "delete");
+src\pages\AdminPanel.tsx:465:  const getRoleLabel = (role?: string | null) => {
+src\pages\AdminPanel.tsx:466:    if (!role) return translate("adminPanelPage.fallbacks.member");
+src\pages\AdminPanel.tsx:468:    switch (role) {
+src\pages\AdminPanel.tsx:476:        return role.replace(/_/g, " ");
+src\pages\AdminPanel.tsx:1116:          is_superuser: memberDetail.is_superuser,
+src\pages\AdminPanel.tsx:1221:      !userRolesData.some((role) => role.id === selectedRoleId)
+src\pages\AdminPanel.tsx:1287:            userRolesData.find((role) => role.slug === ROLE_SLUGS.MEMBER)?.id ||
+src\pages\AdminPanel.tsx:1291:          is_superuser: false,
+src\pages\AdminPanel.tsx:1619:        notifyRequiredField(translate("adminPanelPage.form.role"));
+src\pages\AdminPanel.tsx:1736:                "permissions",
+src\pages\AdminPanel.tsx:1737:                "role",
+src\pages\AdminPanel.tsx:1762:          if (formData.is_superuser !== editingItem.is_superuser) {
+src\pages\AdminPanel.tsx:1763:            changedData.is_superuser = formData.is_superuser;
+src\pages\AdminPanel.tsx:1784:            is_superuser: formData.is_superuser,
+src\pages\AdminPanel.tsx:2038:  const handleEditRole = (role: UserRoleDetails) => {
+src\pages\AdminPanel.tsx:2040:    setEditingRole(role);
+src\pages\AdminPanel.tsx:2042:      name: role.name,
+src\pages\AdminPanel.tsx:2043:      description: role.description || "",
+src\pages\AdminPanel.tsx:2048:  const confirmDeleteRole = (role: UserRoleDetails) => {
+src\pages\AdminPanel.tsx:2049:    setRoleToDelete(role);
+src\pages\AdminPanel.tsx:2248:      {[usersCountQuery, forumsCountQuery, articlesCountQuery, technicoproCountQuery, trainingsCountQuery, rolesCountQuery].some(query => query.isError) && <div role="alert" className="mb-4 flex items-center gap-3 text-sm text-slate-600">
+src\pages\AdminPanel.tsx:2695:          <div className="admin-role-directory grid grid-cols-1 gap-6 xl:grid-cols-2">
+src\pages\AdminPanel.tsx:2708:                  .filter((role) => {
+src\pages\AdminPanel.tsx:2712:                      role.name.toLowerCase().includes(query) ||
+src\pages\AdminPanel.tsx:2713:                      role.slug.toLowerCase().includes(query) ||
+src\pages\AdminPanel.tsx:2714:                      (role.description || "").toLowerCase().includes(query)
+src\pages\AdminPanel.tsx:2717:                  .map((role) => (
+src\pages\AdminPanel.tsx:2719:                      key={role.id}
+src\pages\AdminPanel.tsx:2720:                      onClick={() => setSelectedRoleId(role.id)}
+src\pages\AdminPanel.tsx:2722:                        selectedRoleId === role.id
+src\pages\AdminPanel.tsx:2729:                          <button type="button" aria-pressed={selectedRoleId === role.id} onClick={(event) => { event.stopPropagation(); setSelectedRoleId(role.id); }} className="text-left text-sm font-black uppercase tracking-wide focus-visible:ring-2 focus-visible:ring-primary">
+src\pages\AdminPanel.tsx:2730:                            {role.name}
+src\pages\AdminPanel.tsx:2734:                              selectedRoleId === role.id
+src\pages\AdminPanel.tsx:2739:                            {role.slug}
+src\pages\AdminPanel.tsx:2747:                              handleEditRole(role);
+src\pages\AdminPanel.tsx:2750:                              selectedRoleId === role.id
+src\pages\AdminPanel.tsx:2764:                              confirmDeleteRole(role);
+src\pages\AdminPanel.tsx:2767:                              selectedRoleId === role.id
+src\pages\AdminPanel.tsx:2779:                          selectedRoleId === role.id
+src\pages\AdminPanel.tsx:2784:                        {role.description ||
+src\pages\AdminPanel.tsx:2794:                <h4 className="text-sm font-bold">{translate("adminPanelPage.rolePermissions.permissionsFor")}: {userRolesData.find((role) => role.id === selectedRoleId)?.name}</h4>
+src\pages\AdminPanel.tsx:2795:                <AdminPermissionsEditor key={selectedRoleId} kind="role" targetId={selectedRoleId} canManage={canManageRolesPermissions} />
+src\pages\AdminPanel.tsx:2803:                <div className="admin-table-scroll archi-scrollbar w-full max-w-full min-w-0 overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]" tabIndex={0} role="region" aria-label={translate("adminUi.tableScroll")}>
+src\pages\AdminPanel.tsx:2821:                                  {translate("adminPanelPage.table.role")}
+src\pages\AdminPanel.tsx:2825:                                aria-label={translate("adminPanelPage.table.role")}
+src\pages\AdminPanel.tsx:2835:                                {userRolesData.map((role) => (
+src\pages\AdminPanel.tsx:2836:                                  <option key={role.id} value={role.id}>
+src\pages\AdminPanel.tsx:2837:                                    {role.name}
+src\pages\AdminPanel.tsx:3054:                              {getRoleLabel(member.role)}
+src\pages\AdminPanel.tsx:3787:          formId="admin-role-form"
+src\pages\AdminPanel.tsx:3798:          id="admin-role-form"
+src\pages\AdminPanel.tsx:3811:            <label htmlFor={`${adminFieldId}-role-description`} className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+src\pages\AdminPanel.tsx:3814:            <textarea id={`${adminFieldId}-role-description`}
+src\pages\AdminPanel.tsx:3874:        <div className="admin-log-output min-h-[260px] rounded-[28px] bg-slate-950 p-5 font-mono text-[11px] text-slate-200 shadow-inner" tabIndex={0} role="region" aria-label={translate("adminPanelPage.systemLogs")}>
+src\pages\AdminPanel.tsx:3998:        {hasDraftConflict && <p role="status">{translate('common.draftConflict')}</p>}
+src\pages\AdminPanel.tsx:3999:        {editingItem && !isEditorDetailReady && <p role="status">{translate(isCurrentDetailError ? 'common.error' : 'common.loading')}</p>}
+src\pages\AdminPanel.tsx:4096:                    label={translate("adminPanelPage.form.role")}
+src\pages\AdminPanel.tsx:4097:                    options={userRolesData.map((role) => ({
+src\pages\AdminPanel.tsx:4098:                      label: role.name,
+src\pages\AdminPanel.tsx:4099:                      value: role.id,
+src\pages\AdminPanel.tsx:4144:                      id={`${adminFieldId}-is_superuser`}
+src\pages\AdminPanel.tsx:4146:                      checked={formData.is_superuser || false}
+src\pages\AdminPanel.tsx:4150:                          is_superuser: e.target.checked,
+src\pages\AdminPanel.tsx:4155:                      htmlFor={`${adminFieldId}-is_superuser`}
+src\pages\AdminPanel.tsx:5141:                            detailsItem?.role,
+src\pages\AdminPanel.tsx:5155:                          className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${detailsItem?.is_superuser
+src\pages\AdminPanel.tsx:5160:                          {detailsItem?.is_superuser
+src\pages\AdminPanel.tsx:5202:                        label={translate("adminPanelPage.form.role")}
+src\pages\AdminPanel.tsx:5204:                          detailsItem?.role_details?.slug || detailsItem?.role,
+src\pages\admin\adminCounts.ts:9:// used only for the existing, unpaginated role list, never paginated content.
+src\types\user.ts:12:  role: string;
+src\utils\navigation.ts:2:import { canAccessAdminPanel, canAccessFeature, type PermissionFeature } from '../redux/features/auth/permissionUtils';
+src\utils\navigation.ts:20:  HOME_CONTENT_FEATURES.some(feature => canAccessFeature(user, feature));
+src\utils\navigation.ts:24:    : 'feature' in item ? canAccessFeature(user, item.feature) : canAccessAdminPanel(user));
+src\redux\features\articles\articleTypes.ts:78:  permissions: ArticlePermission[];
+src\redux\features\trainings\trainingTypes.ts:82:  permissions: TrainingPermission[];
+src\pages\admin\AdminPermissionsEditor.tsx:11:import { PERMISSION_FEATURES, PERMISSION_ACTIONS, hasPermission, type PermissionAction } from "../../redux/features/auth/permissionUtils";
+src\pages\admin\AdminPermissionsEditor.tsx:14:  kind: "role" | "member";
+src\pages\admin\AdminPermissionsEditor.tsx:21:// written to the role endpoint. IDs always come from the currently loaded target.
+src\pages\admin\AdminPermissionsEditor.tsx:25:  const roleQuery = useGetUserPermissionsQuery({ role_id: targetId }, { skip: !canManage || !targetId || kind !== "role" });
+src\pages\admin\AdminPermissionsEditor.tsx:28:  const query = kind === "role" ? roleQuery : memberQuery;
+src\pages\admin\AdminPermissionsEditor.tsx:35:  const permissions = query.currentData;
+src\pages\admin\AdminPermissionsEditor.tsx:40:    if (!canManage || !targetId || pending.current || !permissions || query.isFetching || query.isError || profileUnavailable || !drafts[feature]) return;
+src\pages\admin\AdminPermissionsEditor.tsx:41:    const original = permissions.find((row) => row.feature === feature);
+src\pages\admin\AdminPermissionsEditor.tsx:55:      if (kind === "role") {
+src\pages\admin\AdminPermissionsEditor.tsx:73:  if (query.isError || (kind === "member" && profileQuery.isError)) return <div role="alert" className="space-y-3">
+src\pages\admin\AdminPermissionsEditor.tsx:77:  if (!permissions || (kind === "member" && member?.id !== targetId)) return <p role="status">{translate("common.loading")}</p>;
+src\pages\admin\AdminPermissionsEditor.tsx:80:    <p className="text-xs text-slate-500">{translate(`adminPanelPage.${kind === "role" ? "rolePermissions" : "memberPermissions"}.permissionsHint`)}</p>
+src\pages\admin\AdminPermissionsEditor.tsx:81:    {kind === "member" && <p role="note" className="text-xs text-slate-500">{translate("adminPanelPage.memberPermissions.inheritanceUnavailable")}</p>}
+src\pages\admin\AdminPermissionsEditor.tsx:83:      const original: UserPermission | undefined = permissions.find((row) => row.feature === feature);
+src\pages\admin\AdminPermissionsEditor.tsx:108:              <span className="block font-normal">{translate("adminPanelPage.memberPermissions.effectiveValue", { value: translate(`adminPanelPage.memberPermissions.${hasPermission(member, feature, field) ? "allow" : "deny"}`) })}</span>
+src\redux\features\trainings\trainingsApi.ts:167:      query: (id) => `/trainings/trainings/${id}/permissions`,
+src\redux\features\trainings\trainingsApi.ts:175:        url: "/trainings/training/permissions/bulk",
+src\pages\AdminPanel.css:33:.admin-role-directory { min-width: 0; padding: clamp(1rem, 2.5cqi, 2rem); }
+src\pages\AdminPanel.css:34:.admin-role-directory p { overflow-wrap: anywhere; }
+src\pages\AdminPanel.css:35:.admin-role-directory button { min-width: 2.75rem; min-height: 2.75rem; flex-shrink: 0; }
+src\pages\AdminPanel.css:36:.admin-role-directory .justify-between { flex-wrap: wrap; }
+src\pages\AdminPanel.css:37:.admin-role-directory .justify-between > div { min-width: 0; max-width: 100%; }
+src\types\forum.ts:25:  is_active?: boolean;
+src\types\forum.ts:55:  is_active: boolean;
+src\types\forum.ts:95:  permissions: ForumPermission[];
+src\pages\Articles.tsx:182:  const { hasPermission, canAccessAdminPanel: isSuperuser } = usePermissions();
+src\pages\Articles.tsx:184:  const canCreateArticle = hasPermission("article", "create");
+src\pages\Articles.tsx:185:  const canEditArticle = hasPermission("article", "edit");
+src\pages\Articles.tsx:186:  const canDeleteArticle = hasPermission("article", "delete");
+src\pages\Articles.tsx:187:  const canViewArticle = hasPermission("article", "view");
+src\pages\Articles.tsx:692:        {hasDraftConflict && <p role="status">{translate('common.draftConflict')}</p>}
+src\pages\Articles.tsx:758:              <div role="group" aria-labelledby="article-editor-form-field-4-label" className="space-y-2 text-left">
+src\redux\features\auth\resourceAuthorization.ts:2:import { hasPermission, isActiveSuperuser, type PermissionFeature } from './permissionUtils';
+src\redux\features\auth\resourceAuthorization.ts:46:  if (!resource?.id || !hasPermission(user, feature, action)) return false;
+src\redux\features\auth\resourceAuthorization.ts:56:): boolean => hasPermission(user, feature, 'create') &&
+src\redux\features\auth\resourceAuthorization.ts:65:// Explicit allowlist: no role, superuser, status, payment, or permission assignments.
+src\redux\features\articles\articlesApi.ts:129:      query: (id) => `/articles/articles/${id}/permissions`,
+src\redux\features\articles\articlesApi.ts:137:        url: '/articles/article/permissions/bulk',
+src\pages\Agenda\Agenda.tsx:223:  const { hasPermission, canModify, canAccessAdminPanel: isSuperuser } = usePermissions();
+src\pages\Agenda\Agenda.tsx:224:  const canViewEvent = hasPermission("event", "view");
+src\pages\Agenda\Agenda.tsx:225:  const canCreateEvent = hasPermission("event", "create");
+src\pages\Agenda\Agenda.tsx:996:            {isCalendarError ? <p role="alert" className="m-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{translate("agendaPage.failedToLoadEvents")}</p> : null}
+src\pages\Agenda\Agenda.tsx:1259:                role="group"
+src\redux\features\auth\permissionUtils.ts:20:  'can_view',
+src\redux\features\auth\permissionUtils.ts:21:  'can_create',
+src\redux\features\auth\permissionUtils.ts:22:  'can_edit',
+src\redux\features\auth\permissionUtils.ts:23:  'can_delete',
+src\redux\features\auth\permissionUtils.ts:34:  isActiveUser(user) && user.is_superuser === true;
+src\redux\features\auth\permissionUtils.ts:39:  view: 'can_view',
+src\redux\features\auth\permissionUtils.ts:40:  create: 'can_create',
+src\redux\features\auth\permissionUtils.ts:41:  edit: 'can_edit',
+src\redux\features\auth\permissionUtils.ts:42:  delete: 'can_delete',
+src\redux\features\auth\permissionUtils.ts:47:  can_view: false,
+src\redux\features\auth\permissionUtils.ts:48:  can_create: false,
+src\redux\features\auth\permissionUtils.ts:49:  can_edit: false,
+src\redux\features\auth\permissionUtils.ts:50:  can_delete: false,
+src\redux\features\auth\permissionUtils.ts:60:  can_view: true,
+src\redux\features\auth\permissionUtils.ts:61:  can_create: true,
+src\redux\features\auth\permissionUtils.ts:62:  can_edit: true,
+src\redux\features\auth\permissionUtils.ts:63:  can_delete: true,
+src\redux\features\auth\permissionUtils.ts:67:  permissions: UserPermission[] | undefined,
+src\redux\features\auth\permissionUtils.ts:69:  (Array.isArray(permissions) ? permissions : []).filter(
+src\redux\features\auth\permissionUtils.ts:74:export const getMergedPermissions = (
+src\redux\features\auth\permissionUtils.ts:84:  if (!user || user.is_superuser) {
+src\redux\features\auth\permissionUtils.ts:88:  // The backend publishes the final action decisions in permissions. Do not
+src\redux\features\auth\permissionUtils.ts:89:  // merge raw role/direct rows here: that can reverse the server's decisions.
+src\redux\features\auth\permissionUtils.ts:90:  normalizePermissions(user.permissions).forEach((permission) => {
+src\redux\features\auth\permissionUtils.ts:104:): UserPermission => getMergedPermissions(user)[feature];
+src\redux\features\auth\permissionUtils.ts:106:export const hasPermission = (
+src\redux\features\auth\permissionUtils.ts:120:export const hasAnyPermission = (
+src\redux\features\auth\permissionUtils.ts:124:    'can_view',
+src\redux\features\auth\permissionUtils.ts:125:    'can_create',
+src\redux\features\auth\permissionUtils.ts:126:    'can_edit',
+src\redux\features\auth\permissionUtils.ts:127:    'can_delete',
+src\redux\features\auth\permissionUtils.ts:129:): boolean => actions.some((action) => hasPermission(user, feature, action));
+src\redux\features\auth\permissionUtils.ts:131:export const canAccessFeature = (
+src\redux\features\auth\permissionUtils.ts:134:): boolean => hasPermission(user, feature, 'view');
+src\redux\features\auth\permissionUtils.ts:149:  const roleSlug = normalizeRoleSlug(user.role_details?.slug || user.role);
+src\pages\DocumentLibrary.tsx:301:  const { user, hasPermission, canModify, canCreateIn, canAccessAdminPanel: isSuperuser } = usePermissions();
+src\pages\DocumentLibrary.tsx:302:  const canViewDocument = hasPermission("document", "view");
+src\pages\DocumentLibrary.tsx:303:  const canCreateDocument = hasPermission("document", "create");
+src\pages\DocumentLibrary.tsx:777:        <div className="documents-view-toggle flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-100" role="group" aria-label={translate("documentLibraryPage.displayMode")}>
+src\pages\DocumentLibrary.tsx:908:                  <table role="table" className="documents-table documents-folder-table">
+src\pages\DocumentLibrary.tsx:909:                    <thead role="rowgroup" className="bg-slate-50/50 border-b border-slate-100">
+src\pages\DocumentLibrary.tsx:910:                      <tr role="row">
+src\pages\DocumentLibrary.tsx:911:                        <th role="columnheader" scope="col" className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+src\pages\DocumentLibrary.tsx:914:                        <th role="columnheader" scope="col" className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+src\pages\DocumentLibrary.tsx:917:                        <th role="columnheader" scope="col" className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+src\pages\DocumentLibrary.tsx:918:                          {translate("documentLibraryPage.permissions")}
+src\pages\DocumentLibrary.tsx:920:                        <th role="columnheader" scope="col" className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">
+src\pages\DocumentLibrary.tsx:925:                    <tbody role="rowgroup" className="divide-y divide-slate-50 text-sm">
+src\pages\DocumentLibrary.tsx:927:                        <tr role="row"
+src\pages\DocumentLibrary.tsx:932:                          <td role="cell" className="px-6 py-4">
+src\pages\DocumentLibrary.tsx:938:                          <td role="cell" data-label={translate("documentLibraryPage.items")} className="px-6 py-4 text-slate-500">
+src\pages\DocumentLibrary.tsx:941:                          <td role="cell" data-label={translate("documentLibraryPage.permissions")} className="px-6 py-4 text-slate-500">
+src\pages\DocumentLibrary.tsx:946:                          <td role="cell" className="px-6 py-4 text-right">
+src\pages\DocumentLibrary.tsx:1094:                    <table role="table" className="documents-table documents-file-table">
+src\pages\DocumentLibrary.tsx:1095:                      <thead role="rowgroup" className="bg-slate-50/50 border-b border-slate-100">
+src\pages\DocumentLibrary.tsx:1096:                        <tr role="row">
+src\pages\DocumentLibrary.tsx:1097:                          <th role="columnheader" scope="col" className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+src\pages\DocumentLibrary.tsx:1100:                          <th role="columnheader" scope="col" className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+src\pages\DocumentLibrary.tsx:1103:                          <th role="columnheader" scope="col" className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+src\pages\DocumentLibrary.tsx:1106:                          <th role="columnheader" scope="col" className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">
+src\pages\DocumentLibrary.tsx:1111:                      <tbody role="rowgroup" className="divide-y divide-slate-50 text-sm">
+src\pages\DocumentLibrary.tsx:1113:                          <tr role="row"
+src\pages\DocumentLibrary.tsx:1122:                            <td role="cell" className="px-6 py-4">
+src\pages\DocumentLibrary.tsx:1128:                            <td role="cell" data-label={translate("documentLibraryPage.modified")} className="px-6 py-4 text-slate-500">
+src\pages\DocumentLibrary.tsx:1131:                            <td role="cell" data-label={translate("documentLibraryPage.size")} className="px-6 py-4 text-slate-500">
+src\pages\DocumentLibrary.tsx:1134:                            <td role="cell" className="px-6 py-4 text-right">
+src\pages\DocumentLibrary.tsx:1295:              role="button"
+src\redux\features\auth\normalizeProfile.ts:6:  role: typeof user.role === 'string' ? user.role : user.role?.slug || user.role?.name || '',
+src\redux\features\auth\normalizeProfile.ts:7:  role_details: typeof user.role === 'string' ? ('role_details' in user ? user.role_details : null) : user.role,
+src\redux\features\auth\normalizeProfile.ts:8:  is_superuser: user.is_superuser ?? false,
+src\redux\features\auth\normalizeProfile.ts:9:  permissions: user.permissions ?? [],
+src\redux\features\auth\normalizeProfile.ts:10:  user_permissions: user.user_permissions ?? [],
+src\pages\Events.tsx:48:  const { hasPermission, canModify } = usePermissions();
+src\pages\Events.tsx:49:  const canCreateEvent = hasPermission("event", "create");
+src\redux\features\auth\authTypes.ts:19:  role: string;
+src\redux\features\auth\authTypes.ts:55:  role?: string;
+src\redux\features\auth\authTypes.ts:72:export const normalizeRoleSlug = (role?: string | null) =>
+src\redux\features\auth\authTypes.ts:73:  role?.trim().toLowerCase().replace(/\s+/g, '_') ?? '';
+src\redux\features\auth\authTypes.ts:95:  role: string;
+src\redux\features\auth\authTypes.ts:96:  is_superuser: boolean;
+src\redux\features\auth\authTypes.ts:109:  permissions: UserPermission[];
+src\redux\features\auth\authTypes.ts:110:  user_permissions: UserPermission[];
+src\pages\DocumentLibrary.css:42:.documents-page :is(a, button, [role="button"]):focus-visible, .documents-dialog :is(button, [role="button"]):focus-visible { outline: 2px solid var(--archi-accent); outline-offset: 2px; }
+src\redux\features\auth\authSlice.ts:21:    permissions: user.permissions ?? [],
+src\redux\features\auth\authSlice.ts:22:    user_permissions: user.user_permissions ?? [],
+src\redux\features\auth\authSlice.ts:28:  // Persisted profile/role data is never authorization evidence for a restored session.
+src\redux\features\auth\authSlice.ts:50:        role?: string;
+src\redux\features\auth\authSlice.ts:106:        state.user.role = action.payload;
+src\pages\Home.tsx:36:  return <div role="alert" className="rounded-[14px] border border-[var(--archi-border)] bg-white p-6 text-sm text-[var(--archi-secondary)]">
+src\pages\Home.tsx:111:  const { user, hasPermission, isLoading } = usePermissions();
+src\pages\Home.tsx:112:  const canViewForum = hasPermission("forum", "view");
+src\pages\Home.tsx:113:  const canViewArticle = hasPermission("article", "view");
+src\pages\Home.tsx:114:  const canViewEvent = hasPermission("event", "view");
+src\pages\Home.tsx:115:  const canViewTraining = hasPermission("training", "view");
+src\redux\features\auth\authApi.ts:34:  role: response.role ?? response.role_slug ?? '',
+src\pages\Forums.tsx:580:  const { user, hasPermission, canModify, canReply, canCreateIn, canAccessAdminPanel: isSuperuser } = usePermissions();
+src\pages\Forums.tsx:1271:  const canViewForum = hasPermission("forum", "view");
+src\pages\Forums.tsx:1273:  const canCreateTopic = hasPermission("forum", "create") &&
+src\pages\Forums.tsx:1333:            isTopicsLoading || isTopicsFetching ? <PostsListSkeleton /> : <p role="status" className="forum-empty-state">{translate(isTopicsError ? "forumUi.loadError" : "forumUi.topicUnavailable")}</p>
+src\pages\Forums.tsx:1347:                ) : isForumsError ? (<p role="alert" className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">{translate("forumUi.loadError")}</p>) : !forums.length ? (<p className="forum-empty-state">{translate("forumUi.noForums")}</p>) : (
+src\pages\Forums.tsx:1352:                      role="link"
+src\pages\Forums.tsx:1439:                ) : isTopicsError ? (<p role="alert" className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">{translate("forumUi.loadError")}</p>) : filteredTopics.length > 0 ? (
+src\pages\Forums.tsx:1445:                      role="link"
+src\pages\Forums.tsx:1677:                ) : isPostsError ? (<p role="alert" className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">{translate("forumUi.loadError")}</p>) : (
+src\pages\Forums.tsx:1868:              ) : isPinnedTopicsError ? (<p role="alert" className="text-sm text-red-300">{translate("forumUi.loadError")}</p>) : pinnedTopics.length > 0 ? (
+src\pages\Forums.tsx:1876:                    role="link"
+src\pages\Forums.tsx:1945:              ) : isTopicsError ? (<p role="alert" className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">{translate("forumUi.loadError")}</p>) : !topics.length ? (<p className="text-sm text-slate-500">{translate("forumUi.noActivity")}</p>) : (
+src\pages\Forums.tsx:1955:                      role="link"
+src\pages\Forums.tsx:2070:          <div role="group" aria-labelledby="forum-new-discussion-form-field-3-label" className="space-y-2">
+src\pages\Forums.tsx:2168:          <div role="group" aria-labelledby="forum-create-form-field-3-label" className="space-y-2">
+src\pages\Forums.tsx:2316:          <div role="group" aria-labelledby="forum-edit-form-field-4-label" className="space-y-2">
+src\pages\Forums.tsx:2428:          <div role="group" aria-labelledby="forum-edit-discussion-form-field-2-label" className="space-y-2">
+src\pages\Forums.tsx:2499:          <div role="group" aria-labelledby="forum-edit-reply-form-field-1-label" className="space-y-2">
+src\redux\features\forum\forumApi.ts:368:        url: `${FORUMS_BASE_PATH}/permissions/bulk`,
+src\redux\features\forum\forumApi.ts:377:      query: (forumId) => `${FORUMS_BASE_PATH}/${forumId}/permissions`,
+src\redux\features\api\mutationAuthorization.ts:3:import { hasPermission, isActiveSuperuser, isActiveUser, PERMISSION_ACTIONS, type PermissionFeature } from '../auth/permissionUtils';
+src\redux\features\api\mutationAuthorization.ts:121:    return (feature ? hasPermission(user, feature, 'view') : sharedReads.has(endpoint)) ? { request: args } : { error: forbidden() };
+src\redux\features\api\mutationAuthorization.ts:124:    if (!hasPermission(user, 'user', 'create')) return { error: forbidden() };
+src\redux\features\api\mutationAuthorization.ts:139:    return hasPermission(user, 'event', 'view') ? { request: args } : { error: forbidden() };
+src\redux\features\api\mutationAuthorization.ts:142:    if (!hasPermission(user, 'document', 'create')) return { error: forbidden() };
+src\redux\features\api\mutationAuthorization.ts:151:    if (!hasPermission(user, 'document', 'create')) return { error: forbidden() };
+src\redux\features\api\mutationAuthorization.ts:161:    if (!hasPermission(user, 'forum', 'create')) return { error: forbidden() };
+src\redux\features\api\mutationAuthorization.ts:170:    if (!hasPermission(user, 'forum', action)) return { error: forbidden() };
+src\redux\features\api\mutationAuthorization.ts:193:    if (!hasPermission(user, 'document', action)) return { error: forbidden() };
+src\redux\features\api\mutationAuthorization.ts:208:      if (!hasPermission(user, feature, 'create')) return { error: forbidden() };
+src\redux\features\api\mutationAuthorization.ts:239:    if (path === base && args.method === 'POST') return hasPermission(user, feature, 'create') ? { request: args } : { error: forbidden() };
+src\redux\features\api\mutationAuthorization.ts:241:    if (!hasPermission(user, feature, action)) return { error: forbidden() };
+src\pages\MemberDirectory.tsx:75:  is_superuser: boolean;
+src\pages\MemberDirectory.tsx:93:  is_superuser: false,
+src\pages\MemberDirectory.tsx:98:  role: string | null | undefined,
+src\pages\MemberDirectory.tsx:101:  if (!role) return translate("memberDirectory.roleMember");
+src\pages\MemberDirectory.tsx:102:  return roleLabelKeys[role] ? translate(roleLabelKeys[role]) : role.replace(/_/g, " ");
+src\pages\MemberDirectory.tsx:172:  role: UserRoleDetails,
+src\pages\MemberDirectory.tsx:175:  return roleLabelKeys[role.slug]
+src\pages\MemberDirectory.tsx:176:    ? translate(roleLabelKeys[role.slug])
+src\pages\MemberDirectory.tsx:177:    : role.name;
+src\pages\MemberDirectory.tsx:207:    is_superuser: member.is_superuser,
+src\pages\MemberDirectory.tsx:214:  const { hasPermission, canAccessAdminPanel: isSuperuser } = usePermissions();
+src\pages\MemberDirectory.tsx:215:  const canViewUsers = hasPermission("user", "view");
+src\pages\MemberDirectory.tsx:216:  const canCreateUser = hasPermission("user", "create");
+src\pages\MemberDirectory.tsx:258:    userRoles.find((role) => role.slug === ROLE_SLUGS.MEMBER)?.id || userRoles[0]?.id || "";
+src\pages\MemberDirectory.tsx:353:      notifyRequiredField(translate("memberDirectory.role"));
+src\pages\MemberDirectory.tsx:377:          is_superuser: formData.is_superuser,
+src\pages\MemberDirectory.tsx:399:            is_superuser: formData.is_superuser,
+src\pages\MemberDirectory.tsx:514:            aria-label={translate("memberDirectory.role")}
+src\pages\MemberDirectory.tsx:523:            {userRoles.map((role) => (
+src\pages\MemberDirectory.tsx:524:              <option key={role.id} value={role.id} className="cursor-pointer">
+src\pages\MemberDirectory.tsx:525:                {getRoleDisplayName(role, translate)}
+src\pages\MemberDirectory.tsx:600:                  member.membership_category?.name || formatRole(member.role, translate);
+src\pages\MemberDirectory.tsx:941:                      {translate("memberDirectory.role")}
+src\pages\MemberDirectory.tsx:952:                      {userRoles.map((role) => (
+src\pages\MemberDirectory.tsx:953:                        <option key={role.id} value={role.id}>
+src\pages\MemberDirectory.tsx:954:                          {getRoleDisplayName(role, translate)}
+src\pages\MemberDirectory.tsx:1000:                      checked={formData.is_superuser}
+src\pages\MemberDirectory.tsx:1004:                          is_superuser: e.target.checked,
+src\redux\features\documents\documentsTypes.ts:42:  [role: string]: FolderPermissionDraft;
+src\redux\features\documents\documentsTypes.ts:54:  permissions: FolderPermission[];
+src\redux\features\documents\documentsApi.ts:92:    ...affected.flatMap(id => [{ type: 'Folder' as const, id }, { type: 'Folder' as const, id: `${id}-permissions` }]),
+src\redux\features\documents\documentsApi.ts:139:      query: (id) => `/documents/documents/folders/${id}/permissions`,
+src\redux\features\documents\documentsApi.ts:140:      providesTags: (result, error, id) => [{ type: 'Folder' as const, id: `${id}-permissions` }],
+src\redux\features\documents\documentsApi.ts:145:        url: '/documents/folder/permissions/bulk',
+src\pages\OTPVerification.tsx:24:    role: string;
+src\redux\features\api\apiTypes.ts:46:  can_view: boolean | null;
+src\redux\features\api\apiTypes.ts:47:  can_create: boolean | null;
+src\redux\features\api\apiTypes.ts:48:  can_edit: boolean | null;
+src\redux\features\api\apiTypes.ts:49:  can_delete: boolean | null;
+src\redux\features\api\apiTypes.ts:66:  role: string | ApiUserRoleDetails | null;
+src\redux\features\api\apiTypes.ts:67:  is_superuser?: boolean;
+src\redux\features\api\apiTypes.ts:79:  permissions?: ApiUserPermission[];
+src\redux\features\api\apiTypes.ts:80:  user_permissions?: ApiUserPermission[];
+src\pages\Profile.tsx:187:  const translateRole = (role?: string) => {
+src\pages\Profile.tsx:188:    if (role === "admin") return translate("profilePage.roleAdmin");
+src\pages\Profile.tsx:189:    if (role === "moderator") return translate("profilePage.roleModerator");
+src\pages\Profile.tsx:190:    if (role === "auditeur") return translate("profilePage.roleAuditeur");
+src\pages\Profile.tsx:191:    if (role === "partenaires_technicopro") {
+src\pages\Profile.tsx:194:    if (role === "comite_coproprietaire") {
+src\pages\Profile.tsx:362:      {hasDraftConflict && <p role="status">{translate('common.draftConflict')}</p>}
+src\pages\Profile.tsx:435:              {translateRole(apiUser?.role)}
+src\pages\Profile.tsx:440:                {apiUser?.is_superuser
+src\redux\features\members\membersTypes.ts:37:  can_view: boolean | null;
+src\redux\features\members\membersTypes.ts:38:  can_create: boolean | null;
+src\redux\features\members\membersTypes.ts:39:  can_edit: boolean | null;
+src\redux\features\members\membersTypes.ts:40:  can_delete: boolean | null;
+src\redux\features\members\membersTypes.ts:52:  can_view: boolean;
+src\redux\features\members\membersTypes.ts:53:  can_create: boolean;
+src\redux\features\members\membersTypes.ts:54:  can_edit: boolean;
+src\redux\features\members\membersTypes.ts:55:  can_delete: boolean;
+src\redux\features\members\membersTypes.ts:60:  can_view?: boolean;
+src\redux\features\members\membersTypes.ts:61:  can_create?: boolean;
+src\redux\features\members\membersTypes.ts:62:  can_edit?: boolean;
+src\redux\features\members\membersTypes.ts:63:  can_delete?: boolean;
+src\redux\features\members\membersTypes.ts:80:  can_view?: boolean;
+src\redux\features\members\membersTypes.ts:81:  can_create?: boolean;
+src\redux\features\members\membersTypes.ts:82:  can_edit?: boolean;
+src\redux\features\members\membersTypes.ts:83:  can_delete?: boolean;
+src\redux\features\members\membersTypes.ts:89:  can_view: boolean;
+src\redux\features\members\membersTypes.ts:90:  can_create: boolean;
+src\redux\features\members\membersTypes.ts:91:  can_edit: boolean;
+src\redux\features\members\membersTypes.ts:92:  can_delete: boolean;
+src\redux\features\members\membersTypes.ts:109:  role: string;
+src\redux\features\members\membersTypes.ts:111:  is_superuser: boolean;
+src\redux\features\members\membersTypes.ts:124:  permissions: UserPermission[];
+src\redux\features\members\membersTypes.ts:125:  user_permissions: UserPermission[];
+src\redux\features\members\membersTypes.ts:175:  is_superuser?: boolean;
+src\redux\features\members\membersTypes.ts:206:  is_superuser?: boolean;
+src\redux\features\members\membersApi.ts:54:  'permissions' | 'user_permissions' | 'role' | 'role_details'
+src\redux\features\members\membersApi.ts:57:  permissions?: UserPermission[];
+src\redux\features\members\membersApi.ts:58:  user_permissions?: UserPermission[];
+src\redux\features\members\membersApi.ts:59:  role: string | UserRoleDetails | null;
+src\redux\features\members\membersApi.ts:100:  appendIfDefined(formData, 'is_superuser', userData.is_superuser);
+src\redux\features\members\membersApi.ts:124:  appendIfDefined(formData, 'is_superuser', userData.is_superuser);
+src\redux\features\members\membersApi.ts:241:      query: ({ role_id }) => `/user/permissions?role_id=${encodeURIComponent(role_id)}`,
+src\redux\features\members\membersApi.ts:251:        url: '/user/permissions',
+src\redux\features\members\membersApi.ts:265:        url: `/user/permissions/${id}`,
+src\redux\features\members\membersApi.ts:279:        `/user/user-permissions?user_id=${encodeURIComponent(user_id)}`,
+src\redux\features\members\membersApi.ts:289:        url: `/user/user-permissions/${id}`,
+src\redux\features\members\membersApi.ts:303:        url: '/user/user-permissions',
+src\pages\Dashboard.tsx:326:  const { hasPermission } = usePermissions();
+src\pages\Dashboard.tsx:327:  const isAdmin = hasPermission("user", "edit");
+src\pages\Dashboard.tsx:328:  const isModerator = hasPermission("forum", "edit");
+src\redux\features\technicopro\technicoproApi.ts:194:      query: (id) => `/technicopro/technicopros/${id}/permissions`,
+src\redux\features\technicopro\technicoproApi.ts:202:        url: "/technicopro/technicopro/permissions/bulk",
+src\pages\Signup.tsx:88:            role: 'membre'
+src\redux\features\admin\adminApi.ts:140:        url: '/settings/admin/backups/test-permissions',
+src\pages\TechnicoPro.tsx:88:  const { hasPermission, canModify, canAccessAdminPanel: isSuperuser } = usePermissions();
+src\pages\TechnicoPro.tsx:89:  const canView = hasPermission("technicopro", "view");
+src\pages\TechnicoPro.tsx:90:  const canCreate = hasPermission("technicopro", "create");
+src\pages\TechnicoPro.tsx:91:  const canEdit = hasPermission("technicopro", "edit");
+src\pages\TechnicoPro.tsx:92:  const canDelete = hasPermission("technicopro", "delete");
+src\pages\TechnicoPro.tsx:272:        <div role="alert" className="rounded-2xl border border-red-100 bg-red-50 p-6 text-center text-sm font-semibold text-red-700">{translate("contentListing.loadError")}</div>
+src\pages\TechnicoPro.tsx:365:              <div role="group" aria-label={translate("modalBatchTwo.technicalContent")}>
+src\pages\Trainings.tsx:93:  const { hasPermission, canModify, canAccessAdminPanel: isSuperuser } = usePermissions();
+src\pages\Trainings.tsx:94:  const canViewTraining = hasPermission("training", "view");
+src\pages\Trainings.tsx:95:  const canCreateTraining = hasPermission("training", "create");
+src\pages\Trainings.tsx:96:  const canEditTraining = hasPermission("training", "edit");
+src\pages\Trainings.tsx:97:  const canDeleteTraining = hasPermission("training", "delete");
+src\pages\Trainings.tsx:288:        <div role="alert" className="rounded-2xl border border-red-100 bg-red-50 p-6 text-center text-sm font-semibold text-red-700">{translate("contentListing.loadError")}</div>
+src\pages\Trainings.tsx:406:                role="group"
+src\redux\features\technicopro\technicoproTypes.ts:65:  permissions: TechnicoProPermission[];
+src\components\ui\CategoryManagerDialog.tsx:175:      {isLoading ? <p role="status" className="py-6 text-center text-sm text-slate-500">{translate("common.loading")}</p> : null}
+src\components\ui\CategoryManagerDialog.tsx:176:      {error ? <div role="alert" className="mb-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">
+src\components\ui\CategoryManagerDialog.tsx:211:        {!allowed ? <p role="alert" className="text-sm text-red-700">{translate("common.accessRestrictedTitle")}</p> : null}
+src\components\ui\CategoryManagerDialog.tsx:212:        {message ? <p id={errorId} role="alert" className="break-words rounded-xl bg-red-50 p-3 text-sm text-red-700 [overflow-wrap:anywhere]">{message}</p> : null}
+src\components\ui\ConfirmModal.tsx:72:          role="alertdialog"
+src\components\ui\ContentDetail.tsx:111:    {!url || error ? <p role="alert" className="detail-attachment-error">{!url ? translate("contentDetail.invalidFile") : error}</p> : null}
+src\components\ui\ContentListing.tsx:56:  return <div className="content-status-tabs" role="group" aria-label={translate("articlesPage.status")}>
+src\components\ui\FileUploadPreview.tsx:324:    {!file && (href || url) && !validRemote ? <p role="alert" className="compact-file-error">{translate("modalFoundation.invalidFile")}</p> : null}
+src\components\ui\FileUploadPreview.tsx:325:    {error ? <p role="alert" className="compact-file-error">{error}</p> : null}
+src\components\ui\LoadingIndicator.tsx:6:    <div role="status" aria-live="polite" className={`flex items-center justify-center px-6 ${fullScreen ? 'min-h-screen' : 'min-h-[40vh]'}`}>
+src\components\ui\Modal.tsx:45:            role="dialog"
+src\components\ui\TiptapEditor.tsx:307:        ...(ariaLabelledBy ? { role: 'textbox', 'aria-multiline': 'true', 'aria-labelledby': ariaLabelledBy } : {}),

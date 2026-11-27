@@ -91,6 +91,7 @@ export interface UserProfile {
   city: string | null;
   society: string | null;
   department: string | null;
+  role_id?: string | null;
   role: string;
   is_superuser: boolean;
   role_details?: UserRoleDetails | null;
@@ -104,6 +105,7 @@ export interface UserProfile {
   last_login_at: string | null;
   created_at: string;
   is_deleted: boolean;
+  role_permissions?: UserPermission[];
   permissions: UserPermission[];
   user_permissions: UserPermission[];
   street_address?: string | null;

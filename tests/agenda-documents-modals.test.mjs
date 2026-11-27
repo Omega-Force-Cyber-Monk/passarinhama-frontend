@@ -30,6 +30,7 @@ function inspect(file) {
   function model(file) {
     const { sf, modals } = inspect(file);
     const context = {
+      sanitizeRichContent: html => html,
       React: { createElement: (type, props, ...children) => ({ type, props: { ...props, children } }), Fragment: 'Fragment' },
       motion: { div: 'motion.div' }, format, parse, parseISO, isBefore, dateLocale: undefined,
       translate: (key) => key, calls: [], notifications: [],

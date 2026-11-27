@@ -40,6 +40,22 @@ test('Admin dirty draft survives same-record server refresh and resets on intent
   c.editingItem={id:'C'};c.memberDetail={id:'C',first_name:'C',last_name:'Member',email:'c@test.invalid'};sync();assert.equal(c.formData.first_name,'C');
 });
 
+test('member role selection survives detail synchronization and sends only the selected stable role ID',async()=>{
+  const c=adminContext();c.isEditorDetailReady=true;c.memberDetail={id:'B',first_name:'B',last_name:'Member',email:'b@test.invalid',role_id:'original-role',is_superuser:false};
+  const sync=evaluate(effect(admin,'const sync ='),c);sync();assert.equal(c.formData.role_id,'original-role');
+  c.formData={...c.formData,role_id:'selected-role'};sync();assert.equal(c.formData.role_id,'selected-role');
+  await evaluate(init(admin,'handleSubmit'),c)({preventDefault(){}});
+  assert.equal(c.writes.length,1);assert.equal(c.writes[0].body.role_id,'selected-role');assert.equal(c.writes[0].body.user_permissions,undefined);
+  c.editingItem={id:'C'};c.memberDetail={id:'C',first_name:'C',last_name:'Member',email:'c@test.invalid',role_id:'C-role'};sync();assert.equal(c.formData.role_id,'C-role');
+});
+
+test('rejected role update retains the modal and never reports success',async()=>{
+  const c=adminContext();c.isEditorDetailReady=true;c.formData.role_id='selected-role';let errors=0;
+  c.updateUser=()=>({unwrap:async()=>{throw new Error('Rejected role update');}});
+  c.notifyError=error=>{assert.match(error.message,/Rejected role/);errors++;};c.notifySuccess=()=>assert.fail('false success');c.setIsModalOpen=()=>assert.fail('modal must remain open');
+  await evaluate(init(admin,'handleSubmit'),c)({preventDefault(){}});assert.equal(errors,1);assert.equal(c.formData.role_id,'selected-role');
+});
+
 test('Admin missing detail loads and settled errors render as errors',()=>{
   for(const error of [false,true]){
     const c={isDetailsOpen:true,viewingItem:undefined,isCurrentDetailError:error,isLoadingForum:false,isLoadingMember:false,isLoadingArticle:false,isLoadingTechnicoProDetail:false,isLoadingEvent:false,isLoadingTraining:false};
@@ -75,13 +91,13 @@ test('obsolete sidebar page two cannot append after page one resets the generati
 
 test('search hides earlier terms and suppresses repeated identical automatic triggers',async()=>{
   const sf=parse('src/layouts/DashboardLayout.tsx');let refreshes=0;
-  const c={isAuthenticated:true,useMemo:fn=>fn(),SEARCH_PERMISSION_FEATURES:{articles:'article'},hasPermission:()=>true,searchResults:{results:[{type:'articles',id:'old'}]},debouncedSearchTerm:'old',normalizedSearchTerm:'new',searchOpen:true,isSearchFetching:false,refetchSearch:()=>{refreshes++;},setSearchOpen(){},setDebouncedSearchTerm:term=>c.debouncedSearchTerm=term};
+  const c={isAuthenticated:true,canSearch:true,useMemo:fn=>fn(),SEARCH_PERMISSION_FEATURES:{articles:'article'},hasPermission:()=>true,searchResults:{results:[{type:'articles',id:'old'}]},debouncedSearchTerm:'old',normalizedSearchTerm:'new',searchOpen:true,isSearchFetching:false,refetchSearch:()=>{refreshes++;},setSearchOpen(){},setDebouncedSearchTerm:term=>c.debouncedSearchTerm=term};
   assert.equal(evaluate(init(sf,'visibleSearchResults'),c).length,0);
   const execute=evaluate(init(sf,'executeSearch'),c);await execute(' old ');assert.equal(refreshes,0);await execute('old',true);assert.equal(refreshes,1);await execute('new');assert.equal(c.debouncedSearchTerm,'new');assert.equal(refreshes,1);
 });
 
 test('search failure retries on reopening, without a retry loop driven by error updates',()=>{
-  const sf=parse('src/layouts/DashboardLayout.tsx');let refreshes=0;const c={searchOpen:true,debouncedSearchTerm:'term',isSearchError:true,isSearchFetching:false,refetchSearch:()=>{refreshes++;}};
+  const sf=parse('src/layouts/DashboardLayout.tsx');let refreshes=0;const c={canSearch:true,searchOpen:true,debouncedSearchTerm:'term',isSearchError:true,isSearchFetching:false,refetchSearch:()=>{refreshes++;}};
   const retry=find(sf,n=>ts.isCallExpression(n)&&n.expression.getText(sf)==='useEffect'&&n.arguments[0].getText(sf).includes('Reopening a failed'))[0];
   evaluate(retry.arguments[0].getText(sf),c)();assert.equal(refreshes,1);c.searchOpen=false;evaluate(retry.arguments[0].getText(sf),c)();assert.equal(refreshes,1);
 });

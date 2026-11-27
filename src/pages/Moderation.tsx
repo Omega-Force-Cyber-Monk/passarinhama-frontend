@@ -1,3 +1,4 @@
+import { sanitizeRichContent } from "../utils/richContent";
 import React, { useState } from "react";
 import {
   ShieldCheck,
@@ -235,7 +236,7 @@ export default function Moderation() {
                     {item.content && (
                       <div
                         className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 prose prose-sm prose-slate max-w-none prose-p:my-0 prose-p:text-slate-700 prose-headings:text-slate-900 prose-strong:text-slate-900 prose-a:text-primary prose-img:rounded-xl"
-                        dangerouslySetInnerHTML={{ __html: item.content }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeRichContent(item.content) }}
                       />
                     )}
                   </div>
@@ -353,7 +354,7 @@ export default function Moderation() {
                     {log.post?.content && (
                       <div
                         className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 prose prose-sm prose-slate max-w-none prose-p:my-0 prose-p:text-slate-700 prose-headings:text-slate-900 prose-strong:text-slate-900 prose-a:text-primary prose-img:rounded-xl"
-                        dangerouslySetInnerHTML={{ __html: log.post.content }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeRichContent(log.post.content) }}
                       />
                     )}
                   </div>

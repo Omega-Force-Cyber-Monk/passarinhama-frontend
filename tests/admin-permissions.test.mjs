@@ -23,7 +23,7 @@ function harness(kind, { permissions = [], allowed = true, fetching = false, fai
   const state = [], calls = [], notices = [], queries = [], busy = [];
   let cursor = 0;
   const query = { currentData: permissions, isFetching: fetching, isError: failedQuery, error: new Error('load failed'), refetch: () => ({ unwrap: async () => { calls.push(['refetch']); return query.currentData; } }) };
-  const profileQuery = { currentData: { id: profileId, status: 'active', is_deleted: false, is_superuser: false, permissions: [{feature: 'article', can_view: true, can_create: false, can_edit: false, can_delete: false}], user_permissions: [] }, isFetching: profileFetching, isError: profileError, error: profileError ? new Error('profile failed') : undefined, refetch() {} };
+  const profileQuery = { currentData: { id: profileId, status: 'active', is_deleted: false, is_superuser: false, role_permissions: [{feature: 'article', can_view: true, can_create: false, can_edit: false, can_delete: false}], permissions: [{feature: 'article', can_view: true, can_create: false, can_edit: false, can_delete: false}], user_permissions: [] }, isFetching: profileFetching, isError: profileError, error: profileError ? new Error('profile failed') : undefined, refetch() {} };
   const mutation = (name) => () => [(payload) => ({ unwrap: async () => {
     calls.push([name, payload]);
     if (mutationError) throw mutationError;
@@ -188,15 +188,15 @@ test('profile permission refresh may revoke Admin access without changing hook o
   assert.equal(selectors.length, 1); assert.match(selectors[0].getText(admin), /type="button"/);
 });
 
-test('member editor shows inheritance and effective denial/allowance without changing untouched actions', async () => {
+test('member editor shows current server permissions while drafts preserve untouched actions', async () => {
   const h = harness('member', {permissions: [{id: 'row', feature: 'article', can_view: null, can_create: null, can_edit: false, can_delete: false}]});
   let tree = h.render();
   assert.equal(all(row(tree), 'select')[0].props.value, 'inherit');
   assert.match(JSON.stringify(all(row(tree), 'label')[0]), /Inherited: Allow.*Effective: Allow/);
   toggle(tree, 0, false); tree = h.render();
-  assert.match(JSON.stringify(all(row(tree), 'label')[0]), /Inherited: Allow.*Effective: Deny/);
+  assert.match(JSON.stringify(all(row(tree), 'label')[0]), /Inherited: Allow.*Effective: Allow/);
   toggle(tree, 1, true); tree = h.render();
-  assert.match(JSON.stringify(all(row(tree), 'label')[1]), /Inherited: Deny.*Effective: Allow/);
+  assert.match(JSON.stringify(all(row(tree), 'label')[1]), /Inherited: Deny.*Effective: Deny/);
   save(tree); await flush();
   assert.deepEqual(plain(h.calls[0][1]), {id: 'row', user_id: 'target', can_view: false, can_create: true});
   assert.equal(h.query.currentData[0].can_edit, false);

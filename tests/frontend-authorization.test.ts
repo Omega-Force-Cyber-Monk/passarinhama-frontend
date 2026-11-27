@@ -41,7 +41,7 @@ test('each feature/action requires account eligibility, its independent grant, a
       assert.equal(canAccessAdminPanel(actor), eligible);
       assert.equal(canAccessModeration(actor), eligible);
     }
-    assert.equal(hasPermission(user(action, { user_permissions: [{ feature, [`can_${action}`]: false }] }), feature, action), false);
+    assert.equal(hasPermission(user(action, { permissions: [{ feature, [`can_${action}`]: false }], user_permissions: [{ feature, [`can_${action}`]: true }] }), feature, action), false);
   }
   assert.equal(canModifyResource(user('edit'), 'article', { ...resource('article'), can_write: false }, 'edit'), false);
   assert.equal(canModifyResource(user('edit'), 'technicopro', { ...resource('technicopro'), author_id: 'other' }, 'edit'), false);
@@ -134,7 +134,7 @@ const ownedWrites = [
 test('real RTK mutation entry points deny missing/revoked grants, other/missing owners and inactive superusers without writing', async () => client(async (h) => {
   for (const [name, args, feature, action] of ownedWrites) {
     for (const actor of [user(), user('view'), user('create'), user(action === 'edit' ? 'delete' : 'edit'),
-      user(action, { user_permissions: [{ feature, [`can_${action}`]: false }] }),
+      user(action, { permissions: [{ feature, [`can_${action}`]: false }], user_permissions: [{ feature, [`can_${action}`]: true }] }),
       user(action, { status: 'suspended' }), user(action, { is_deleted: true }),
       user(action, { is_superuser: true, status: 'pending' }), user(action, { is_superuser: true, is_deleted: true })]) {
       h.profile = actor; h.signIn(user(action)); // stale client grant must not win

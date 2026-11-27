@@ -17,9 +17,9 @@ const actor:any={id:'actor',status:'active',is_deleted:false,is_superuser:true,r
 const json=(data:unknown)=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
 const endpoint=(name:string)=>(api.endpoints as any)[name];
 const tick=()=>new Promise(r=>setTimeout(r,20));
-const hooks:Record<string,string>={useGetUsersQuery:'getUsers',useGetForumsQuery:'getForums',useGetArticlesQuery:'getArticles',useGetTechnicoProsQuery:'getTechnicoPros',useGetEventsQuery:'getEvents',useGetEventCategoriesQuery:'getEventCategories',useGetAllTrainingsQuery:'getAllTrainings',useGetUserRolesQuery:'getUserRoles',useGetModerationQueueQuery:'getModerationQueue',useGetModerationLogsQuery:'getModerationLogs',useGetArticleCategoriesQuery:'getArticleCategories',useGetTechnicoProCategoriesQuery:'getTechnicoProCategories',useGetTrainingCategoriesQuery:'getTrainingCategories',useGetAdminSmtpSettingsQuery:'getAdminSmtpSettings',useGetAdminSystemLogsQuery:'getAdminSystemLogs',useGetAdminBackupsQuery:'getAdminBackups'};
+const hooks:Record<string,string>={useGetUsersQuery:'getUsers',useGetForumsQuery:'getForums',useGetArticlesQuery:'getArticles',useGetTechnicoProsQuery:'getTechnicoPros',useGetEventsQuery:'getEvents',useGetEventCategoriesQuery:'getEventCategories',useGetAllTrainingsQuery:'getAllTrainings',useGetTrainingsPaginatedQuery:'getTrainingsPaginated',useGetUserRolesQuery:'getUserRoles',useGetModerationQueueQuery:'getModerationQueue',useGetModerationLogsQuery:'getModerationLogs',useGetArticleCategoriesQuery:'getArticleCategories',useGetTechnicoProCategoriesQuery:'getTechnicoProCategories',useGetTrainingCategoriesQuery:'getTrainingCategories',useGetAdminSmtpSettingsQuery:'getAdminSmtpSettings',useGetAdminSystemLogsQuery:'getAdminSystemLogs',useGetAdminBackupsQuery:'getAdminBackups'};
 
-test('Admin real query blocks dispatch only active-tab HTTP requests and reuse cached tabs',async()=>{
+test('Admin keeps bounded total queries subscribed while full lists follow the active tab',async()=>{
   const requests:string[]=[];const original=globalThis.fetch;
   globalThis.fetch=async input=>{const r=input as Request,url=new URL(r.url);requests.push(`${r.method} ${url.pathname}`);return json(url.pathname.endsWith('/me')?actor:url.pathname.endsWith('/roles')?[]:url.pathname==='/events/events'?[]:{results:[],total:0});};
   const subscriptions=new Map<string,{key:string;request:any}>();
@@ -29,22 +29,23 @@ test('Admin real query blocks dispatch only active-tab HTTP requests and reuse c
   const statements=component.body!.statements.filter(n=>ts.isVariableStatement(n)&&n.declarationList.declarations.some(d=>d.initializer&&ts.isCallExpression(d.initializer)&&hooks[d.initializer.expression.getText(sf)]));
   const code=ts.transpileModule(statements.map(n=>n.getText(sf)).join('\n'),{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
   const render=async(activeTab:string)=>{
-    const pending:any[]=[];const context:any={Date,activeTab,modSubTab:'queue',canAccessAdminPanel:true,memberPage:1,MEMBERS_PAGE_SIZE:10,searchTerm:'',memberRoleFilter:'all',memberStatusFilter:'all',articlePage:1,ARTICLES_PAGE_SIZE:20,technicoproPage:1,TECHNICOPRO_PAGE_SIZE:20,moderationQueuePage:1,MODERATION_QUEUE_PAGE_SIZE:20,moderationLogsPage:1,MODERATION_LOGS_PAGE_SIZE:20,systemLogsLimit:8,systemLogSearchTerm:''};
+    const pending:Promise<unknown>[]=[];const seen=new Set<string>();const context:Record<string,unknown>={Date,activeTab,modSubTab:'queue',canAccessAdminPanel:true,memberPage:1,MEMBERS_PAGE_SIZE:10,searchTerm:'',memberRoleFilter:'all',memberStatusFilter:'all',articlePage:1,ARTICLES_PAGE_SIZE:20,technicoproPage:1,TECHNICOPRO_PAGE_SIZE:20,moderationQueuePage:1,MODERATION_QUEUE_PAGE_SIZE:20,moderationLogsPage:1,MODERATION_LOGS_PAGE_SIZE:20,systemLogsLimit:8,systemLogSearchTerm:''};
     for(const[name,query]of Object.entries(hooks))context[name]=(arg:any,options:any)=>{
-      const key=JSON.stringify(arg),old=subscriptions.get(name);
-      if(options?.skip){old?.request.unsubscribe();subscriptions.delete(name);return{};}
-      if(!old||old.key!==key){old?.request.unsubscribe();const request=store.dispatch(endpoint(query).initiate(arg));subscriptions.set(name,{key,request});pending.push(request);}
+      const key=name+JSON.stringify(arg),old=subscriptions.get(key);
+      if(options?.skip)return{};
+      seen.add(key);
+      if(!old||old.key!==key){old?.request.unsubscribe();const request=store.dispatch(endpoint(query).initiate(arg));subscriptions.set(key,{key,request});pending.push(request);}
       return endpoint(query).select(arg)(store.getState());
     };
-    vm.runInNewContext(code,context);await Promise.all(pending);await tick();
+    vm.runInNewContext(code,context);for(const[key,entry]of subscriptions){if(!seen.has(key)){entry.request.unsubscribe();subscriptions.delete(key);}}await Promise.all(pending);await tick();
   };
   try{
-    await render('members');assert.deepEqual(requests,['GET /user/users','GET /user/roles']);console.log('MEASURE Admin initial Members data requests: 2 (baseline 16)');
+    await render('members');assert.equal(requests.length,7);assert.equal(requests.filter(path=>path==='GET /user/users').length,2);console.log('MEASURE Admin initial Members requests: 7, including six persistent total subscriptions');
     requests.length=0;await render('articles');assert.equal(requests.length,2);console.log('MEASURE Admin first Articles tab data requests: 2');
     requests.length=0;await render('members');assert.equal(requests.length,0);console.log('MEASURE Admin return to cached Members requests: 0');
     await store.dispatch(endpoint('updateUser').initiate({id:'other',body:{role_id:'role'}}));await tick();
-    assert.deepEqual(requests,['GET /user/users/me','PATCH /user/users/other','GET /user/users']);console.log('MEASURE member role update requests: 3, including required ME preflight');
-    await render('outside-admin');requests.length=0;await store.dispatch(endpoint('updateUser').initiate({id:'other',body:{first_name:'Changed'}}));await tick();
+    assert.equal(requests[0],'GET /user/users/me');assert.equal(requests[1],'PATCH /user/users/other');assert.equal(requests.filter(path=>path==='GET /user/users').length,2);console.log('MEASURE member role update refreshes the table and its total');
+    subscriptions.forEach(entry=>entry.request.unsubscribe());subscriptions.clear();requests.length=0;await store.dispatch(endpoint('updateUser').initiate({id:'other',body:{first_name:'Changed'}}));await tick();
     assert.deepEqual(requests,['GET /user/users/me','PATCH /user/users/other']);console.log('MEASURE update after leaving Admin requests: 2; no hidden-tab GET');
   }finally{subscriptions.forEach(s=>s.request.unsubscribe());store.dispatch(auth.logout());globalThis.fetch=original;}
 });

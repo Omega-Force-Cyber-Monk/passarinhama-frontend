@@ -1,3 +1,4 @@
+import { sanitizeRichContent } from "../utils/richContent";
 import { ModalFieldGrid, ModalFullWidth, ModalSubmitButton } from "../components/ui/ModalLayout";
 import "./ArticleForumModals.css";
 import React, { useEffect, useMemo, useState } from "react";
@@ -1365,8 +1366,7 @@ export default function Forums() {
                             className="forum-summary-description mt-1 text-sm text-slate-500 prose prose-sm prose-slate max-w-none prose-p:my-0 prose-p:text-slate-500 prose-strong:text-slate-700 prose-a:text-primary prose-ul:my-1 prose-ol:my-1 line-clamp-3"
                             dangerouslySetInnerHTML={{
                               __html:
-                                forum.description ||
-                                `<p>${translate("forumsPage.defaultForumDescription")}</p>`,
+                                sanitizeRichContent(forum.description || `<p>${translate("forumsPage.defaultForumDescription")}</p>`),
                             }}
                           />
                           {forum.author_name && (
@@ -1660,7 +1660,7 @@ export default function Forums() {
                       <div
                         className="forum-rich-content forum-post-content text-slate-800 leading-relaxed font-medium bg-white rounded-2xl border-2 border-primary/20 shadow-sm shadow-primary/5 prose prose-slate max-w-none prose-p:text-slate-700 prose-headings:text-slate-900 prose-strong:text-slate-900 prose-a:text-primary prose-img:rounded-2xl"
                         dangerouslySetInnerHTML={{
-                          __html: selectedTopic.content,
+                          __html: sanitizeRichContent(selectedTopic.content),
                         }}
                       />
                       {!!selectedTopic.attachments?.length && (
@@ -1733,7 +1733,7 @@ export default function Forums() {
                           </div>
                           <div
                             className="forum-rich-content forum-post-content text-slate-600 leading-relaxed bg-slate-50 rounded-2xl border border-slate-100 prose prose-slate max-w-none prose-p:text-slate-600 prose-headings:text-slate-900 prose-strong:text-slate-900 prose-a:text-primary prose-img:rounded-2xl"
-                            dangerouslySetInnerHTML={{ __html: post.content }}
+                            dangerouslySetInnerHTML={{ __html: sanitizeRichContent(post.content) }}
                           />
                           {!!post.attachments?.length && (
                             <AttachmentGallery

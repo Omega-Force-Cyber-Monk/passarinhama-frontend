@@ -85,31 +85,14 @@ export const getMergedPermissions = (
     return basePermissions;
   }
 
-  normalizePermissions(user?.permissions).forEach((permission) => {
-    basePermissions[permission.feature] = {
-      ...buildEmptyPermission(permission.feature),
-      ...Object.fromEntries(
-        Object.entries(permission).filter(([, value]) => value !== null && value !== undefined),
-      ),
-    };
-  });
-
-  normalizePermissions(user?.user_permissions).forEach((permission) => {
-    const nextPermission = { ...basePermissions[permission.feature] };
-
+  // The backend publishes the final action decisions in permissions. Do not
+  // merge raw role/direct rows here: that can reverse the server's decisions.
+  normalizePermissions(user.permissions).forEach((permission) => {
+    const normalized = buildEmptyPermission(permission.feature);
     PERMISSION_ACTIONS.forEach((action) => {
-      if (permission[action] !== null && permission[action] !== undefined) {
-        nextPermission[action] = permission[action];
-      }
+      normalized[action] = permission[action] === true;
     });
-
-    basePermissions[permission.feature] = {
-      ...nextPermission,
-      id: permission.id,
-      role_id: permission.role_id,
-      user_id: permission.user_id,
-      feature: permission.feature,
-    };
+    basePermissions[permission.feature] = normalized;
   });
 
   return basePermissions;

@@ -29,16 +29,16 @@ async function until(predicate: () => boolean) {
   assert.ok(predicate(), 'Expected profile refresh did not complete');
 }
 
-test('TechnicoPro-only grants do not imply other modules, and nullable personal actions inherit independently', () => {
+test('TechnicoPro-only grants use only the authoritative permissions array', () => {
   for (const role of ['membre', 'admin', 'partenaires_technicopro']) {
     const user = actor({ role });
     for (const feature of PERMISSION_FEATURES) assert.equal(hasPermission(user, feature, 'view'), feature === 'technicopro');
   }
   const user = actor({ user_permissions: [{ feature: 'technicopro', can_view: null, can_create: true, can_edit: false }] });
   assert.equal(hasPermission(user, 'technicopro', 'view'), true);
-  assert.equal(hasPermission(user, 'technicopro', 'create'), true);
+  assert.equal(hasPermission(user, 'technicopro', 'create'), false);
   assert.equal(hasPermission(user, 'technicopro', 'edit'), false);
-  assert.equal(hasPermission(actor({ user_permissions: [{ feature: 'technicopro', can_view: false }] }), 'technicopro', 'view'), false);
+  assert.equal(hasPermission(actor({ user_permissions: [{ feature: 'technicopro', can_view: false }] }), 'technicopro', 'view'), true);
 });
 
 test('direct article API calls are denied for TechnicoPro-only sessions while TechnicoPro reads succeed', async () => {
@@ -116,7 +116,7 @@ test('focus and reconnect refetch the subscribed profile and apply external perm
     }));
     try {
       await subscription;
-      profile = actor({ user_permissions: [{ feature: 'technicopro', can_view: false }] });
+      profile = actor({ permissions: [{ feature: 'technicopro', can_view: false }], user_permissions: [{ feature: 'technicopro', can_view: true }] });
       store.dispatch(apiSlice.internalActions.onFocus());
       await until(() => !hasPermission(store.getState().auth.user, 'technicopro', 'view'));
       profile = actor();

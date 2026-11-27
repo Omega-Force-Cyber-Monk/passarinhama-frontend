@@ -6,7 +6,7 @@ playwright-report/
 test-results/
 .DS_Store
 *.log
-!.env.example
-.gitignore
-config.bat
 security-scanner-v3.py
+.env
+.env.*
+!.env.example

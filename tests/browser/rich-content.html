@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Rich content security regression</title>
+<body><pre id="results">Running browser DOM checks…</pre>
+<script type="module">
+import { sanitizeRichContent } from '/src/utils/richContent.ts';
+const results = document.querySelector('#results');
+const tests = [];
+const check = (name, condition) => { if (!condition) throw new Error(name); tests.push(name); };
+try {
+  const input = `<p style="color: red; position: fixed" onclick="window.auditAttack=1">Safe <strong>text</strong></p>
+    <img src="/missing-audit-test-image" onerror="window.auditAttack=1">
+    <a href="javascript:window.auditAttack=1" target="_blank">Bad URL</a>
+    <svg><a href="javascript:window.auditAttack=1">SVG</a></svg>
+    <iframe src="javascript:window.auditAttack=1" srcdoc="attack"></iframe>
+    <script>window.auditAttack=1<\/script>`;
+  const container = document.createElement('div');
+  container.innerHTML = sanitizeRichContent(input);
+  check('event handlers removed', !container.querySelector('[onclick], [onerror]'));
+  check('active elements removed', !container.querySelector('script, svg, iframe'));
+  check('unsafe URLs removed', !container.querySelector('a[href]'));
+  check('safe formatting preserved', container.querySelector('strong')?.textContent === 'text');
+  check('safe CSS preserved; positioning removed', container.querySelector('p').style.color === 'red' && !container.querySelector('p').style.position);
+  container.innerHTML = sanitizeRichContent('<table><tbody><tr><td colspan="2">Cell</td></tr></tbody></table><a href="https://example.test" target="_blank">Link</a>');
+  check('table preserved', container.querySelector('td')?.colSpan === 2);
+  check('new-tab links isolated', container.querySelector('a').rel.includes('noopener') && container.querySelector('a').rel.includes('noreferrer'));
+  container.innerHTML = sanitizeRichContent('<div data-youtube-video="true" class="youtube-embed"><iframe src="https://www.youtube.com/embed/abcdefghijk" srcdoc="attack" onload="attack()"></iframe></div>');
+  check('YouTube embed preserved', container.querySelector('iframe')?.src === 'https://www.youtube.com/embed/abcdefghijk');
+  check('YouTube unsafe attributes removed', !container.querySelector('[srcdoc], [onload]'));
+  check('YouTube layout preserved', container.querySelector('.youtube-embed'));
+  check('sanitization remains stable', sanitizeRichContent(container.innerHTML) === container.innerHTML);
+  check('no attack executed', !window.auditAttack);
+  results.textContent = `PASS: ${tests.length} browser DOM checks\n${tests.join('\n')}`;
+} catch (error) { results.textContent = `FAIL: ${error.message}\n${tests.join('\n')}`; }
+</script></body></html>
