@@ -1022,6 +1022,7 @@
   },
   "adminPanelPage": {
     "counts": {
+      "eventsThisYear": "Events in the current calendar year",
       "loading": "Loading total",
       "error": "Some totals could not be loaded.",
       "stale": "Last known total; refresh failed.",
@@ -1228,8 +1229,11 @@
       "inherit": "Inherit",
       "inheritedValue": "Inherited: {value}",
       "effectiveValue": "Effective: {value}",
-      "inheritanceUnavailable": "Allow and Deny are explicit personal overrides. Inherit follows the role. Creating new overrides and resetting saved overrides to Inherit require server support and are currently unavailable. Effective access also respects account status and the superuser bypass.",
-      "newOverrideUnavailable": "This feature inherits its role permissions. New personal overrides cannot be saved safely with the current server contract.",
+      "inheritanceUnavailable": "Allow and Deny are explicit personal overrides. Inherit follows the role. A new override requires explicit Allow or Deny choices for all four actions. Resetting a saved override to Inherit is not yet supported. Unsaved selections do not change effective access, which also respects account status and the superuser bypass.",
+      "newOverrideUnavailable": "To create the first override, choose Allow or Deny for all four actions, then save. The existing API creates a full feature override; actions left at Inherit cannot be saved. No record is created until you save.",
+      "missingRecordId": "The returned permission record has no ID. Selections remain unsaved until the API provides a valid record ID.",
+      "resetUnavailable": "Resetting a saved override to Inherit is not supported by the confirmed API contract. This row cannot be saved with that selection.",
+      "refreshing": "Permissions are refreshing. You can edit your selections; saving is available after the refresh completes.",
       "title": "Member Permissions",
       "permissionsFor": "Permissions for member",
       "permissionsHint": "Update feature access for this member and save each feature row."

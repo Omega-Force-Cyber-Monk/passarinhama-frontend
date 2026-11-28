@@ -396,15 +396,24 @@ test('unknown protected reads deny even superusers while explicit shared and fea
   }
 }));
 
-test('personal override creation and undocumented null resets deny at final RTK boundary', async () => client(async (h) => {
-  for (const actor of [user('edit'), user(undefined, {is_superuser: true})]) {
+test('full personal override creation requires active superuser; partial/null writes and undocumented resets deny', async () => client(async (h) => {
+  const fullRow = {user_id: 'owner', feature: 'article', can_view: true, can_create: true, can_edit: false, can_delete: false};
+  for (const actor of [user('edit'), user(undefined, {is_superuser: true, status: 'suspended'}), user(undefined, {is_superuser: true, is_deleted: true})]) {
     h.profile = actor; h.signIn();
-    assert.equal((await h.call('createMemberPermission', {user_id: 'owner', feature: 'article', can_view: true, can_create: true, can_edit: false, can_delete: false})).error?.status, 403);
+    assert.equal((await h.call('createMemberPermission', fullRow)).error?.status, 403);
     assert.equal(h.writes.length, 0);
     assert.equal((await h.call('updateMemberPermission', {id: 'permission', user_id: 'owner', can_view: null})).error?.status, 403);
     assert.equal(h.writes.length, 0);
   }
   h.profile = user(undefined, {is_superuser: true}); h.signIn();
+  assert.ok('data' in await h.call('createMemberPermission', fullRow));
+  assert.deepEqual(await h.writes[0].json(), fullRow);
+  for (const payload of [{user_id: 'owner', feature: 'article', can_view: true}, {...fullRow, can_edit: null}, {...fullRow, is_override: true}, {...fullRow, user_id: ''}, {...fullRow, feature: 'unknown'}]) {
+    assert.equal((await h.call('createMemberPermission', payload)).error?.status, 403);
+    assert.equal(h.writes.length, 0);
+  }
+  assert.equal((await h.call('updateMemberPermission', {id: 'permission', user_id: 'owner', can_view: null})).error?.status, 403);
+  assert.equal(h.writes.length, 0);
   assert.ok('data' in await h.call('updateMemberPermission', {id: 'permission', user_id: 'owner', can_edit: true}));
   assert.deepEqual(await h.writes[0].json(), {can_edit: true});
 }));

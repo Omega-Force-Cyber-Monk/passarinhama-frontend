@@ -2,6 +2,7 @@ import { profileTags, projectionTags, statsTag, mutationChanged } from '../api/c
 import { apiSlice } from '../api/apiSlice';
 import { sessionFailed, logout } from '../auth/authSlice';
 import { normalizeUserProfile } from '../auth/normalizeProfile';
+import { PERMISSION_ACTIONS } from '../auth/permissionUtils';
 import type { RootState } from '../../store';
 import type { FetchBaseQueryMeta } from '@reduxjs/toolkit/query';
 import {
@@ -285,6 +286,21 @@ export const membersApi = apiSlice.injectEndpoints({
       MemberPermission,
       UpdateMemberPermissionRequest
     >({
+      async onQueryStarted({ id, user_id }, { dispatch, getState, queryFulfilled }) {
+        const version = (getState() as RootState).auth.sessionVersion;
+        try {
+          const { data } = await queryFulfilled;
+          if ((getState() as RootState).auth.sessionVersion !== version ||
+            !data || data.id !== id || data.user_id !== user_id ||
+            PERMISSION_ACTIONS.some(action => data[action] !== null && typeof data[action] !== 'boolean')) return;
+          // Keep the acknowledged selection visible while tag invalidation
+          // refreshes the list. Never infer saved values from the request.
+          dispatch(membersApi.util.updateQueryData('getMemberPermissions', { user_id }, rows => {
+            const row = rows.find(permission => permission.id === id && permission.user_id === user_id && permission.feature === data.feature);
+            if (row) Object.assign(row, data);
+          }));
+        } catch { /* Rejected updates retain the existing cache; the editor reports the error. */ }
+      },
       query: ({ id, user_id: _userId, ...body }) => ({
         url: `/user/user-permissions/${id}`,
         method: 'PATCH',
@@ -299,6 +315,20 @@ export const membersApi = apiSlice.injectEndpoints({
       MemberPermission,
       CreateMemberPermissionRequest
     >({
+      async onQueryStarted({ user_id, feature }, { dispatch, getState, queryFulfilled }) {
+        const version = (getState() as RootState).auth.sessionVersion;
+        try {
+          const { data } = await queryFulfilled;
+          if ((getState() as RootState).auth.sessionVersion !== version ||
+            !data || typeof data.id !== 'string' || !data.id.trim() || data.user_id !== user_id || data.feature !== feature ||
+            PERMISSION_ACTIONS.some(action => data[action] !== null && typeof data[action] !== 'boolean')) return;
+          // Publish only a server-created row; opening the editor never creates
+          // placeholders, IDs or permission records.
+          dispatch(membersApi.util.updateQueryData('getMemberPermissions', { user_id }, rows => {
+            if (!rows.some(row => row.feature === feature)) rows.push(data);
+          }));
+        } catch { /* The editor reports failed creation and retains its unsaved choices. */ }
+      },
       query: (body) => ({
         url: '/user/user-permissions',
         method: 'POST',

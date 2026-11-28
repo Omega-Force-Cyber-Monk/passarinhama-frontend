@@ -120,6 +120,7 @@ import {
 } from "../redux/features/technicopro/technicoproApi";
 import {
   useGetEventsQuery,
+  useGetCalendarStatsQuery,
   useDeleteEventMutation,
   useCreateEventMutation,
   useGetEventByIdQuery,
@@ -652,6 +653,7 @@ export default function AdminPanel() {
   const articlesCountQuery = useGetArticlesQuery({ page: 1, pageSize: 1 }, { skip: !canAccessAdminPanel });
   const technicoproCountQuery = useGetTechnicoProsQuery({ page: 1, pageSize: 1 }, { skip: !canAccessAdminPanel });
   const trainingsCountQuery = useGetTrainingsPaginatedQuery({ page: 1, pageSize: 1 }, { skip: !canAccessAdminPanel });
+  const eventsCountQuery = useGetCalendarStatsQuery(undefined, { skip: !canAccessAdminPanel });
 
 
   const {
@@ -2112,7 +2114,7 @@ export default function AdminPanel() {
           id: "events",
           icon: CalendarIcon,
           label: getTabLabel("events"),
-          count: { status: "unavailable" },
+          count: readAdminCount(eventsCountQuery, false, 'events_this_year'),
         }
       : null,
     canViewTrainings
@@ -2236,19 +2238,20 @@ export default function AdminPanel() {
               <p
                 className={`text-xl font-black ${activeTab === tab.id ? "text-white" : "text-slate-900"}`}
               >
-                <span title={tab.count.status === "ready" ? undefined : translate(`adminPanelPage.counts.${tab.count.status}`)} aria-label={tab.count.status === "ready" ? undefined : translate(`adminPanelPage.counts.${tab.count.status}`)}>
+                <span title={[tab.id === "events" ? translate("adminPanelPage.counts.eventsThisYear") : null, tab.count.status === "ready" ? null : translate(`adminPanelPage.counts.${tab.count.status}`)].filter(Boolean).join(" ") || undefined} aria-describedby={tab.id === "events" ? `${adminFieldId}-events-count-period` : undefined} aria-label={tab.count.status === "ready" ? undefined : translate(`adminPanelPage.counts.${tab.count.status}`)}>
                   {tab.count.value ?? (tab.count.status === "loading" ? "…" : "—")}
                 </span>
+                {tab.id === "events" && <span id={`${adminFieldId}-events-count-period`} className="sr-only">{translate("adminPanelPage.counts.eventsThisYear")}</span>}
               </p>
             </div>
           </button>
         ))}
       </div>
 
-      {[usersCountQuery, forumsCountQuery, articlesCountQuery, technicoproCountQuery, trainingsCountQuery, rolesCountQuery].some(query => query.isError) && <div role="alert" className="mb-4 flex items-center gap-3 text-sm text-slate-600">
+      {[usersCountQuery, forumsCountQuery, articlesCountQuery, technicoproCountQuery, trainingsCountQuery, rolesCountQuery, eventsCountQuery].some(query => query.isError) && <div role="alert" className="mb-4 flex items-center gap-3 text-sm text-slate-600">
         <span>{translate("adminPanelPage.counts.error")}</span>
         <button type="button" className="rounded-xl border px-3 py-2" onClick={() => {
-          [usersCountQuery, forumsCountQuery, articlesCountQuery, technicoproCountQuery, trainingsCountQuery, rolesCountQuery].forEach(query => { if (query.isError && !query.isFetching) void query.refetch(); });
+          [usersCountQuery, forumsCountQuery, articlesCountQuery, technicoproCountQuery, trainingsCountQuery, rolesCountQuery, eventsCountQuery].forEach(query => { if (query.isError && !query.isFetching) void query.refetch(); });
         }}>{translate("adminPanelPage.retryFetch")}</button>
       </div>}
 

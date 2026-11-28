@@ -1022,6 +1022,7 @@
   },
   "adminPanelPage": {
     "counts": {
+      "eventsThisYear": "Événements de l’année civile en cours",
       "loading": "Chargement du total",
       "error": "Certains totaux n’ont pas pu être chargés.",
       "stale": "Dernier total connu ; échec de l’actualisation.",
@@ -1228,8 +1229,11 @@
       "inherit": "Hériter",
       "inheritedValue": "Hérité : {value}",
       "effectiveValue": "Effectif : {value}",
-      "inheritanceUnavailable": "Autoriser et Refuser remplacent explicitement les droits du rôle. Hériter suit le rôle. La création et le retour à l’héritage nécessitent une prise en charge du serveur et sont actuellement indisponibles. L’accès effectif tient aussi compte du statut du compte et des privilèges superutilisateur.",
-      "newOverrideUnavailable": "Cette fonctionnalité hérite des droits du rôle. Le contrat serveur actuel ne permet pas d’enregistrer de nouvelles exceptions personnelles en préservant l’héritage.",
+      "inheritanceUnavailable": "Autoriser et Refuser sont des dérogations personnelles explicites. Hériter suit le rôle. Une nouvelle dérogation exige un choix explicite Autoriser ou Refuser pour les quatre actions. Le retour à l’héritage d’une dérogation enregistrée n’est pas encore pris en charge. Les sélections non enregistrées ne modifient pas l’accès effectif, qui respecte aussi le statut du compte et les privilèges superutilisateur.",
+      "newOverrideUnavailable": "Pour créer la première dérogation, choisissez Autoriser ou Refuser pour les quatre actions, puis enregistrez. L’API existante crée une dérogation complète pour la fonctionnalité ; les actions laissées sur Hériter ne peuvent pas être enregistrées. Aucun enregistrement n’est créé avant votre validation.",
+      "missingRecordId": "L’enregistrement de permission reçu n’a pas d’identifiant. Les sélections restent non enregistrées jusqu’à ce que l’API fournisse un identifiant valide.",
+      "resetUnavailable": "Le contrat API confirmé ne permet pas de rétablir l’héritage d’une dérogation enregistrée. Cette ligne ne peut pas être enregistrée avec cette sélection.",
+      "refreshing": "Actualisation des permissions en cours. Vous pouvez modifier vos sélections ; l’enregistrement sera disponible après l’actualisation.",
       "title": "Permissions du membre",
       "permissionsFor": "Permissions du membre",
       "permissionsHint": "Mettez à jour l'accès par fonctionnalité pour ce membre puis enregistrez chaque ligne."

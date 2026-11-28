@@ -1,6 +1,6 @@
 import type { FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import type { UserProfile } from '../auth/authTypes';
-import { hasPermission, isActiveSuperuser, isActiveUser, PERMISSION_ACTIONS, type PermissionFeature } from '../auth/permissionUtils';
+import { hasPermission, isActiveSuperuser, isActiveUser, PERMISSION_ACTIONS, PERMISSION_FEATURES, type PermissionFeature } from '../auth/permissionUtils';
 import { canCreateInResource, canModifyResource, canReplyToTopic, ORDINARY_ACCOUNT_FIELDS } from '../auth/resourceAuthorization';
 
 // Locators only: never accept an owner or a permission decision from mutation args.
@@ -25,7 +25,7 @@ const administrative = new Set([
   'createTechnicoProCategory', 'updateTechnicoProCategory', 'deleteTechnicoProCategory',
   'setArticlePermission', 'setForumPermission', 'setTrainingPermission', 'setTechnicoProPermission', 'updateFolderPermissionsBulk',
   'createUserRole', 'updateUserRole', 'deleteUserRole', 'createUserPermission', 'updateUserPermission',
-  'updateMemberPermission', 'updateUser', 'deleteUser', 'softDeleteUser', 'restoreUser', 'validateUser',
+  'createMemberPermission', 'updateMemberPermission', 'updateUser', 'deleteUser', 'softDeleteUser', 'restoreUser', 'validateUser',
   'pinTopic', 'moderatePost', 'deleteFile',
   'updateAdminSmtpSettings', 'testAdminSmtpSettings', 'clearAdminSystemLogs',
   'updateAdminBackupConfiguration', 'runAdminBackup', 'testAdminBackupPermissions', 'deleteAdminBackup',
@@ -98,9 +98,18 @@ export async function authorizeRequest(
   const { clientAuthorization: context = {}, ...args } = request;
   if (!isActiveUser(user)) return { error: forbidden() };
   const path = '/' + args.url.replace(/^\//, '').split('?')[0];
-  // Existing POST requires four non-null booleans: it cannot preserve inheritance.
-  // Do not allow direct RTK callers to bypass the editor's safe blocked state.
-  if (endpoint === 'createMemberPermission') return { error: forbidden() };
+  // Preserve the established full-row POST contract. Partial/null writes do not
+  // have a confirmed inheritance meaning and must not pass this final boundary.
+  if (endpoint === 'createMemberPermission') {
+    const body: unknown = args.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return { error: forbidden() };
+    const fields = body as Record<string, unknown>;
+    if (args.method !== 'POST' || path !== '/user/user-permissions' ||
+      typeof fields.user_id !== 'string' || !fields.user_id.trim() ||
+      typeof fields.feature !== 'string' || !PERMISSION_FEATURES.includes(fields.feature as PermissionFeature) ||
+      PERMISSION_ACTIONS.some(action => typeof fields[action] !== 'boolean') ||
+      Object.keys(fields).some(key => !['user_id', 'feature', ...PERMISSION_ACTIONS].includes(key))) return { error: forbidden() };
+  }
   if (endpoint === 'updateMemberPermission' && (!args.body || !Object.keys(args.body).length ||
     Object.entries(args.body).some(([key, value]) => !PERMISSION_ACTIONS.includes(key as typeof PERMISSION_ACTIONS[number]) || typeof value !== 'boolean'))) {
     return { error: forbidden() };

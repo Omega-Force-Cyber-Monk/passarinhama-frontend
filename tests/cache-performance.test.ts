@@ -17,7 +17,7 @@ const actor:any={id:'actor',status:'active',is_deleted:false,is_superuser:true,r
 const json=(data:unknown)=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
 const endpoint=(name:string)=>(api.endpoints as any)[name];
 const tick=()=>new Promise(r=>setTimeout(r,20));
-const hooks:Record<string,string>={useGetUsersQuery:'getUsers',useGetForumsQuery:'getForums',useGetArticlesQuery:'getArticles',useGetTechnicoProsQuery:'getTechnicoPros',useGetEventsQuery:'getEvents',useGetEventCategoriesQuery:'getEventCategories',useGetAllTrainingsQuery:'getAllTrainings',useGetTrainingsPaginatedQuery:'getTrainingsPaginated',useGetUserRolesQuery:'getUserRoles',useGetModerationQueueQuery:'getModerationQueue',useGetModerationLogsQuery:'getModerationLogs',useGetArticleCategoriesQuery:'getArticleCategories',useGetTechnicoProCategoriesQuery:'getTechnicoProCategories',useGetTrainingCategoriesQuery:'getTrainingCategories',useGetAdminSmtpSettingsQuery:'getAdminSmtpSettings',useGetAdminSystemLogsQuery:'getAdminSystemLogs',useGetAdminBackupsQuery:'getAdminBackups'};
+const hooks:Record<string,string>={useGetUsersQuery:'getUsers',useGetForumsQuery:'getForums',useGetArticlesQuery:'getArticles',useGetTechnicoProsQuery:'getTechnicoPros',useGetEventsQuery:'getEvents',useGetCalendarStatsQuery:'getCalendarStats',useGetEventCategoriesQuery:'getEventCategories',useGetAllTrainingsQuery:'getAllTrainings',useGetTrainingsPaginatedQuery:'getTrainingsPaginated',useGetUserRolesQuery:'getUserRoles',useGetModerationQueueQuery:'getModerationQueue',useGetModerationLogsQuery:'getModerationLogs',useGetArticleCategoriesQuery:'getArticleCategories',useGetTechnicoProCategoriesQuery:'getTechnicoProCategories',useGetTrainingCategoriesQuery:'getTrainingCategories',useGetAdminSmtpSettingsQuery:'getAdminSmtpSettings',useGetAdminSystemLogsQuery:'getAdminSystemLogs',useGetAdminBackupsQuery:'getAdminBackups'};
 
 test('Admin keeps bounded total queries subscribed while full lists follow the active tab',async()=>{
   const requests:string[]=[];const original=globalThis.fetch;
@@ -40,7 +40,7 @@ test('Admin keeps bounded total queries subscribed while full lists follow the a
     vm.runInNewContext(code,context);for(const[key,entry]of subscriptions){if(!seen.has(key)){entry.request.unsubscribe();subscriptions.delete(key);}}await Promise.all(pending);await tick();
   };
   try{
-    await render('members');assert.equal(requests.length,7);assert.equal(requests.filter(path=>path==='GET /user/users').length,2);console.log('MEASURE Admin initial Members requests: 7, including six persistent total subscriptions');
+    await render('members');assert.equal(requests.length,8);assert.equal(requests.filter(path=>path==='GET /user/users').length,2);assert.equal(requests.filter(path=>path==='GET /events/events/calendar-stats').length,1);console.log('MEASURE Admin initial Members requests: 8, including seven persistent count subscriptions');
     requests.length=0;await render('articles');assert.equal(requests.length,2);console.log('MEASURE Admin first Articles tab data requests: 2');
     requests.length=0;await render('members');assert.equal(requests.length,0);console.log('MEASURE Admin return to cached Members requests: 0');
     await store.dispatch(endpoint('updateUser').initiate({id:'other',body:{role_id:'role'}}));await tick();

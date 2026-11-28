@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import test from 'node:test';
 import ts from 'typescript';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 const read = (file) => readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
 const parse = (file) => ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
@@ -53,7 +55,7 @@ function harness(kind, { permissions = [], allowed = true, fetching = false, fai
     useCreateMemberPermissionMutation: mutation('createMember'), useUpdateMemberPermissionMutation: mutation('updateMember'),
   };
   evaluate(policyCode + '\n' + component.getText(sf).replace('export ', '') + '\nresult = AdminPermissionsEditor;', context);
-  return { calls, notices, queries, busy, query, render() { cursor = 0; return context.result({ kind, targetId, canManage: allowed, onBusyChange: (value) => busy.push(value) }); } };
+  return { calls, notices, queries, busy, query, profileQuery, render() { cursor = 0; return context.result({ kind, targetId, canManage: allowed, onBusyChange: (value) => busy.push(value) }); } };
 }
 function all(tree, type) {
   const result = [];
@@ -69,6 +71,21 @@ const toggle = (tree, index, checked) => {
 const save = (tree) => all(row(tree), 'button')[0].props.onClick();
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 const plain = (value) => JSON.parse(JSON.stringify(value));
+function markup(tree) {
+  const convert = node => {
+    if (Array.isArray(node)) return node.map(convert);
+    if (!node?.props) return node;
+    const { children, ...props } = node.props;
+    const renderedChildren = convert(children);
+    return React.createElement(node.type, props, ...(Array.isArray(renderedChildren) ? renderedChildren : [renderedChildren]));
+  };
+  return renderToStaticMarkup(convert(tree));
+}
+function assertEditableDropdowns(tree) {
+  const html = markup(tree);
+  assert.equal((html.match(/<select\b/g) || []).length, 28);
+  assert.doesNotMatch(html, /<fieldset[^>]*\sdisabled|<select[^>]*\sdisabled/);
+}
 
 for (const kind of ['role', 'member']) {
   test(`${kind}: loads only its target endpoint; renders all seven features and four labelled actions`, () => {
@@ -78,15 +95,17 @@ for (const kind of ['role', 'member']) {
     if (kind === 'member') assert.ok(all(tree, 'select').every((n) => n.props.value === 'inherit'));
     assert.equal(h.queries.find(([name]) => name === kind)[2].skip, false);
     assert.equal(h.queries.find(([name]) => name !== kind)[2].skip, true);
+    if (kind === 'member') assert.equal(h.queries.find(([name]) => name === kind)[2].refetchOnMountOrArgChange, true);
     assert.ok(all(tree, 'button').every((button) => button.props.type === 'button' && button.props.disabled));
   });
 
   test(`${kind}: missing row ${kind === 'role' ? 'creates the correct target permission' : 'preserves inheritance and blocks unsafe creation'}`, async () => {
     const h = harness(kind); let tree = h.render(); toggle(tree, 0, true); tree = h.render();
     if (kind === 'member') {
+      assertEditableDropdowns(tree);
       assert.equal(all(row(tree), 'button')[0].props.disabled, true); save(tree); await flush();
       assert.equal(h.calls.length, 0); assert.match(JSON.stringify(tree), /Inherited: Allow/);
-      assert.match(JSON.stringify(tree), /cannot be saved safely/); return;
+      assert.match(JSON.stringify(tree), /choose Allow or Deny for all four actions/); return;
     }
     assert.equal(all(row(tree), 'button')[0].props.disabled, false); save(tree); await flush();
     const owner = kind === 'role' ? { role_id: 'target' } : { user_id: 'target' };
@@ -126,6 +145,92 @@ test('failed saves preserve drafts and expose the original error without a succe
   assert.deepEqual(h.notices, [['error', 'Forbidden']]); assert.deepEqual(h.busy, [true, false]); assert.equal(h.calls.length, 1);
 });
 
+test('supported member dropdowns immediately retain Allow/Deny choices and save only changed fields', async () => {
+  const h = harness('member', { permissions: [{ id: 'row', user_id: 'target', feature: 'article', can_view: false, can_create: false, can_edit: true, can_delete: true }] });
+  let tree = h.render(); assert.equal(row(tree).props.disabled, false);
+  for (const [index, value] of [[0, true], [1, true], [2, false], [3, false]]) {
+    toggle(tree, index, value); tree = h.render();
+    assert.equal(all(row(tree), 'select')[index].props.value, String(value));
+  }
+  save(tree); await flush();
+  assert.deepEqual(plain(h.calls[0]), ['updateMember', { id: 'row', user_id: 'target', can_view: true, can_create: true, can_edit: false, can_delete: false }]);
+});
+
+test('empty direct rows render enabled dropdowns and create only after all four actions are explicitly chosen', async () => {
+  const h = harness('member'); let tree = h.render();
+  assertEditableDropdowns(tree); assert.equal(h.calls.length, 0);
+  for (const [index, value] of [[0, true], [1, false], [2, false], [3, false]]) {
+    toggle(tree, index, value); tree = h.render();
+    assert.equal(all(row(tree), 'select')[index].props.value, String(value));
+    assert.equal(all(row(tree), 'button')[0].props.disabled, index !== 3);
+    if (index !== 3) { save(tree); await flush(); assert.equal(h.calls.length, 0); }
+  }
+  save(tree); await flush();
+  assert.deepEqual(plain(h.calls), [['createMember', {user_id:'target',feature:'article',can_view:true,can_create:false,can_edit:false,can_delete:false}]]);
+  assertEditableDropdowns(h.render());
+});
+
+test('a row missing its record ID stays editable but cannot PATCH or create a duplicate', async () => {
+  const h = harness('member', {permissions:[{feature:'article',can_view:true,can_create:false,can_edit:false,can_delete:false}]});
+  let tree = h.render(); assertEditableDropdowns(tree);
+  for (let index=0; index<4; index++) { toggle(tree,index,false); tree=h.render(); }
+  assert.match(markup(tree), /record has no ID/); assert.equal(all(row(tree),'button')[0].props.disabled,true);
+  save(tree); await flush(); assert.equal(h.calls.length,0);
+});
+
+test('background permission/profile refresh permits local editing but waits to save until fresh data arrives', async () => {
+  for (const options of [{fetching:true}, {profileFetching:true}]) {
+    const h=harness('member',{permissions:[{id:'row',feature:'article',can_view:true}],...options});
+    let tree=h.render(); assertEditableDropdowns(tree); toggle(tree,0,false); tree=h.render();
+    assert.equal(all(row(tree),'select')[0].props.value,'false'); assert.equal(all(row(tree),'button')[0].props.disabled,true);
+    save(tree); await flush(); assert.equal(h.calls.length,0);
+    h.query.isFetching=false;h.profileQuery.isFetching=false;tree=h.render();assertEditableDropdowns(tree);
+    assert.equal(all(row(tree),'select')[0].props.value,'false'); assert.equal(all(row(tree),'button')[0].props.disabled,false);
+    save(tree);await flush();assert.equal(h.calls[0][1].can_view,false);
+  }
+});
+
+test('existing inherited actions with a record ID can be changed to Allow and Deny without touching other inherited actions',async()=>{
+  for(const value of [true,false]){
+    const h=harness('member',{permissions:[{id:'row',feature:'article',can_view:null,can_create:null,can_edit:null,can_delete:null}]});
+    let tree=h.render();assertEditableDropdowns(tree);toggle(tree,0,value);tree=h.render();
+    assert.equal(all(row(tree),'button')[0].props.disabled,false);save(tree);await flush();
+    assert.deepEqual(plain(h.calls[0][1]),{id:'row',user_id:'target',can_view:value});assert.equal(h.query.currentData[0].can_create,null);
+  }
+});
+
+test('Allow and Deny can preview Inherit but reset cannot persist or silently save other actions',async()=>{
+  for(const original of [true,false]){
+    const h=harness('member',{permissions:[{id:'row',feature:'article',can_view:original,can_create:false}]});let tree=h.render();
+    assertEditableDropdowns(tree);all(row(tree),'select')[0].props.onChange({target:{value:'inherit'}});tree=h.render();toggle(tree,1,true);tree=h.render();
+    assert.equal(all(row(tree),'select')[0].props.value,'inherit');assert.equal(all(row(tree),'button')[0].props.disabled,true);
+    assert.match(markup(tree),/Resetting a saved override/);save(tree);await flush();assert.equal(h.calls.length,0);
+  }
+});
+
+test('disabled-state explanations are translated in English and French',()=>{
+  for(const locale of ['en','fr']){
+    const messages=JSON.parse(read(`src/i18n/locales/${locale}.json`)).adminPanelPage.memberPermissions;
+    for(const key of ['inheritanceUnavailable','newOverrideUnavailable','missingRecordId','resetUnavailable','refreshing'])assert.equal(typeof messages[key],'string');
+  }
+});
+
+test('initial loading and failed queries render no actionable dropdowns; errors expose retry',()=>{
+  const loading=harness('member');loading.query.currentData=undefined;
+  assert.equal(loading.render().props.role,'status');assert.doesNotMatch(markup(loading.render()),/<select\b/);
+  const failed=harness('member',{failedQuery:true});const tree=failed.render();
+  assert.equal(tree.props.role,'alert');assert.doesNotMatch(markup(tree),/<select\b/);assert.match(markup(tree),/load failed|Retry Fetch/);
+  assert.equal(harness('member',{allowed:false}).render(),null);
+});
+
+test('active member save disables rendered parent fieldsets until completion and blocks duplicate submit',async()=>{
+  let resolve;const deferred=new Promise(done=>{resolve=done;});
+  const h=harness('member',{permissions:[{id:'row',feature:'article',can_view:true}],deferred});
+  let tree=h.render();assertEditableDropdowns(tree);toggle(tree,0,false);tree=h.render();save(tree);save(tree);
+  assert.equal(h.calls.length,1);assert.equal((markup(h.render()).match(/<fieldset[^>]*\sdisabled/g)||[]).length,7);
+  resolve();await flush();assertEditableDropdowns(h.render());
+});
+
 test('saving synchronously blocks duplicate submissions and disables toggles until completion', async () => {
   let resolve; const deferred = new Promise((done) => { resolve = done; });
   const h = harness('role', { deferred }); let tree = h.render(); toggle(tree, 0, true); tree = h.render(); save(tree); save(tree);
@@ -141,7 +246,7 @@ test('loading, errors, background fetching and lost authorization never permit w
     if (options.allowed === false || options.targetId === '') assert.equal(tree, null);
     else if (options.failedQuery) { assert.equal(tree.props.role, 'alert'); assert.equal(all(tree, 'input').length, 0); }
     else if (Object.hasOwn(options, 'permissions')) assert.equal(tree.props.role, 'status');
-    else assert.ok(all(tree, 'fieldset').every((n) => n.props.disabled));
+    else { assertEditableDropdowns(tree); assert.ok(all(tree, 'button').every(button => button.props.disabled)); }
     assert.equal(h.calls.length, 0);
   }
 });
@@ -202,13 +307,19 @@ test('member editor shows current server permissions while drafts preserve untou
   assert.equal(h.query.currentData[0].can_edit, false);
 });
 
-test('unsupported persisted reset is disabled; reverting an unsaved inherited action sends no mutation', async () => {
+test('saved-to-Inherit selection is editable but unsupported reset cannot be saved', async () => {
   const h = harness('member', {permissions: [{id: 'row', feature: 'article', can_view: true, can_create: null}]});
   let tree = h.render();
   const select = all(row(tree), 'select')[0];
-  assert.equal(all(select, 'option').find(option => option.props.value === 'inherit').props.disabled, true);
-  select.props.onChange({target: {value: 'inherit'}}); save(h.render()); await flush();
+  assertEditableDropdowns(tree);
+  assert.equal(all(select, 'option').find(option => option.props.value === 'inherit').props.disabled, undefined);
+  select.props.onChange({target: {value: 'inherit'}}); tree = h.render();
+  assert.equal(all(row(tree), 'select')[0].props.value, 'inherit');
+  assert.equal(all(row(tree), 'button')[0].props.disabled, true);
+  assert.match(JSON.stringify(tree), /Resetting a saved override to Inherit/);
+  save(tree); await flush();
   assert.equal(h.calls.length, 0);
+  all(row(tree), 'select')[0].props.onChange({target: {value: 'true'}}); tree = h.render();
   toggle(tree, 1, true); tree = h.render();
   all(row(tree), 'select')[1].props.onChange({target: {value: 'inherit'}});
   tree = h.render(); assert.equal(all(row(tree), 'button')[0].props.disabled, true);
@@ -222,7 +333,7 @@ test('member profile loading, mismatch, refresh and error fail closed for overri
     if (extra.profileError) assert.equal(tree.props.role, 'alert');
     else if (extra.profileId === null || extra.profileId === 'different') assert.equal(tree.props.role, 'status');
     else if (extra.profileFetching) {
-      assert.ok(all(tree, 'fieldset').every(field => field.props.disabled));
+      assertEditableDropdowns(tree);
       toggle(tree, 0, false); save(h.render()); await flush();
     }
     assert.equal(h.calls.length, 0);
