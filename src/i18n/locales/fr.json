@@ -1224,15 +1224,9 @@
       }
     },
     "memberPermissions": {
-      "allow": "Autoriser",
-      "deny": "Refuser",
-      "inherit": "Hériter",
-      "inheritedValue": "Hérité : {value}",
-      "effectiveValue": "Effectif : {value}",
-      "inheritanceUnavailable": "Autoriser et Refuser sont des dérogations personnelles explicites. Hériter suit le rôle. Une nouvelle dérogation exige un choix explicite Autoriser ou Refuser pour les quatre actions. Le retour à l’héritage d’une dérogation enregistrée n’est pas encore pris en charge. Les sélections non enregistrées ne modifient pas l’accès effectif, qui respecte aussi le statut du compte et les privilèges superutilisateur.",
-      "newOverrideUnavailable": "Pour créer la première dérogation, choisissez Autoriser ou Refuser pour les quatre actions, puis enregistrez. L’API existante crée une dérogation complète pour la fonctionnalité ; les actions laissées sur Hériter ne peuvent pas être enregistrées. Aucun enregistrement n’est créé avant votre validation.",
       "missingRecordId": "L’enregistrement de permission reçu n’a pas d’identifiant. Les sélections restent non enregistrées jusqu’à ce que l’API fournisse un identifiant valide.",
-      "resetUnavailable": "Le contrat API confirmé ne permet pas de rétablir l’héritage d’une dérogation enregistrée. Cette ligne ne peut pas être enregistrée avec cette sélection.",
+      "finalPermissionsUnavailable": "Les permissions actuelles sont indisponibles ou incomplètes. Rechargez les permissions de ce membre avant de les modifier.",
+      "savePermissions": "Enregistrer les permissions",
       "refreshing": "Actualisation des permissions en cours. Vous pouvez modifier vos sélections ; l’enregistrement sera disponible après l’actualisation.",
       "title": "Permissions du membre",
       "permissionsFor": "Permissions du membre",

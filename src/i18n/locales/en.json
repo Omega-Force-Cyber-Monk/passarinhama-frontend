@@ -1224,15 +1224,9 @@
       }
     },
     "memberPermissions": {
-      "allow": "Allow",
-      "deny": "Deny",
-      "inherit": "Inherit",
-      "inheritedValue": "Inherited: {value}",
-      "effectiveValue": "Effective: {value}",
-      "inheritanceUnavailable": "Allow and Deny are explicit personal overrides. Inherit follows the role. A new override requires explicit Allow or Deny choices for all four actions. Resetting a saved override to Inherit is not yet supported. Unsaved selections do not change effective access, which also respects account status and the superuser bypass.",
-      "newOverrideUnavailable": "To create the first override, choose Allow or Deny for all four actions, then save. The existing API creates a full feature override; actions left at Inherit cannot be saved. No record is created until you save.",
       "missingRecordId": "The returned permission record has no ID. Selections remain unsaved until the API provides a valid record ID.",
-      "resetUnavailable": "Resetting a saved override to Inherit is not supported by the confirmed API contract. This row cannot be saved with that selection.",
+      "finalPermissionsUnavailable": "Current permissions are unavailable or incomplete. Reload this member’s permissions before editing.",
+      "savePermissions": "Save Permissions",
       "refreshing": "Permissions are refreshing. You can edit your selections; saving is available after the refresh completes.",
       "title": "Member Permissions",
       "permissionsFor": "Permissions for member",

@@ -82,7 +82,7 @@ test('search rows and count exclude denied and unknown result types, regardless 
 test('new landing, publication and permission labels exist in both languages', () => {
   for (const locale of ['en', 'fr']) {
     const dictionary = JSON.parse(read(`src/i18n/locales/${locale}.json`));
-    for (const key of ['homePage.moduleLandingTitle', 'homePage.moduleLandingDescription', 'contentListing.creationPublicationPolicy', 'contentListing.existingPublicationPolicy', 'adminPanelPage.memberPermissions.inheritanceUnavailable', 'adminPanelPage.memberPermissions.newOverrideUnavailable', 'adminPanelPage.memberPermissions.inherit', 'adminPanelPage.memberPermissions.inheritedValue', 'adminPanelPage.memberPermissions.effectiveValue']) {
+    for (const key of ['homePage.moduleLandingTitle', 'homePage.moduleLandingDescription', 'contentListing.creationPublicationPolicy', 'contentListing.existingPublicationPolicy', 'adminPanelPage.memberPermissions.savePermissions', 'adminPanelPage.memberPermissions.finalPermissionsUnavailable', 'adminPanelPage.memberPermissions.missingRecordId', 'adminPanelPage.memberPermissions.refreshing']) {
       assert.equal(typeof key.split('.').reduce((value, part) => value?.[part], dictionary), 'string', `${locale}: ${key}`);
     }
   }
