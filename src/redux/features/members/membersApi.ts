@@ -325,7 +325,9 @@ export const membersApi = apiSlice.injectEndpoints({
           // Publish only a server-created row; opening the editor never creates
           // placeholders, IDs or permission records.
           dispatch(membersApi.util.updateQueryData('getMemberPermissions', { user_id }, rows => {
-            if (!rows.some(row => row.feature === feature)) rows.push(data);
+            const index = rows.findIndex(row => row.feature === feature);
+            if (index < 0) rows.push(data);
+            else if (rows[index].id == null && PERMISSION_ACTIONS.every(action => rows[index][action] === null)) rows[index] = data;
           }));
         } catch { /* The editor reports failed creation and retains its unsaved choices. */ }
       },

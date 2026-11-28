@@ -16,6 +16,7 @@ const component=source.statements.find(node=>ts.isFunctionDeclaration(node)&&nod
 const en=JSON.parse(read('src/i18n/locales/en.json'));
 const values=extra=>({can_view:true,can_create:false,can_edit:false,can_delete:false,...extra});
 const finalRows=(article=values())=>PERMISSION_FEATURES.map(feature=>({feature,...(feature==='article'?article:values({can_view:false}))}));
+const placeholders=()=>PERMISSION_FEATURES.map(feature=>({id:null,user_id:'target',feature,can_view:null,can_create:null,can_edit:null,can_delete:null}));
 const plain=value=>JSON.parse(JSON.stringify(value));
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 
@@ -29,7 +30,7 @@ function harness(kind='member', options={}) {
     calls.push([name,payload]);
     const error=typeof mutationError==='function'?mutationError(payload):mutationError;if(error)throw error;
     if(deferred)await deferred;
-    if(name.startsWith('create'))query.currentData=[...query.currentData,{id:'server-id',...payload}];
+    if(name.startsWith('create'))query.currentData=[...query.currentData.filter(row=>row.feature!==payload.feature),{id:'server-id',...payload}];
     else query.currentData=query.currentData.map(row=>row.id===payload.id?{...row,...payload}:row);
     return payload;
   }})];
@@ -56,6 +57,11 @@ const save=(tree,feature)=>all(row(tree,feature),'button')[0].props.onClick();
 const dirty=(tree,feature)=>!all(row(tree,feature),'button')[0].props.disabled;
 function markup(tree){function convert(node){if(Array.isArray(node))return node.map(convert);if(!node?.props)return node;const{children,...props}=node.props,rendered=convert(children);return React.createElement(node.type,props,...(Array.isArray(rendered)?rendered:[rendered]));}return renderToStaticMarkup(convert(tree));}
 function editable(tree){const html=markup(tree);assert.equal(all(tree,'input').length,28);assert.equal(all(tree,'select').length,0);assert.doesNotMatch(html,/<fieldset[^>]*\sdisabled|<input[^>]*\sdisabled/);assert.ok(all(tree,'input').every(input=>input.props.type==='checkbox'));}
+function savable(tree,feature='article'){
+  const section=row(tree,feature);assert.equal(section.props.disabled,false,'parent fieldset must permit input');
+  const button=all(section,'button')[0];assert.equal(button.props.disabled,false,'rendered Save button must be enabled');
+  assert.doesNotMatch(markup(section),/<(?:fieldset|button)[^>]*\sdisabled(?:=|[\s>])/);
+}
 
 for(const kind of ['role','member']) {
   test(`${kind}: seven features use labelled checkboxes, correct queries and no initial mutation`,()=>{
@@ -120,12 +126,30 @@ test('active save disables rendered fieldsets and synchronously rejects duplicat
   resolve();await flush();editable(h.render());assert.deepEqual(h.busy,[true,false]);
 });
 
-test('background direct/profile requests permit local checkbox edits but block writes until settled',async()=>{
-  for(const which of ['query','profileQuery']){
-    const h=harness();h[which].isFetching=true;let tree=h.render();editable(tree);toggle(tree,1,true);tree=h.render();assert.equal(inputs(tree)[1].props.checked,true);
-    assert.equal(dirty(tree),false);save(tree);await flush();assert.equal(h.calls.length,0);
-    h[which].isFetching=false;tree=h.render();assert.equal(dirty(tree),true);save(tree);await flush();assert.equal(h.calls.length,1);
+test('rendered member Save permits POST/PATCH and checked/unchecked edits while background reads remain pending',async()=>{
+  for(const records of [placeholders(),[{id:'existing',user_id:'target',feature:'article',...values()}]]){
+    for(const which of ['query','profileQuery','both'])for(const [index,checked]of[[0,false],[1,true]]){
+      const h=harness('member',{records});if(which!=='profileQuery')h.query.isFetching=true;if(which!=='query')h.profileQuery.isFetching=true;
+      let tree=h.render();editable(tree);toggle(tree,index,checked);tree=h.render();savable(tree);
+      assert.equal(inputs(tree)[index].props.checked,checked);save(tree);await flush();
+      const name=records[0].id?'updateMember':'createMember';
+      const payload=name==='updateMember'?{id:'existing',user_id:'target',[PERMISSION_ACTIONS[index]]:checked}:{user_id:'target',feature:'article',...values({[PERMISSION_ACTIONS[index]]:checked})};
+      assert.deepEqual(plain(h.calls),[[name,payload]]);assert.ok(h.query.isFetching||h.profileQuery.isFetching,'save must not wait for the reads');
+    }
   }
+});
+
+test('actual API inherited placeholders enable Save after one edit and become PATCH targets after successful POST',async()=>{
+  const h=harness('member',{records:placeholders(),finalPermissions:finalRows(values({can_edit:true}))});let tree=h.render();
+  assert.match(markup(tree),/No unsaved changes/);assert.doesNotMatch(markup(tree),/record has no ID/);
+  toggle(tree,1,true);tree=h.render();savable(tree);save(tree);await flush();
+  assert.deepEqual(plain(h.calls[0]),['createMember',{user_id:'target',feature:'article',can_view:true,can_create:true,can_edit:true,can_delete:false}]);
+  tree=h.render();toggle(tree,0,false);tree=h.render();savable(tree);save(tree);await flush();
+  assert.deepEqual(plain(h.calls[1]),['updateMember',{id:'server-id',user_id:'target',can_view:false}]);
+  const persisted=values({can_view:false,can_create:true,can_edit:true});
+  h.refresh(persisted);tree=h.render();assert.deepEqual(inputs(tree).map(input=>input.props.checked),[false,true,true,false]);
+  const reopened=harness('member',{records:plain(h.query.currentData),finalPermissions:finalRows(persisted)});
+  tree=reopened.render();assert.deepEqual(inputs(tree).map(input=>input.props.checked),[false,true,true,false]);assert.equal(dirty(tree),false);assert.equal(reopened.calls.length,0);
 });
 
 test('background final-profile refresh preserves edited actions and refreshes untouched POST values',async()=>{
@@ -163,7 +187,9 @@ test('initial loading, target mismatch, failed queries and authorization loss wi
 });
 
 test('malformed existing row IDs block saving without locking checkbox interaction or creating duplicates',async()=>{
-  const h=harness('member',{records:[{feature:'article',...values()}]});let tree=h.render();editable(tree);toggle(tree,0,false);tree=h.render();assert.equal(dirty(tree),false);assert.match(markup(tree),/record has no ID/);save(tree);await flush();assert.equal(h.calls.length,0);
+  for(const id of [undefined,null,'','   ']){
+    const h=harness('member',{records:[{id,feature:'article',...values()}]});let tree=h.render();editable(tree);toggle(tree,0,false);tree=h.render();assert.equal(dirty(tree),false);assert.match(markup(tree),/record has no ID/);save(tree);await flush();assert.equal(h.calls.length,0);
+  }
 });
 
 test('closing/reopening and distinct keyed member instances initialize fresh final values without shared drafts',()=>{

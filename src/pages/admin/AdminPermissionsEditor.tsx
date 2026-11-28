@@ -41,6 +41,10 @@ export function AdminPermissionsEditor({ kind, targetId, canManage, onBusyChange
   const profileUnavailable = kind === "member" && (member?.id !== targetId || profileQuery.isError);
   const refreshing = query.isFetching || (kind === "member" && profileQuery.isFetching);
   const profileVersion = profileQuery.fulfilledTimeStamp ?? 0;
+  const findRecord = (feature: string) => records?.find(row => row.feature === feature &&
+    // The member GET includes inherited placeholders: no saved ID and four null
+    // actions. These need POST on save, not a PATCH ID or a missing-ID lock.
+    !(kind === "member" && row.id == null && PERMISSION_ACTIONS.every(action => row[action] === null)));
   const readServerValues = (feature: string): ActionValues | undefined => {
     if (kind === "role") {
       const row = records?.find(record => record.feature === feature);
@@ -80,11 +84,14 @@ export function AdminPermissionsEditor({ kind, targetId, canManage, onBusyChange
   }, [kind, targetId, member?.permissions, profileVersion, profileQuery.isFetching, profileUnavailable, finalPermissionsAvailable, saving]);
 
   const savePermission = async (feature: string) => {
-    if (!canManage || !targetId || pending.current || !records || refreshing || query.isError || profileUnavailable || !finalPermissionsAvailable) return;
+    if (!canManage || !targetId || pending.current || !records || (kind === "role" && query.isFetching) || query.isError || profileUnavailable || !finalPermissionsAvailable) return;
     const draft = drafts[feature];
     if (!draft) return;
-    const record = records.find(row => row.feature === feature);
-    if (kind === "member" && record && !record.id) return;
+    const record = findRecord(feature);
+    if (kind === "member" && record && (typeof record.id !== "string" || !record.id.trim())) {
+      toast.error(translate("adminPanelPage.memberPermissions.missingRecordId"));
+      return;
+    }
     const changes = Object.fromEntries(PERMISSION_ACTIONS
       .filter(action => draft.values[action] !== draft.original[action])
       .map(action => [action, draft.values[action]]));
@@ -132,14 +139,15 @@ export function AdminPermissionsEditor({ kind, targetId, canManage, onBusyChange
   return <div className="min-w-0 space-y-4" aria-busy={saving || refreshing || profileUnavailable}>
     <p className="text-xs text-slate-500">{translate(`adminPanelPage.${kind === "role" ? "rolePermissions" : "memberPermissions"}.permissionsHint`)}</p>
     {kind === "member" && refreshing && <p role="status" className="text-xs text-slate-500">{translate("adminPanelPage.memberPermissions.refreshing")}</p>}
+    {kind === "member" && saving && <p role="status" className="text-xs text-slate-500">{translate("adminPanelPage.memberPermissions.saving")}</p>}
     {PERMISSION_FEATURES.map((feature) => {
-      const record = records.find(row => row.feature === feature);
+      const record = findRecord(feature);
       const serverValues = readServerValues(feature)!;
       const draft = drafts[feature];
       const values = draft?.values ?? serverValues;
       const original = draft?.original ?? serverValues;
       const dirty = PERMISSION_ACTIONS.some(action => values[action] !== original[action]);
-      const missingRecordId = kind === "member" && Boolean(record && !record.id);
+      const missingRecordId = kind === "member" && Boolean(record && (typeof record.id !== "string" || !record.id.trim()));
       return <fieldset key={feature} disabled={saving || profileUnavailable || (kind === "role" && query.isFetching)} className="min-w-0 rounded-2xl border border-slate-200 p-4">
         <legend className="px-2 text-sm font-bold">{translate(`adminPanelPage.rolePermissions.features.${feature}`)}</legend>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -155,7 +163,8 @@ export function AdminPermissionsEditor({ kind, targetId, canManage, onBusyChange
           </label>)}
         </div>
         {missingRecordId && <p className="mt-3 text-xs text-slate-500">{translate("adminPanelPage.memberPermissions.missingRecordId")}</p>}
-        <button type="button" disabled={!dirty || saving || refreshing || profileUnavailable || missingRecordId} onClick={() => { void savePermission(feature); }} className="mt-3 rounded-xl bg-slate-900 px-4 py-3 text-xs font-bold text-white focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50">
+        {kind === "member" && !dirty && !saving && !missingRecordId && <p className="mt-3 text-xs text-slate-500">{translate("adminPanelPage.memberPermissions.noChanges")}</p>}
+        <button type="button" disabled={!dirty || saving || (kind === "role" && query.isFetching) || profileUnavailable || missingRecordId} onClick={() => { void savePermission(feature); }} className="mt-3 rounded-xl bg-slate-900 px-4 py-3 text-xs font-bold text-white focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50">
           {translate(kind === "member" ? "adminPanelPage.memberPermissions.savePermissions" : "adminPanelPage.rolePermissions.savePermission")}
         </button>
       </fieldset>;

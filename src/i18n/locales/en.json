@@ -1227,7 +1227,9 @@
       "missingRecordId": "The returned permission record has no ID. Selections remain unsaved until the API provides a valid record ID.",
       "finalPermissionsUnavailable": "Current permissions are unavailable or incomplete. Reload this member’s permissions before editing.",
       "savePermissions": "Save Permissions",
-      "refreshing": "Permissions are refreshing. You can edit your selections; saving is available after the refresh completes.",
+      "refreshing": "Permissions are refreshing. You can continue editing and saving your changes.",
+      "saving": "Saving permissions…",
+      "noChanges": "No unsaved changes. Change a checkbox to enable Save Permissions.",
       "title": "Member Permissions",
       "permissionsFor": "Permissions for member",
       "permissionsHint": "Update feature access for this member and save each feature row."

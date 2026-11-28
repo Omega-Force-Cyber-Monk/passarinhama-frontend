@@ -1227,7 +1227,9 @@
       "missingRecordId": "L’enregistrement de permission reçu n’a pas d’identifiant. Les sélections restent non enregistrées jusqu’à ce que l’API fournisse un identifiant valide.",
       "finalPermissionsUnavailable": "Les permissions actuelles sont indisponibles ou incomplètes. Rechargez les permissions de ce membre avant de les modifier.",
       "savePermissions": "Enregistrer les permissions",
-      "refreshing": "Actualisation des permissions en cours. Vous pouvez modifier vos sélections ; l’enregistrement sera disponible après l’actualisation.",
+      "refreshing": "Actualisation des permissions en cours. Vous pouvez continuer à modifier et à enregistrer vos changements.",
+      "saving": "Enregistrement des permissions…",
+      "noChanges": "Aucune modification non enregistrée. Modifiez une case pour activer l’enregistrement des permissions.",
       "title": "Permissions du membre",
       "permissionsFor": "Permissions du membre",
       "permissionsHint": "Mettez à jour l'accès par fonctionnalité pour ce membre puis enregistrez chaque ligne."

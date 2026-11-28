@@ -208,3 +208,35 @@ test('rejected first override creation leaves the inherited feature without fabr
     }finally{subscription.unsubscribe();}
   });
 });
+
+test('POST replaces an inherited null-ID placeholder with the server row before refetch, then PATCH and reopen persist false', { timeout: 5000 }, async () => {
+  const gate=deferred();let reads=0;const writes=[];
+  const placeholder={id:null,user_id:'member-a',feature:'article',can_view:null,can_create:null,can_edit:null,can_delete:null};
+  let saved;
+  const fields={user_id:'member-a',feature:'article',can_view:true,can_create:true,can_edit:true,can_delete:false};
+  await fixture(async request=>{
+    const path=new URL(request.url).pathname;
+    if(path==='/user/users/me')return json(actor);
+    if(request.method==='POST'){
+      const body=await request.json();writes.push(['POST',path,body]);saved={id:'server-id',...body};return json(saved);
+    }
+    if(request.method==='PATCH'){
+      const body=await request.json();writes.push(['PATCH',path,body]);saved={...saved,...body};return json(saved);
+    }
+    reads++;if(reads>1)await gate.promise;return json([saved??placeholder]);
+  },async()=>{
+    const args={user_id:'member-a'};const subscription=store.dispatch(membersApi.endpoints.getMemberPermissions.initiate(args));
+    try{
+      await subscription;assert.deepEqual(membersApi.endpoints.getMemberPermissions.select(args)(store.getState()).data,[placeholder]);
+      await store.dispatch(membersApi.endpoints.createMemberPermission.initiate(fields)).unwrap();
+      const rows=membersApi.endpoints.getMemberPermissions.select(args)(store.getState()).data;
+      assert.equal(rows.length,1);assert.equal(rows[0].id,'server-id');assert.equal(rows[0].can_edit,true);
+      await store.dispatch(membersApi.endpoints.updateMemberPermission.initiate({id:rows[0].id,user_id:'member-a',can_view:false})).unwrap();
+      assert.deepEqual(writes,[['POST','/user/user-permissions',fields],['PATCH','/user/user-permissions/server-id',{can_view:false}]]);
+      gate.resolve();await until(()=>membersApi.endpoints.getMemberPermissions.select(args)(store.getState()).status==='fulfilled');
+      subscription.unsubscribe();
+      const reopened=store.dispatch(membersApi.endpoints.getMemberPermissions.initiate(args,{forceRefetch:true}));
+      try{await reopened;assert.deepEqual(membersApi.endpoints.getMemberPermissions.select(args)(store.getState()).data,[{id:'server-id',...fields,can_view:false}]);}finally{reopened.unsubscribe();}
+    }finally{gate.resolve();subscription.unsubscribe();}
+  });
+});
